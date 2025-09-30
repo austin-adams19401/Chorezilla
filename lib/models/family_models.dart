@@ -1,4 +1,16 @@
+// lib/models/family_models.dart
 enum MemberRole { parent, child }
+
+class Family {
+  final String id;
+  String name;
+  final DateTime createdAt;
+  Family({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+  });
+}
 
 class Member {
   final String id;
@@ -6,8 +18,9 @@ class Member {
   String name;
   MemberRole role;
   String avatar;        // emoji or asset key
-  bool usesThisDevice;  // will use this device
-  String? pinHash;      // null => no PIN set
+  bool usesThisDevice;
+  bool requiresPin;
+  String? pin;          // store hashed later; plaintext for MVP
 
   Member({
     required this.id,
@@ -16,6 +29,7 @@ class Member {
     required this.role,
     required this.avatar,
     this.usesThisDevice = true,
-    this.pinHash,
+    this.requiresPin = false,
+    this.pin,
   });
 }

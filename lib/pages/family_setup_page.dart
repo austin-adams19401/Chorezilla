@@ -118,7 +118,7 @@ class _FamilySetupPageState extends State<FamilySetupPage> {
                   );
                   return;
                 }
-                Navigator.of(context).pushReplacementNamed('/home');
+                Navigator.of(context).pushReplacementNamed('/parent');
               },
             ),
           ],
@@ -130,6 +130,7 @@ class _FamilySetupPageState extends State<FamilySetupPage> {
 
 class _AddMemberCard extends StatelessWidget {
   const _AddMemberCard({
+    super.key,
     required this.nameCtrl,
     required this.role,
     required this.setRole,
@@ -148,7 +149,9 @@ class _AddMemberCard extends StatelessWidget {
   final ValueChanged<bool> setUsesThisDevice;
   final String avatar;
   final List<String> avatars;
+  final ValueChanged<String> setAvatar;
   final VoidCallback onAdd;
+
 
   @override
   Widget build(BuildContext context) {

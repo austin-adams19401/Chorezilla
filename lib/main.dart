@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'themes/app_theme.dart';
-import 'pages/home_screen.dart';
 import 'auth/login_page.dart';
 import 'auth/register_page.dart';
 import 'pages/family_setup_page.dart';
+import 'pages/parent_dashboard.dart';
+import 'pages/kid_dashboard.dart';
 import 'state/app_state.dart';
 
 void main() {
@@ -35,7 +36,8 @@ class Chorezilla extends StatelessWidget {
         '/login': (_) => const LoginPage(),
         '/register': (_) => const RegisterPage(),
         '/family-setup': (_) => const FamilySetupPage(),
-        '/home': (_) => const HomeScreen(),
+        '/parent': (_) => const ParentDashboardPage(),
+        '/kid': (_) => const KidDashboardPage(),
       },
 
       // Start here (don’t set `home:` when using initialRoute)
