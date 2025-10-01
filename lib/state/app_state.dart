@@ -144,13 +144,12 @@ void addChore({
     points: points,
     schedule: schedule,
     daysOfWeek: daysOfWeek != null ? Set<int>.from(daysOfWeek) : {},
-    assigneeIds: Set<String>.from(assigneeIds), // <-- copy
+    assigneeIds: Set<String>.from(assigneeIds),
     icon: icon,
     iconColor: iconColor,
   ));
   notifyListeners();
 }
-
 
   void updateChore({
     required String choreId,
@@ -213,7 +212,6 @@ void addChore({
       id: _id(),
       choreId: choreId,
       memberId: memberId,
-      // Noon avoids DST edge cases
       completedAt: DateTime(day.year, day.month, day.day, 12),
     ));
     notifyListeners();
