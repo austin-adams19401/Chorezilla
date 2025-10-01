@@ -3,7 +3,11 @@ import 'package:chorezilla/models/chore_models.dart';
 import 'package:chorezilla/models/family_models.dart';
 
 class ChoreCard extends StatelessWidget {
-  const ChoreCard({super.key, required this.chore, required this.assignees});
+  const ChoreCard({
+    super.key,
+    required this.chore,
+    required this.assignees,
+  });
 
   final Chore chore;
   final List<Member> assignees;
@@ -25,27 +29,36 @@ class ChoreCard extends StatelessWidget {
                 backgroundColor: cs.secondaryContainer,
                 child: Icon(
                   chore.icon,
-                  color: chore.iconColor ?? cs.onSecondaryContainer, // <-- use saved color
+                  color: chore.iconColor ?? cs.onSecondaryContainer,
                 ),
               )
             : null,
-        title: Text(chore.title, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('${chore.points} pts • ${chore.frequency.name}'),
+        title: Text(
+          chore.title,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text('${chore.points} pts • ${scheduleLabel(chore)}'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             ...assignees.take(4).map((m) => Padding(
-              padding: const EdgeInsets.only(left: 4),
-              child: CircleAvatar(
-                radius: 14,
-                backgroundColor: m.role == MemberRole.child ? cs.tertiaryContainer : cs.secondaryContainer,
-                child: Text(m.avatar, style: const TextStyle(fontSize: 16)),
-              ),
-            )),
+                  padding: const EdgeInsets.only(left: 4),
+                  child: CircleAvatar(
+                    radius: 14,
+                    backgroundColor: m.role == MemberRole.child
+                        ? cs.tertiaryContainer
+                        : cs.secondaryContainer,
+                    child: Text(m.avatar, style: const TextStyle(fontSize: 16)),
+                  ),
+                )),
             if (assignees.length > 4)
               Padding(
                 padding: const EdgeInsets.only(left: 6),
-                child: Text('+${assignees.length - 4}', style: TextStyle(color: cs.onSurfaceVariant)),
+                child: Text(
+                  '+${assignees.length - 4}',
+                  style: TextStyle(color: cs.onSurfaceVariant),
+                ),
               ),
           ],
         ),

@@ -1,15 +1,23 @@
 import 'package:flutter/material.dart';
 
-enum ChoreFrequency { once, daily, weekly }
+/// When is the chore due?
+enum ChoreSchedule { daily, weeklyAny, customDays }
 
 class Chore {
   final String id;
   String title;
   int points;
-  ChoreFrequency frequency;
 
+  /// Daily, Weekly (any day once per week), or specific weekdays.
+  ChoreSchedule schedule;
+
+  /// For customDays: 1=Mon … 7=Sun (DateTime.weekday)
+  final Set<int> daysOfWeek;
+
+  /// Member IDs assigned to this chore (multi-assignee)
   final Set<String> assigneeIds;
 
+  /// Visuals
   IconData? icon;
   Color? iconColor;
 
@@ -17,14 +25,16 @@ class Chore {
     required this.id,
     required this.title,
     required this.points,
-    required this.frequency,
+    required this.schedule,
+    Set<int>? daysOfWeek,
     Set<String>? assigneeIds,
     this.icon,
     this.iconColor,
-  }) : assigneeIds = assigneeIds ?? <String>{};
+  })  : daysOfWeek  = {...?daysOfWeek},     // <-- copy to a new Set
+        assigneeIds = {...?assigneeIds};    // <-- copy to a new Set
 }
 
-/// Simple completion record (MVP)
+/// Completion record
 class ChoreCompletion {
   final String id;
   final String choreId;
@@ -39,29 +49,48 @@ class ChoreCompletion {
   });
 }
 
-/// Quick-pick templates (you can tweak this list anytime)
+String scheduleLabel(Chore c) {
+  const names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  switch (c.schedule) {
+    case ChoreSchedule.daily:
+      return 'Daily';
+    case ChoreSchedule.weeklyAny:
+      if (c.daysOfWeek.isEmpty) return 'Weekly (any day)';
+      final sorted = c.daysOfWeek.toList()..sort();
+      if (sorted.length == 1) return 'Weekly (${names[sorted.first - 1]})';
+      return 'Weekly (${sorted.map((d) => names[d - 1]).join(', ')})';
+    case ChoreSchedule.customDays:
+      final sorted = c.daysOfWeek.toList()..sort();
+      return sorted.isEmpty ? 'Custom (none)'
+                            : sorted.map((d)=>names[d-1]).join(', ');
+  }
+}
+
+
+/// Quick-pick templates
 class ChoreTemplate {
   final String title;
   final int points;
-  final ChoreFrequency frequency;
+  final ChoreSchedule schedule;
+  final Set<int> daysOfWeek; // empty unless customDays
   final IconData icon;
   const ChoreTemplate({
     required this.title,
     required this.points,
-    required this.frequency,
+    required this.schedule,
+    this.daysOfWeek = const {},
     required this.icon,
   });
 }
 
 const kSuggestedChores = <ChoreTemplate>[
-  ChoreTemplate(title: 'Make bed',        points: 5,  frequency: ChoreFrequency.daily,  icon: Icons.bed_outlined),
-  ChoreTemplate(title: 'Brush teeth',     points: 3,  frequency: ChoreFrequency.daily,  icon: Icons.brush),
-  ChoreTemplate(title: 'Feed pet',        points: 5,  frequency: ChoreFrequency.daily,  icon: Icons.pets),
-  ChoreTemplate(title: 'Dishes',          points: 7,  frequency: ChoreFrequency.daily,  icon: Icons.local_dining),
-  ChoreTemplate(title: 'Take out trash',  points: 6,  frequency: ChoreFrequency.weekly, icon: Icons.delete_outline),
-  ChoreTemplate(title: 'Vacuum',          points: 8,  frequency: ChoreFrequency.weekly, icon: Icons.cleaning_services), // if missing, swap to Icons.cleaning_services
-  ChoreTemplate(title: 'Clean room',      points: 8,  frequency: ChoreFrequency.weekly, icon: Icons.home),
-  ChoreTemplate(title: 'Laundry',         points: 8,  frequency: ChoreFrequency.weekly, icon: Icons.local_laundry_service),
-  ChoreTemplate(title: 'Homework',        points: 10, frequency: ChoreFrequency.daily,  icon: Icons.school),
-  ChoreTemplate(title: 'Water plants',    points: 4,  frequency: ChoreFrequency.weekly, icon: Icons.grass),
+  ChoreTemplate(title: 'Make bed',       points: 5, schedule: ChoreSchedule.daily,      icon: Icons.bed_outlined),
+  ChoreTemplate(title: 'Brush teeth',    points: 3, schedule: ChoreSchedule.daily,      icon: Icons.brush),
+  ChoreTemplate(title: 'Dishes',         points: 7, schedule: ChoreSchedule.daily,      icon: Icons.local_dining),
+  // Custom-day examples
+  ChoreTemplate(title: 'Take out trash', points: 6, schedule: ChoreSchedule.customDays, daysOfWeek: {1,4}, icon: Icons.delete_outline), // Mon/Thu
+  ChoreTemplate(title: 'Vacuum',         points: 8, schedule: ChoreSchedule.customDays, daysOfWeek: {6},   icon: Icons.cleaning_services),
+  ChoreTemplate(title: 'Laundry',        points: 8, schedule: ChoreSchedule.customDays, daysOfWeek: {3,6}, icon: Icons.local_laundry_service),
+  ChoreTemplate(title: 'Homework',       points: 10, schedule: ChoreSchedule.daily,     icon: Icons.school),
+  ChoreTemplate(title: 'Water plants',   points: 4, schedule: ChoreSchedule.customDays, daysOfWeek: {2},   icon: Icons.grass),
 ];

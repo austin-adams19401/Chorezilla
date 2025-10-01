@@ -101,7 +101,7 @@ Future<(IconData, Color?)?> pickChoreIcon(
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: sel ? cs.primaryContainer : cs.surfaceVariant,
+                            color: sel ? cs.primaryContainer : cs.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: sel ? cs.primary : Colors.transparent, width: 2),
                           ),
@@ -127,7 +127,7 @@ Future<(IconData, Color?)?> pickChoreIcon(
                         spacing: 10,
                         runSpacing: 10,
                         children: swatches.map((c) {
-                          final sel = selectedColor?.value == c.value;
+                          final sel = selectedColor?.b == c.b;
                           return GestureDetector(
                             onTap: () => setSB(() => selectedColor = c),
                             child: Container(

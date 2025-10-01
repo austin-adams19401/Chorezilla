@@ -1,79 +1,35 @@
-import 'package:chorezilla/models/chore_models.dart';
-import 'package:chorezilla/models/family_models.dart';
-import 'package:flutter/foundation.dart';
+// lib/state/app_state.dart
 import 'package:flutter/material.dart';
+import 'package:chorezilla/models/family_models.dart';
+import 'package:chorezilla/models/chore_models.dart';
 
+/// Simple id helper
 String _id() => DateTime.now().microsecondsSinceEpoch.toString();
 
+/// Date helpers (normalize to midnight for comparisons)
+DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+/// Monday-start week
+DateTime _startOfWeek(DateTime d) {
+  final x = _dateOnly(d);
+  final diff = x.weekday - DateTime.monday; // 0..6
+  return x.subtract(Duration(days: diff));
+}
+
 class AppState extends ChangeNotifier {
+  // =========================
+  // Family / Members
+  // =========================
   Family? _family;
   final List<Member> _members = [];
-  String? _currentProfileId;
+  String? _currentProfileId; // active local profile (kid dashboard target)
 
-  final List<Chore> _chores = [];
-  final List<ChoreCompletion> _completions = [];
-
-  // ---- Getters ----
   Family? get family => _family;
   List<Member> get members => List.unmodifiable(_members);
   String? get currentProfileId => _currentProfileId;
   Member? get currentProfile =>
       _members.where((m) => m.id == _currentProfileId).firstOrNull;
 
-  List<Chore> get chores => List.unmodifiable(_chores);
-
-  void addChore({
-    required String title,
-    required int points,
-    required ChoreFrequency frequency,
-    required Set<String> assigneeIds,
-    IconData? icon,
-    Color? iconColor,
-  }) {
-    final c = Chore(
-      id: _id(),
-      title: title,
-      points: points,
-      frequency: frequency,
-      assigneeIds: assigneeIds,
-      icon: icon,
-      iconColor: iconColor
-    );
-    _chores.add(c);
-    notifyListeners();
-  }
-
-    void assignMembersToChore(String choreId, Set<String> memberIds) {
-    final c = _chores.firstWhere((x) => x.id == choreId);
-    c.assigneeIds.addAll(memberIds);
-    notifyListeners();
-  }
-
-  void updateChore({
-    required String choreId,
-    String? title,
-    int? points,
-    ChoreFrequency? frequency,
-    IconData? icon,
-    Color? iconColor,
-  }) {
-    final c = _chores.firstWhere((x) => x.id == choreId);
-    if (title != null) c.title = title;
-    if (points != null) c.points = points;
-    if (frequency != null) c.frequency = frequency;
-    if (icon != null) c.icon = icon;
-    if (iconColor != null) c.iconColor = iconColor;
-    notifyListeners();
-  }
-
-  // Convenience lookups
-  Member? memberById(String id) =>
-      _members.where((m) => m.id == id).firstOrNull;
-
-  List<Member> membersByIds(Iterable<String> ids) =>
-      ids.map(memberById).whereType<Member>().toList();
-
-  // ---- Family/Member methods ----
   void createOrUpdateFamily(String name) {
     if (_family == null) {
       _family = Family(id: _id(), name: name, createdAt: DateTime.now());
@@ -91,7 +47,8 @@ class AppState extends ChangeNotifier {
     bool requiresPin = false,
     String? pin,
   }) {
-    final fam = _family ?? Family(id: _id(), name: 'Family', createdAt: DateTime.now());
+    final fam =
+        _family ?? Family(id: _id(), name: 'Family', createdAt: DateTime.now());
     _family ??= fam;
 
     final m = Member(
@@ -135,14 +92,15 @@ class AppState extends ChangeNotifier {
   }
 
   bool verifyPin(String memberId, String input) {
-    final m = _members.firstWhere((e) => e.id == memberId, orElse: () => throw StateError('Missing member'));
+    final m = _members.firstWhere((e) => e.id == memberId,
+        orElse: () => throw StateError('Missing member'));
     if (!m.requiresPin) return true;
     return (m.pin ?? '') == input;
   }
 
   void removeMember(String memberId) {
     _members.removeWhere((m) => m.id == memberId);
-    // Clean up assignees & completions
+    // Clean up assignees/completions for that member
     for (final c in _chores) {
       c.assigneeIds.remove(memberId);
     }
@@ -157,6 +115,72 @@ class AppState extends ChangeNotifier {
     _currentProfileId = memberId;
     notifyListeners();
   }
+
+  Member? memberById(String id) =>
+      _members.where((m) => m.id == id).firstOrNull;
+  List<Member> membersByIds(Iterable<String> ids) =>
+      ids.map(memberById).whereType<Member>().toList();
+
+  // =========================
+  // Chores / Completions
+  // =========================
+  final List<Chore> _chores = [];
+  final List<ChoreCompletion> _completions = [];
+
+  List<Chore> get chores => List.unmodifiable(_chores);
+
+void addChore({
+  required String title,
+  required int points,
+  required ChoreSchedule schedule,
+  Set<int>? daysOfWeek,
+  required Set<String> assigneeIds,
+  IconData? icon,
+  Color? iconColor,
+}) {
+  _chores.add(Chore(
+    id: _id(),
+    title: title,
+    points: points,
+    schedule: schedule,
+    daysOfWeek: daysOfWeek != null ? Set<int>.from(daysOfWeek) : {},
+    assigneeIds: Set<String>.from(assigneeIds), // <-- copy
+    icon: icon,
+    iconColor: iconColor,
+  ));
+  notifyListeners();
+}
+
+
+  void updateChore({
+    required String choreId,
+    String? title,
+    int? points,
+    ChoreSchedule? schedule,
+    Set<int>? daysOfWeek,
+    IconData? icon,
+    Color? iconColor,
+  }) {
+    final c = _chores.firstWhere((x) => x.id == choreId);
+    if (title != null) c.title = title;
+    if (points != null) c.points = points;
+    if (schedule != null) c.schedule = schedule;
+    if (daysOfWeek != null) {
+      c.daysOfWeek
+        ..clear()
+        ..addAll(daysOfWeek);
+    }
+    if (icon != null) c.icon = icon;
+    if (iconColor != null) c.iconColor = iconColor;
+    notifyListeners();
+  }
+
+  void deleteChore(String choreId) {
+    _chores.removeWhere((x) => x.id == choreId);
+    _completions.removeWhere((x) => x.choreId == choreId);
+    notifyListeners();
+  }
+
   void toggleAssignee(String choreId, String memberId) {
     final c = _chores.firstWhere((x) => x.id == choreId);
     if (c.assigneeIds.contains(memberId)) {
@@ -167,9 +191,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void deleteChore(String choreId) {
-    _chores.removeWhere((x) => x.id == choreId);
-    _completions.removeWhere((x) => x.choreId == choreId);
+  void assignMembersToChore(String choreId, Set<String> memberIds) {
+    final c = _chores.firstWhere((x) => x.id == choreId);
+    c.assigneeIds.addAll(memberIds);
     notifyListeners();
   }
 
@@ -183,59 +207,98 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Simple derived data
+  /// Record completion on an arbitrary calendar day (used by parent grid taps).
+  void completeChoreOn(String choreId, String memberId, DateTime day) {
+    _completions.add(ChoreCompletion(
+      id: _id(),
+      choreId: choreId,
+      memberId: memberId,
+      // Noon avoids DST edge cases
+      completedAt: DateTime(day.year, day.month, day.day, 12),
+    ));
+    notifyListeners();
+  }
+
+  // -------- Queries / Derived --------
+
   List<Chore> choresForMember(String memberId) =>
       _chores.where((c) => c.assigneeIds.contains(memberId)).toList();
 
   int pointsForMemberAllTime(String memberId) {
     var total = 0;
     for (final comp in _completions.where((x) => x.memberId == memberId)) {
-      final chore = _chores.firstWhere((c) => c.id == comp.choreId, orElse: () => Chore(id: '', title: '', points: 0, frequency: ChoreFrequency.once));
+      final chore = _chores.firstWhere(
+        (c) => c.id == comp.choreId,
+        orElse: () => Chore(
+          id: '',
+          title: '',
+          points: 0,
+          schedule: ChoreSchedule.daily,
+        ),
+      );
       total += chore.points;
     }
     return total;
   }
 
-  // === Helpers for weekly grid ===
-DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+  bool wasCompletedOnDay(String choreId, String memberId, DateTime day) {
+    final t = _dateOnly(day);
+    return _completions.any((c) =>
+        c.choreId == choreId &&
+        c.memberId == memberId &&
+        _dateOnly(c.completedAt) == t);
+  }
 
-// Was this chore completed by member on a specific calendar day?
-bool wasCompletedOnDay(String choreId, String memberId, DateTime day) {
-  final target = _dateOnly(day);
-  return _completions.any((c) =>
-      c.choreId == choreId &&
-      c.memberId == memberId &&
-      _dateOnly(c.completedAt) == target);
+  bool wasCompletedInWeek(
+      String choreId, String memberId, DateTime anyDayInWeek) {
+    final s = _startOfWeek(anyDayInWeek);
+    final e = s.add(const Duration(days: 6));
+    return _completions.any((c) {
+      if (c.choreId != choreId || c.memberId != memberId) return false;
+      final d = _dateOnly(c.completedAt);
+      return !d.isBefore(s) && !d.isAfter(e);
+    });
+  }
+
+  /// Is this chore scheduled on [day], independent of completions?
+  bool isScheduledOnDate(Chore chore, DateTime day) {
+    switch (chore.schedule) {
+      case ChoreSchedule.daily:
+        return true;
+      case ChoreSchedule.weeklyAny:
+        // If no weekday chosen => any day in the week.
+        // If one (or more) weekdays chosen => only those day(s).
+        return chore.daysOfWeek.isEmpty
+            ? true
+            : chore.daysOfWeek.contains(day.weekday);
+      case ChoreSchedule.customDays:
+        return chore.daysOfWeek.contains(day.weekday);
+    }
+  }
+
+  /// Should the chore appear for [memberId] on [day]?
+  /// This combines scheduling with once-per-week gating (for weekly-any).
+  bool isApplicableForMemberOnDate(
+      Chore chore, String memberId, DateTime day) {
+    if (!isScheduledOnDate(chore, day)) return false;
+
+    if (chore.schedule == ChoreSchedule.weeklyAny) {
+      if (chore.daysOfWeek.isEmpty) {
+        // Weekly (any day): show until they finish once in the week.
+        final doneThisWeek = wasCompletedInWeek(chore.id, memberId, day);
+        return !doneThisWeek;
+      } else {
+        // Weekly on a specific day(s): show on those day(s) (no week-wide gating).
+        return true;
+      }
+    }
+
+    // Daily / Custom days: show on scheduled day
+    return true;
+  }
 }
 
-// Did member complete this chore at least once between [start,end] (inclusive)?
-bool wasCompletedInRange(String choreId, String memberId, DateTime start, DateTime end) {
-  final s = _dateOnly(start);
-  final e = _dateOnly(end);
-  return _completions.any((c) {
-    if (c.choreId != choreId || c.memberId != memberId) return false;
-    final d = _dateOnly(c.completedAt);
-    return !d.isBefore(s) && !d.isAfter(e);
-  });
-}
-
-// Mark completion on an arbitrary day (used by parent grid taps)
-void completeChoreOn(String choreId, String memberId, DateTime day) {
-  _completions.add(ChoreCompletion(
-    id: _id(),
-    choreId: choreId,
-    memberId: memberId,
-    // normalize to noon to avoid timezone DST edges
-    completedAt: DateTime(day.year, day.month, day.day, 12, 0, 0),
-  ));
-  notifyListeners();
-}
-}
-
-// Keep this tiny helper
+// Iterable helper (avoids bringing in package:collection)
 extension _FirstOrNull<E> on Iterable<E> {
   E? get firstOrNull => isEmpty ? null : first;
 }
-
-
-

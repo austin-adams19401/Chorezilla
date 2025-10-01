@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
+import 'package:chorezilla/models/chore_models.dart'; // for scheduleLabel
 
-class KidDashboardPage extends StatelessWidget {
-  const KidDashboardPage({super.key});
+
+class ChildDashboardPage extends StatelessWidget {
+  const ChildDashboardPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +47,7 @@ class KidDashboardPage extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               tileColor: cs.surfaceContainerHighest,
               title: Text(c.title),
-              subtitle: Text('${c.points} pts • ${c.frequency.name}'),
+              subtitle: Text('${c.points} pts • ${scheduleLabel(c)}'),
               trailing: IconButton(
                 icon: const Icon(Icons.check_circle),
                 color: cs.primary,

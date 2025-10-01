@@ -4,8 +4,8 @@ import 'themes/app_theme.dart';
 import 'auth/login_page.dart';
 import 'auth/register_page.dart';
 import 'pages/family_setup_page.dart';
-import 'pages/parent_dashboard.dart';
-import 'pages/kid_dashboard.dart';
+import 'pages/parent_dashboard/parent_dashboard.dart';
+import 'pages/child_dashboard/child_dashboard.dart';
 import 'state/app_state.dart';
 
 void main() {
@@ -22,8 +22,9 @@ class Chorezilla extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bool isLoggedIn = false; // TODO: real auth
-    final startRoute = isLoggedIn ? '/home' : '/login';
+    // const bool isLoggedIn = false; 
+    // TODO: implement actual auth
+    final startRoute = '/login';
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -37,10 +38,9 @@ class Chorezilla extends StatelessWidget {
         '/register': (_) => const RegisterPage(),
         '/family-setup': (_) => const FamilySetupPage(),
         '/parent': (_) => const ParentDashboardPage(),
-        '/kid': (_) => const KidDashboardPage(),
+        '/kid': (_) => const ChildDashboardPage(),
       },
 
-      // Start here (don’t set `home:` when using initialRoute)
       initialRoute: startRoute,
     );
   }

@@ -18,7 +18,11 @@ class _FamilySetupPageState extends State<FamilySetupPage> {
   bool _usesThisDevice = true;
   String _avatar = '🦖';
 
-  final _avatars = ['🦖','🦄','🐱','🐶','🐵','🐼','🦊','🐯','🐸','🐨','🐰','🐮'];
+final _avatars = [
+  '🦖','🦄','🐱','🐶','🐵','🐼','🦊','🐯','🐸','🐨','🐰','🐮',
+  '🐷','🐤','🐙','🦁','🐢','🐞','🦉','🐝','🐬','🐧','🦋','🐳','+'
+];
+
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +47,7 @@ class _FamilySetupPageState extends State<FamilySetupPage> {
             TextField(
               controller: _familyCtrl,
               decoration: InputDecoration(
-                hintText: 'e.g., The Parkers',
+                hintText: 'e.g., The Adams',
                 filled: true,
                 fillColor: cs.surfaceContainerHighest,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -130,7 +134,6 @@ class _FamilySetupPageState extends State<FamilySetupPage> {
 
 class _AddMemberCard extends StatelessWidget {
   const _AddMemberCard({
-    super.key,
     required this.nameCtrl,
     required this.role,
     required this.setRole,
@@ -209,20 +212,20 @@ class _AddMemberCard extends StatelessWidget {
             Text('Pick an avatar', style: TextStyle(color: cs.onSurfaceVariant)),
             const SizedBox(height: 8),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 16,
+              runSpacing: 16,
               children: avatars.map((a) {
                 final selected = a == avatar;
                 return GestureDetector(
                   onTap: () => setAvatar(a),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     decoration: BoxDecoration(
                       color: selected ? cs.tertiaryContainer : cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: selected ? cs.tertiary : Colors.transparent, width: 2),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: selected ? Colors.lightBlue : Colors.grey, width: 2),
                     ),
-                    child: Text(a, style: const TextStyle(fontSize: 20)),
+                    child: Text(a, style: const TextStyle(fontSize: 32)),
                   ),
                 );
               }).toList(),
@@ -263,7 +266,7 @@ class _MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
+    context.watch<AppState>();
     final cs = Theme.of(context).colorScheme;
 
     return Card(
