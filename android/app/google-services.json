@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "588085741239",
+    "project_id": "chorezilla-dev",
+    "storage_bucket": "chorezilla-dev.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:588085741239:android:7915b00b78dba9f25c2f32",
+        "android_client_info": {
+          "package_name": "com.chorezilla.chorezilla"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "588085741239-tetqvu3rths6h7s5paoj2qvvham46sfg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDfGQwOTXJsS2AW6sj2jv3_KIEL6TKIgfI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "588085741239-tetqvu3rths6h7s5paoj2qvvham46sfg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
