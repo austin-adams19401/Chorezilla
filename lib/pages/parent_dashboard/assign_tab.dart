@@ -17,7 +17,7 @@ class AssignTab extends StatefulWidget {
 class _AssignTabState extends State<AssignTab> {
   final _form = GlobalKey<FormState>();
   final _title = TextEditingController();
-  final _points = TextEditingController(text: '5');
+  final _difficultyLvl = TextEditingController(text: '5');
 
   ChoreSchedule _schedule = ChoreSchedule.daily;
   final Set<int> _days = {}; // 1..7 for weekly/custom
@@ -32,8 +32,7 @@ class _AssignTabState extends State<AssignTab> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text('Chores Overview'),
-        centerTitle: true,
+        title: Text('Assign Chores'),
       ),
       body: ListView(
         padding: EdgeInsets.all(15),
@@ -66,7 +65,7 @@ class _AssignTabState extends State<AssignTab> {
                             final cs = Theme.of(context).colorScheme;
                             setState(() {
                               _title.text  = c.title;
-                              _points.text = c.points.toString();
+                              _difficultyLvl.text = c.points.toString();
                               _schedule    = c.schedule;
                               _days
                                 ..clear()
@@ -93,7 +92,118 @@ class _AssignTabState extends State<AssignTab> {
               ),
               child: Padding(
                 padding: EdgeInsets.all(12), 
-              
+                child: Form(
+                  key: _form,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('New Chore',
+                      style: TextStyle(
+                        color: cs.secondary, fontWeight: FontWeight.w700,
+                      )),
+                      const SizedBox(height: 8),
+
+                      //Title
+                      TextFormField(
+                        controller: _title,
+                        decoration: InputDecoration(
+                          labelText: 'Chore Name..',
+                          filled: true,
+                          fillColor: cs.surfaceContainerHighest,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))
+                        ),
+                        onChanged: (_) => setState(() {}),
+                          validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter a name' : null, //null means no errors, input is valid
+                      ),
+                      
+                      const SizedBox(height: 8),
+
+                      //Schedule dropdown
+                      DropdownButtonFormField<ChoreSchedule>(
+                        initialValue: _schedule,
+                        isExpanded: true,
+                        borderRadius: BorderRadius.circular(12),
+                        dropdownColor: cs.surface,
+                        selectedItemBuilder: (_) => [
+                          _ScheduleOptionTile(icon: Icons.calendar_today_rounded, title: 'Daily', cs: cs, compact: true),
+                          _ScheduleOptionTile(icon: Icons.calendar_view_week_rounded, title: 'Weekly', cs: cs, compact: true),
+                          _ScheduleOptionTile(icon: Icons.tune_rounded, title: 'Custom Days', cs: cs, compact: true),
+                        ],
+                        items: [
+                          DropdownMenuItem(
+                            value: ChoreSchedule.daily,
+                            child: _ScheduleOptionTile(
+                              icon: Icons.calendar_today_rounded, title: 'Daily', subtitle: 'Shows every day', cs: cs),
+                          ),
+                          DropdownMenuItem(
+                            value: ChoreSchedule.weeklyAny,
+                            child: _ScheduleOptionTile(
+                              icon: Icons.calendar_view_week_rounded, title: 'Weekly', subtitle: 'Pick one day or “any”', cs: cs),
+                          ),
+                          DropdownMenuItem(
+                            value: ChoreSchedule.customDays,
+                            child: _ScheduleOptionTile(
+                              icon: Icons.tune_rounded, title: 'Custom Days', subtitle: 'Pick multiple weekdays', cs: cs),
+                          ),
+                        ],
+                        onChanged: (v) {
+                          if (v == null) return;
+                          setState(() {
+                            _schedule = v;
+                            if (_schedule == ChoreSchedule.daily) _days.clear();
+                          });
+                        },decoration: InputDecoration(
+                          labelText: 'Schedule',
+                          filled: true,
+                          fillColor: cs.surfaceContainerHighest,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+
+                      //Weekday row
+                      if (_schedule == ChoreSchedule.weeklyAny || _schedule == ChoreSchedule.customDays) ...[
+                        const SizedBox(height: 8,),
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: List.generate(7, (i) {
+                            const labels = [
+                              'Mon','Tue','Wed','Thu','Fri','Sat','Sun'
+                            ];
+                            final dayVal = i + 1; //Sets the days from 1-7 rather than 0-6
+                            final selection = _days.contains(dayVal);
+                            return Padding(
+                              padding: const EdgeInsets.all(1),
+                              child: FilterChip(
+                                label: Text(labels[i]),
+                                selected: selection,
+                                onSelected: (v) => setState(() {
+                                  if (_schedule == ChoreSchedule.weeklyAny) {
+                                    // Enforce single selection for weekly
+                                    _days.clear();
+                                    if (v) 
+                                    {
+                                      _days.add(dayVal);
+                                    }
+                                  } else {
+                                    if (v) {
+                                      _days.add(dayVal);
+                                    } else {
+                                      _days.remove(dayVal);
+                                    }
+                                  }                              
+                                }),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                    ],
+
+                  const SizedBox(height: 8,),
+
+                  ],
+                ))
               ),
             ),
         ],
@@ -105,4 +215,49 @@ class _AssignTabState extends State<AssignTab> {
     super.dispose();
   }
 
+}
+
+// In assign_tab.dart (below the state class)
+class _ScheduleOptionTile extends StatelessWidget {
+  const _ScheduleOptionTile({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    required this.cs,
+    this.compact = false, // use compact for selectedItemBuilder
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final ColorScheme cs;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final avatar = CircleAvatar(
+      radius: compact ? 12 : 14,
+      backgroundColor: cs.secondaryContainer,
+      child: Icon(icon, size: compact ? 14 : 16, color: cs.onSecondaryContainer),
+    );
+
+    return Row(
+      children: [
+        avatar,
+        const SizedBox(width: 8),
+        Expanded(
+          child: compact
+              ? Text(title, overflow: TextOverflow.ellipsis)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    if (subtitle != null)
+                      Text(subtitle!, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
 }
