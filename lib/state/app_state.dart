@@ -1,7 +1,13 @@
-// lib/state/app_state.dart
+// lib/state/app_state.dart (reorganized)
+import 'dart:async';
+import 'dart:math';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:chorezilla/models/family_models.dart';
 import 'package:chorezilla/models/chore_models.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Simple id helper
 String _id() => DateTime.now().microsecondsSinceEpoch.toString();
@@ -17,18 +23,231 @@ DateTime _startOfWeek(DateTime d) {
 }
 
 class AppState extends ChangeNotifier {
-  // =========================
-  // Family / Members
-  // =========================
-  Family? _family;
-  final List<Member> _members = [];
-  String? _currentProfileId; // active local profile (kid dashboard target)
+  String? _loadedUid;
+  bool _isLoading = false;
+  bool get isLoading => _isLoading;
 
+  Family? _family;
   Family? get family => _family;
-  List<Member> get members => List.unmodifiable(_members);
+
+  final List<Member> _members = [];
+  List<Member> get members => _members;
+
+  final List<Chore> _chores = [];
+  List<Chore> get chores => _chores;
+
+    // 0-9 A-Z code (len=6 by default)
+  String _makeCode([int len = 6]) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    final r = Random.secure();
+    return List.generate(len, (_) => chars[r.nextInt(chars.length)]).join();
+  }
+
+  Member? get currentProfile {
+  // 1) if a profile is selected, return that
+    if (_currentProfileId != null) {
+      final m = _members.firstWhere(
+        (e) => e.id == _currentProfileId,
+        orElse: () => _members.isEmpty ? null as Member : _members.first,
+      );
+      return m;
+    }
+    // 2) otherwise prefer a member marked usesThisDevice
+    final devicePick = _members.where((m) => m.usesThisDevice).firstOrNull;
+    if (devicePick != null) return devicePick;
+
+    // 3) otherwise first member, or null if empty
+    return _members.firstOrNull;
+  }
+
+  // =========================
+  // Light / Dark Theme
+  // =========================
+  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode get themeMode => _themeMode;
+
+    Future<void> loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getString('themeMode');
+    _themeMode = switch (v) {
+      'light' => ThemeMode.light,
+      'dark'  => ThemeMode.dark,
+      _       => ThemeMode.system,
+    };
+    notifyListeners();
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    notifyListeners();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('themeMode', switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark  => 'dark',
+      _               => 'system',
+    });
+    notifyListeners();
+  }
+
+  // ---------------- Family state ----------------
+  String? _currentProfileId;
   String? get currentProfileId => _currentProfileId;
-  Member? get currentProfile =>
-      _members.where((m) => m.id == _currentProfileId).firstOrNull;
+
+  set family(Family? value) {
+    _family = value;
+    notifyListeners();
+  }
+
+  set members(List<Member> value) {
+    _members
+      ..clear()
+      ..addAll(value);
+    notifyListeners();
+  }
+
+  set currentProfileId(String? value) {
+    _currentProfileId = value;
+    notifyListeners();
+  }
+
+  /// Hydrate this AppState from Firestore for an existing family.
+  /// Loads family doc (name, createdAt) + members (including flags).
+  /// Returns true on success so UI can await and then render.
+  Future<bool> loadFamilyFromFirestore(String familyId) async {
+    try {
+      final db = FirebaseFirestore.instance;
+
+      // ----- Family doc -----
+      final famDoc = await db.collection('families').doc(familyId).get();
+      final famData = famDoc.data();
+      if (famData == null) return false;
+
+      final name = (famData['name'] as String?) ?? 'Family';
+      final createdAt = (famData['createdAt'] is Timestamp)
+          ? (famData['createdAt'] as Timestamp).toDate()
+          : DateTime.now();
+
+      _family = Family(
+        id: familyId,
+        name: name,
+        createdAt: createdAt,
+      );
+
+      // ----- Members -----
+      final memSnap = await db
+          .collection('families')
+          .doc(familyId)
+          .collection('members')
+          .get();
+
+      _members
+        ..clear()
+        ..addAll(memSnap.docs.map((d) {
+          final m = d.data();
+          final roleStr = ((m['role'] as String?) ?? 'child').toLowerCase();
+
+          return Member(
+            id: d.id,
+            familyId: familyId,
+            name: (m['name'] as String?) ?? 'Member',
+            avatar: (m['avatar'] as String?) ?? '👤',
+            role: roleStr == 'parent' ? MemberRole.parent : MemberRole.child,
+            // optional flags: default safely if missing
+            usesThisDevice: (m['usesThisDevice'] as bool?) ?? false,
+            requiresPin: (m['requiresPin'] as bool?) ?? false,
+            pin: (m['pin'] as String?),
+          );
+        }));
+
+      _currentProfileId = _members.isNotEmpty ? _members.first.id : null;
+
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+Future<void> loadFor(User user) async {
+  if (_loadedUid == user.uid) return; // already loaded
+  _isLoading = true;
+  notifyListeners();
+  try {
+    // TODO: replace with your real preload calls:
+    // await _loadUserProfile(user.uid);
+    // await _loadFamily(user.uid);
+    // await _subscribeFamilyStreams(); // keep state fresh
+    _loadedUid = user.uid;
+  } finally {
+    _isLoading = false;
+    notifyListeners();
+  }
+}
+
+  /// Create a new family with an auto id & join code, write initial members,
+/// link current user as parent, hydrate local state, and return familyId.
+Future<String> createFamily({
+    required String familyName,
+    required List<Member> initialMembers,
+  }) async {
+    final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+
+    // ids
+    final familyDoc = db.collection('families').doc(); // auto-id
+    final familyId = familyDoc.id;
+    final code = _makeCode(6);
+
+    // 1) families/{fid}
+    await familyDoc.set({
+      'name': familyName.trim().isEmpty ? 'Family' : familyName.trim(),
+      'code': code,
+      'createdBy': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // 2) /joinCodes/{code} → fid
+    await db.collection('joinCodes').doc(code).set({
+      'familyId': familyId,
+      'createdBy': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    // 3) link /users/{uid}
+    await db.collection('users').doc(uid).set({
+      'familyId': familyId,
+      'role': 'parent',
+      'memberId': null,
+    }, SetOptions(merge: true));
+
+    // 4) members
+    final membersCol = familyDoc.collection('members');
+    final batch = db.batch();
+    for (final m in initialMembers) {
+      final doc = membersCol.doc(m.id); // keep stable ids from UI
+      batch.set(doc, {
+        'name': m.name,
+        'avatar': m.avatar,
+        'role': m.role == MemberRole.parent ? 'parent' : 'child',
+        'usesThisDevice': m.usesThisDevice,
+        'requiresPin': m.requiresPin,
+        'pin': m.pin,
+      }, SetOptions(merge: true));
+    }
+    await batch.commit();
+
+    // 5) hydrate local state
+    _family = Family(id: familyId, name: familyName, createdAt: DateTime.now());
+    _members
+      ..clear()
+      ..addAll(initialMembers);
+    _currentProfileId = _members.isNotEmpty ? _members.first.id : null;
+    notifyListeners();
+
+    return familyId;
+  }
+
 
   void createOrUpdateFamily(String name) {
     if (_family == null) {
@@ -38,6 +257,90 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
   }
+
+  /// Return the existing join code for the current family, creating one if missing.
+  Future<String> createInvite() async {
+    if (_family == null) {
+      throw StateError('No family in AppState');
+    }
+    final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final famRef = db.collection('families').doc(_family!.id);
+
+    // read current code
+    final snap = await famRef.get();
+    String? code = (snap.data()?['code'] as String?);
+
+    // create one if missing and backfill /joinCodes
+    if (code == null || code.trim().isEmpty) {
+      code = _makeCode(6);
+      await famRef.set({'code': code}, SetOptions(merge: true));
+    }
+
+    await db.collection('joinCodes').doc(code).set({
+      'familyId': _family!.id,
+      'createdBy': uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    return code;
+  }
+
+  /// Join an existing family by its invite code.
+  /// Links the current user as a parent and (optionally) ensures a parent member exists.
+  Future<String> redeemInvite(
+    String code, {
+    String? parentDisplayName,
+  }) async {
+    final db = FirebaseFirestore.instance;
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final input = code.trim().toUpperCase();
+    if (input.isEmpty) {
+      throw ArgumentError('Invite code cannot be empty');
+    }
+
+    // 1) look up /joinCodes/{code}
+    final codeDoc = await db.collection('joinCodes').doc(input).get();
+    if (!codeDoc.exists) {
+      throw StateError('Invite code not found');
+    }
+    final familyId = (codeDoc.data()!['familyId'] as String);
+
+    // 2) link /users/{uid}
+    await db.collection('users').doc(uid).set({
+      'familyId': familyId,
+      'role': 'parent',
+      'memberId': null,
+    }, SetOptions(merge: true));
+
+    // 3) (optional) ensure a parent member exists for display, if a name was provided
+    if (parentDisplayName != null && parentDisplayName.trim().isNotEmpty) {
+      final membersCol = db.collection('families').doc(familyId).collection('members');
+
+      // try to find an existing parent member with the same name
+      final existing = await membersCol
+          .where('role', isEqualTo: 'parent')
+          .where('name', isEqualTo: parentDisplayName.trim())
+          .limit(1)
+          .get();
+
+      if (existing.docs.isEmpty) {
+        await membersCol.add({
+          'name': parentDisplayName.trim(),
+          'avatar': '👤',
+          'role': 'parent',
+          'usesThisDevice': false,
+          'requiresPin': false,
+          'pin': null,
+        });
+      }
+    }
+
+    // 4) hydrate local state for this family so UI can render immediately
+    await loadFamilyFromFirestore(familyId);
+    return familyId;
+  }
+
 
   void addMember({
     required String name,
@@ -98,18 +401,25 @@ class AppState extends ChangeNotifier {
     return (m.pin ?? '') == input;
   }
 
-  void removeMember(String memberId) {
-    _members.removeWhere((m) => m.id == memberId);
-    // Clean up assignees/completions for that member
-    for (final c in _chores) {
-      c.assigneeIds.remove(memberId);
-    }
-    _completions.removeWhere((x) => x.memberId == memberId);
-    if (_currentProfileId == memberId) {
-      _currentProfileId = _members.isEmpty ? null : _members.first.id;
+  void upsertMember(Member member) {
+    final i = _members.indexWhere((m) => m.id == member.id);
+    if (i >= 0) {
+      _members[i] = member;
+    } else {
+      _members.add(member);
     }
     notifyListeners();
   }
+
+  /// Remove a member by id.
+  void removeMember(String memberId) {
+    _members.removeWhere((m) => m.id == memberId);
+    if (_currentProfileId == memberId) {
+      _currentProfileId = _members.isNotEmpty ? _members.first.id : null;
+    }
+    notifyListeners();
+  }
+
 
   void setCurrentProfile(String memberId) {
     _currentProfileId = memberId;
@@ -120,14 +430,12 @@ class AppState extends ChangeNotifier {
       _members.where((m) => m.id == id).firstOrNull;
   List<Member> membersByIds(Iterable<String> ids) =>
       ids.map(memberById).whereType<Member>().toList();
+      
 
   // =========================
   // Chores / Completions
   // =========================
-  final List<Chore> _chores = [];
   final List<ChoreCompletion> _completions = [];
-
-  List<Chore> get chores => List.unmodifiable(_chores);
 
 void addChore({
   required String title,
@@ -299,4 +607,34 @@ void addChore({
 // Iterable helper (avoids bringing in package:collection)
 extension _FirstOrNull<E> on Iterable<E> {
   E? get firstOrNull => isEmpty ? null : first;
+}
+
+// ---- CopyWith extensions ----
+extension FamilyCopyX on Family {
+  Family copyWith({String? id, String? name, DateTime? createdAt}) {
+    return Family(id: id ?? this.id, name: name ?? this.name, createdAt: createdAt ?? this.createdAt);
+  }
+}
+extension MemberCopyX on Member {
+  Member copyWith({
+    String? id,
+    String? familyId,
+    String? name,
+    String? avatar,
+    MemberRole? role,
+    bool? usesThisDevice,
+    bool? requiresPin,
+    String? pin,
+  }) {
+    return Member(
+      id: id ?? this.id,
+      familyId: familyId ?? this.familyId,
+      name: name ?? this.name,
+      avatar: avatar ?? this.avatar,
+      role: role ?? this.role,
+      usesThisDevice: usesThisDevice ?? this.usesThisDevice,
+      requiresPin: requiresPin ?? this.requiresPin,
+      pin: pin ?? this.pin,
+    );
+  }
 }

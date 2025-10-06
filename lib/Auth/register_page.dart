@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:chorezilla/components/auth_scaffold.dart';
 import 'package:chorezilla/components/inputs.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -84,18 +87,32 @@ class _RegisterPageState extends State<RegisterPage> {
                       height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.person_add),
               label: const Text('Create account'),
-                onPressed: _busy ? null : () async {
-                if (!_form.currentState!.validate()) return;
-                setState(() => _busy = true);
+                onPressed: () async {
+                  if (!_form.currentState!.validate()) return;
 
-                // TODO: create account with your auth service
-                await Future.delayed(const Duration(milliseconds: 700));
+                  try {
+                    // 1) Auth
+                    final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+                      email: _email.text.trim(),
+                      password: _password.text,
+                    );
+                    final uid = cred.user!.uid;
 
-                if (!mounted) return;
-                setState(() => _busy = false);
-                Navigator.of(context).pushReplacementNamed('/family-setup');
-              },
+                    // 2) Create minimal /users/{uid}
+                    await FirebaseFirestore.instance.collection('users').doc(uid).set({
+                      'role': 'parent',
+                      'familyId': null,
+                      'memberId': null,
+                    });
 
+                    // 3) Send to family setup
+                    Navigator.of(context).pushReplacementNamed('/family-setup');
+                  } on FirebaseAuthException catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(e.message ?? 'Registration failed')),
+                    );
+                  }
+                },
               style: FilledButton.styleFrom(
                 backgroundColor: cs.primary,
                 foregroundColor: cs.onPrimary,

@@ -1,3 +1,4 @@
+import 'package:chorezilla/components/difficulty_slider.dart';
 import 'package:chorezilla/components/inputs.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -202,6 +203,19 @@ class _AssignTabState extends State<AssignTab> {
 
                   const SizedBox(height: 8,),
 
+                  Consumer<AppState>(
+                    builder: (context, app, _) {
+                      //final draft = app.choreDraft; // however you store your current draft
+                      //final difficulty = draft.difficulty ?? 3;
+
+                      return DifficultySlider(
+                        value: 3,//difficulty,
+                        helperText: "Set expectations: 1 is super quick, 5 is big effort.",
+                        onChanged: (value) => {},
+                        //onChanged: (v) => app.updateChoreDraft(difficulty: v), // implement this
+                      );
+                    },
+                  )
                   ],
                 ))
               ),

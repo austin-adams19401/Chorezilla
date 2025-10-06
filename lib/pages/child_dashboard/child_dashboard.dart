@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/chore_models.dart'; // for scheduleLabel
+import 'package:firebase_auth/firebase_auth.dart';
 
 
 class ChildDashboardPage extends StatelessWidget {
@@ -12,16 +13,28 @@ class ChildDashboardPage extends StatelessWidget {
     final app = context.watch<AppState>();
     final cs = Theme.of(context).colorScheme;
     final kid = app.currentProfile;
+    if (kid == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    final chores = (kid == null) ? [] : app.choresForMember(kid.id);
-    final points = (kid == null) ? 0 : app.pointsForMemberAllTime(kid.id);
+
+    final chores = app.choresForMember(kid.id);
+    final points = app.pointsForMemberAllTime(kid.id);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(kid == null ? 'My chores' : 'Hi, ${kid.name}!'),
+        title: Text('Hi, ${kid.name}!'),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
         elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.switch_account),
+          onPressed: () async {
+            try { await FirebaseAuth.instance.signOut(); } catch (_) {}
+            if (!context.mounted) return;
+            Navigator.of(context).pushReplacementNamed('/kid-join');
+          },
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(12),
@@ -52,7 +65,6 @@ class ChildDashboardPage extends StatelessWidget {
                 icon: const Icon(Icons.check_circle),
                 color: cs.primary,
                 onPressed: () {
-                  if (kid == null) return;
                   app.completeChore(c.id, kid.id);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('Great job! +${c.points}')),

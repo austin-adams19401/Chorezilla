@@ -14,11 +14,7 @@ class MascotHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(48, 48, 24, 24),
       decoration: BoxDecoration(
-        // gradient: LinearGradient(
-        //   colors: [cs.secondary, cs.secondaryContainer],
-        //   begin: Alignment.topLeft,
-        //   end: Alignment.bottomRight,
-        // ),
+        color: cs.inversePrimary,
         
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
       ),
@@ -26,10 +22,10 @@ class MascotHeader extends StatelessWidget {
         children: [
           // Mascot inside a soft circle
           Container(
-            width: 72,
-            height: 72,
+            width: 84,
+            height: 84,
             decoration: BoxDecoration(
-              color: cs.surface.withOpacity(0.15),
+              color: cs.surface,
               shape: BoxShape.circle,
             ),
             child: ClipOval(
@@ -41,7 +37,7 @@ class MascotHeader extends StatelessWidget {
             child: Text(
               title,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: cs.inversePrimary,
+                    color: cs.primary,
                     fontWeight: FontWeight.w700,
                   ),
             ),

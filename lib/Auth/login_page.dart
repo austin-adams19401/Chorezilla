@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:chorezilla/components/auth_scaffold.dart';
 import 'package:chorezilla/components/inputs.dart';
-import 'package:provider/provider.dart';
-import 'package:chorezilla/state/app_state.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 
 class LoginPage extends StatefulWidget {
@@ -33,7 +33,7 @@ class _LoginPageState extends State<LoginPage> {
                 style: Theme.of(context)
                     .textTheme
                     .titleLarge
-                    ?.copyWith(color: cs.secondary, fontWeight: FontWeight.w700)),
+                    ?.copyWith(color: cs.primary, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             TextFormField(
               controller: _email,
@@ -54,7 +54,7 @@ class _LoginPageState extends State<LoginPage> {
                 'Password',
                 suffix: IconButton(
                   icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility,
-                      color: cs.secondary),
+                      color: cs.primary),
                   onPressed: () => setState(() => _obscure = !_obscure),
                 ),
               ),
@@ -69,20 +69,50 @@ class _LoginPageState extends State<LoginPage> {
                       height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.login),
               label: const Text('Sign in'),
-              onPressed: _busy ? null : () async {
+              onPressed: () async {
                 if (!_form.currentState!.validate()) return;
-                setState(() => _busy = true);
 
-                // TODO: sign in
-                await Future.delayed(const Duration(milliseconds: 600));
+                try {
+                  // 1) Auth
+                  final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+                    email: _email.text.trim(),
+                    password: _password.text,
+                  );
 
-                if (!mounted) return;
-                setState(() => _busy = false);
+                  final uid = cred.user!.uid;
 
-                final app = context.read<AppState>();
-                final needsSetup = app.family == null || app.members.isEmpty;
-                Navigator.of(context).pushReplacementNamed(needsSetup ? '/family-setup' : '/home');
+                  // 2) Ensure the /users/{uid} doc exists with at least a role
+                  final users = FirebaseFirestore.instance.collection('users');
+                  final userDoc = await users.doc(uid).get();
+                  if (!userDoc.exists) {
+                    await users.doc(uid).set({
+                      'role': 'parent',
+                      'familyId': null,
+                      'memberId': null,
+                    });
+                  }
+
+                  // 3) Route to parent flow (if familyId is null, send to family setup)
+                  final data = (await users.doc(uid).get()).data() ?? {};
+                  final familyId = data['familyId'];
+                  if (familyId == null) {
+                    Navigator.of(context).pushReplacementNamed('/parent-setup');
+                  } else {
+                    Navigator.of(context).pushReplacementNamed('/parent');
+                  }
+                } on FirebaseAuthException catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(e.message ?? 'Sign-in failed')),
+                  );
+                }
               },
+            ),
+            FilledButton(
+              onPressed: () {
+                // Take them to the kid join flow
+                Navigator.of(context).pushReplacementNamed('/kid-join');
+              },
+              child: const Text('Kid Login (Join with Code)'),
             ),
             const SizedBox(height: 8),
             TextButton(
