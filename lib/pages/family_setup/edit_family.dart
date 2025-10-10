@@ -66,7 +66,7 @@ class _EditFamilyPageState extends State<EditFamilyPage> {
               try {
                 await app.updateFamilyName(toSave);
                 _pendingName = null;
-                if (mounted) {
+                if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Family name updated')),
                   );
@@ -97,7 +97,7 @@ class _EditFamilyPageState extends State<EditFamilyPage> {
             ...parents.map((p) => ListTile(
                   dense: true,
                   contentPadding: EdgeInsets.zero,
-                  leading: Text(p.avatar ?? '👤', style: const TextStyle(fontSize: 22)),
+                  leading: Text(p.avatar, style: const TextStyle(fontSize: 22)),
                   title: Text(p.name),
                 )),
           ],

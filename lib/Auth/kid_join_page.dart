@@ -23,7 +23,7 @@ Future<void> _findFamily() async {
   await _ensureAnon();
 
   final code = _code.text.trim().toUpperCase();
-  if (code.isEmpty) {
+  if (code.isEmpty && mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Enter your family code')),
     );
@@ -35,7 +35,7 @@ Future<void> _findFamily() async {
       .doc(code)
       .get();
 
-  if (!codeDoc.exists) {
+  if (!codeDoc.exists && mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Code not found. Check with your parent.')),
     );
@@ -73,7 +73,10 @@ Future<void> _findFamily() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Join Family")),
+      appBar: AppBar(
+        title: const Text("Join Family"),
+        leading: const BackButton(),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

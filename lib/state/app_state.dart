@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:math';
-
+import 'dart:convert';
+import 'dart:io';
+import 'package:crypto/crypto.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:chorezilla/models/family_models.dart';
 import 'package:chorezilla/models/chore_models.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 
 // ENUMS
@@ -30,7 +32,6 @@ class AppState extends ChangeNotifier {
   AuthState _authState = AuthState.unknown;
   AuthState get authState => _authState;
 
-  User? _user;
   Map<String, dynamic>? _userDoc;
   DocumentSnapshot<Map<String, dynamic>>? _familySnap;
   StreamSubscription? _familySub;
@@ -44,12 +45,36 @@ class AppState extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   Family? _family;
+  User? _user;
 
   final List<Member> _members = [];
   List<Member> get members => _members;
 
   final List<Chore> _chores = [];
   List<Chore> get chores => _chores;
+
+  String? _deviceIdHashCache;
+
+  Future<String> getDeviceIdHash() async {
+    if (_deviceIdHashCache != null) return _deviceIdHashCache!;
+    final info = DeviceInfoPlugin();
+    String base;
+
+    if (Platform.isAndroid) {
+      final a = await info.androidInfo;
+      base = '${a.manufacturer}|${a.model}|${a.id}|${a.hardware}|${a.device}';
+    } else if (Platform.isIOS) {
+      final i = await info.iosInfo;
+      base = '${i.name}|${i.systemName}|${i.model}|${i.identifierForVendor}';
+    } else {
+      // Fallback for web/desktop if you later support them
+      base = 'unknown-device';
+    }
+
+    _deviceIdHashCache = sha256.convert(utf8.encode(base)).toString();
+    return _deviceIdHashCache!;
+  }
+
 
   void _onAuth(User? user) async {
     _user = user;
@@ -122,7 +147,7 @@ class AppState extends ChangeNotifier {
     if (_currentProfileId != null) {
       final m = _members.firstWhere(
         (e) => e.id == _currentProfileId,
-        orElse: () => _members.isEmpty ? null as Member : _members.first,
+        //orElse: () => _members.isEmpty ? null as Member : _members.first,
       );
       return m;
     }
@@ -248,7 +273,6 @@ Future<void> loadFor(User user) async {
   _isLoading = true;
   notifyListeners();
   try {
-    // TODO: replace with your real preload calls:
     // await _loadUserProfile(user.uid);
     // await _loadFamily(user.uid);
     // await _subscribeFamilyStreams(); // keep state fresh
@@ -682,9 +706,9 @@ void addChore({
     return true;
   }
 
-  Future<void> updateFamilyName(toSave) async {
+  Future<void> updateFamilyName(String toSave) async {
     final famId = _family?.id ?? (_userDoc?['familyId'] as String?);
-    if (famId == null || (toSave ?? '').toString().trim().isEmpty) return;
+    if (famId == null || (toSave).toString().trim().isEmpty) return;
 
     final name = toSave.toString().trim();
     await _db.collection('families').doc(famId).set(

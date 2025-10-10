@@ -95,22 +95,25 @@ class _LoginPageState extends State<LoginPage> {
                   // 3) Route to parent flow (if familyId is null, send to family setup)
                   final data = (await users.doc(uid).get()).data() ?? {};
                   final familyId = data['familyId'];
-                  if (familyId == null) {
+                  if (familyId == null && context.mounted) {
                     Navigator.of(context).pushReplacementNamed('/parent-setup');
-                  } else {
+                  } else if (context.mounted) {
                     Navigator.of(context).pushReplacementNamed('/parent');
                   }
                 } on FirebaseAuthException catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  if(context.mounted){
+                    ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(e.message ?? 'Sign-in failed')),
                   );
+                  }
+                  
                 }
               },
             ),
             FilledButton(
               onPressed: () {
                 // Take them to the kid join flow
-                Navigator.of(context).pushReplacementNamed('/kid-join');
+                Navigator.of(context).pushNamed('/kid-join');
               },
               child: const Text('Kid Login (Join with Code)'),
             ),

@@ -20,9 +20,6 @@ class SettingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-
-    final app = context.watch<AppState>();
-
     return FutureBuilder<String?>(
       future: _getFamilyId(),
       builder: (context, familySnap) {

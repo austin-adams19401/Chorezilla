@@ -1,7 +1,4 @@
-import 'package:chorezilla/models/chore_models.dart';
-import 'package:chorezilla/state/app_state.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'parent_home_tab.dart';
 import 'assign_tab.dart';
 import 'checkoff_tab.dart';
@@ -26,10 +23,10 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
       SettingsTab(),
     ];
 
-    final app = context.watch<AppState>();
-    final choresToCheckOff = app.chores.where((c) => c.assigneeIds.isNotEmpty).length;
+    // final app = context.watch<AppState>();
+    // final choresToCheckOff = app.chores.where((c) => c.assigneeIds.isNotEmpty).length;
 
-    String _numberOfChoresReadyForCheckOff(int n) => n > 99 ? '99+' : '$n';
+    // String _numberOfChoresReadyForCheckOff(int n) => n > 99 ? '99+' : '$n';
 
     return Scaffold(
       body: pages[_index],

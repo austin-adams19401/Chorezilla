@@ -3,7 +3,6 @@ import 'package:chorezilla/Auth/login_page.dart';
 import 'package:chorezilla/pages/family_setup/parent_setup_screen.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_dashboard.dart';
 import 'package:chorezilla/state/app_state.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -23,8 +22,7 @@ class AuthGate extends StatelessWidget {
         return const ParentSetupScreen();
       case AuthState.ready:
         return const ParentDashboardPage();
-      default: return SplashScreen();
-    }
+      }
   }
 }
 

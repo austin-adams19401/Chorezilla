@@ -1,6 +1,4 @@
-import 'package:chorezilla/state/app_state.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 /// Shows an overview for today/week. Read-only check indicators.
 /// Public widget (no underscore) so it can be imported by the shell.
@@ -14,7 +12,7 @@ class ParentHomeTab extends StatefulWidget {
 class _HomeTabState extends State<ParentHomeTab> {
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
+    //final app = context.watch<AppState>();
     final cs = Theme.of(context).colorScheme;
     // final chores = app.chores.choreListForToday; // example if you split state
 
