@@ -75,6 +75,40 @@ class AppTheme {
           ),
         ),
       );
+    ThemeData buildTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      // pick your brand color here
+      colorSchemeSeed: const Color(0xFF2ECC71),
+
+      inputDecorationTheme: const InputDecorationTheme(
+        filled: true,
+        isDense: true,
+        hintStyle: TextStyle(fontWeight: FontWeight.w500),
+        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+        ),
+      ),
+
+      chipTheme: const ChipThemeData(
+        shape: StadiumBorder(),
+        labelStyle: TextStyle(fontWeight: FontWeight.w600),
+      ),
+
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          elevation: 2,
+        ),
+      ),
+    );
+  }
+
+  
 }
 
 // primary:	

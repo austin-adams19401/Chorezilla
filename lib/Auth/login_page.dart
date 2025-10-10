@@ -16,7 +16,7 @@ class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   bool _obscure = true;
-  bool _busy = false;
+  final bool _busy = false;
 
   @override
   Widget build(BuildContext context) {

@@ -1,3 +1,5 @@
+import 'package:chorezilla/navigation/transitions.dart';
+import 'package:chorezilla/pages/family_setup/edit_family.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +20,9 @@ class SettingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
+    final app = context.watch<AppState>();
+
     return FutureBuilder<String?>(
       future: _getFamilyId(),
       builder: (context, familySnap) {
@@ -117,34 +122,17 @@ class SettingsTab extends StatelessWidget {
                   leading: const Icon(Icons.group),
                   title: const Text('Manage Family'),
                   subtitle: const Text('Edit family name and members'),
-                  onTap: () async {
-                    final uid = FirebaseAuth.instance.currentUser!.uid;
-                    final db = FirebaseFirestore.instance;
-                    final userDoc = await db.collection('users').doc(uid).get();
-                    final familyId = userDoc.data()?['familyId'] as String?;
-
-                    if (familyId == null) {
-                      if (context.mounted) {
-                        Navigator.of(context).pushNamed('/add-kids'); // create new
-                      }
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () {
+                    final fid = context.read<AppState>().familyId;
+                    if (fid == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Family not loaded yet')),
+                      );
                       return;
                     }
-
-                    final ok = await context.read<AppState>().loadFamilyFromFirestore(familyId);
-
-                    if (!context.mounted) return;
-                    if (ok) {
-                      Navigator.of(context).pushNamed(
-                        '/family-setup',
-                        arguments: {'edit': true, 'familyId': familyId},
-                      );
-                    } else {
-                      // Fallback: open create page if load failed
-                      Navigator.of(context).pushNamed('/add-kids');
-                    }
+                    Navigator.of(context).push(fadeThrough(const EditFamilyPage()));
                   },
-
-                  trailing: const Icon(Icons.chevron_right),
                 ),
 
                 // (Optional) Kid Login deep link
@@ -160,8 +148,10 @@ class SettingsTab extends StatelessWidget {
                 ListTile(
                   leading: const Icon(Icons.logout),
                   title: const Text('Logout'),
-                  onTap: () {
-                    Navigator.of(context).pushNamed('/login');
+                  onTap: () async {
+                    await context.read<AppState>().logout();
+                    if (!context.mounted) return;
+                    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
                   },
                   trailing: const Icon(Icons.chevron_right),
                 ),

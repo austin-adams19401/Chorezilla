@@ -1,21 +1,22 @@
-// lib/state/app_state.dart (reorganized)
 import 'dart:async';
 import 'dart:math';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:chorezilla/models/family_models.dart';
 import 'package:chorezilla/models/chore_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+
+// ENUMS
+enum AuthState { unknown, signedOut, needsFamilySetup, ready }
+
 /// Simple id helper
 String _id() => DateTime.now().microsecondsSinceEpoch.toString();
-
-/// Date helpers (normalize to midnight for comparisons)
 DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
-/// Monday-start week
 DateTime _startOfWeek(DateTime d) {
   final x = _dateOnly(d);
   final diff = x.weekday - DateTime.monday; // 0..6
@@ -23,12 +24,26 @@ DateTime _startOfWeek(DateTime d) {
 }
 
 class AppState extends ChangeNotifier {
+  final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
+
+  AuthState _authState = AuthState.unknown;
+  AuthState get authState => _authState;
+
+  User? _user;
+  Map<String, dynamic>? _userDoc;
+  DocumentSnapshot<Map<String, dynamic>>? _familySnap;
+  StreamSubscription? _familySub;
+
+  String? get familyId => _userDoc?['familyId'];
+  Map<String , dynamic>? get family => _familySnap?.data();
+  Map<String, dynamic>? get userProfile => _userDoc;
+
   String? _loadedUid;
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
   Family? _family;
-  Family? get family => _family;
 
   final List<Member> _members = [];
   List<Member> get members => _members;
@@ -36,11 +51,70 @@ class AppState extends ChangeNotifier {
   final List<Chore> _chores = [];
   List<Chore> get chores => _chores;
 
+  void _onAuth(User? user) async {
+    _user = user;
+    _familySub?.cancel();
+    _familySub = null;
+    _familySnap = null;
+    _userDoc = null;
+    _members.clear();
+
+    if(user == null) {
+      _authState = AuthState.signedOut;
+      notifyListeners();
+      return;
+    }
+
+    final userRef = _db.collection('users').doc(user.uid);
+    final snap = await userRef.get();
+    _userDoc = snap.data();
+
+    final familyId = _userDoc?['familyId'];
+    if (familyId == null){
+      _authState = AuthState.needsFamilySetup;
+      notifyListeners();
+      return;
+    }
+
+    _familySub = _db.collection('families').doc(familyId)
+      .snapshots().listen((fam) {
+        _familySnap = fam;
+        _authState = AuthState.ready;
+        notifyListeners();
+      });
+  }
+
+  Future<void> logout() async {
+    await _familySub?.cancel();
+    _familySub = null;
+    _familySnap = null;
+    _userDoc = null;
+    _members.clear();
+    _authState = AuthState.signedOut;
+    notifyListeners();
+    await FirebaseAuth.instance.signOut();
+  }
+
+  AppState() {
+    _auth.authStateChanges().listen(_onAuth);
+  }
+
     // 0-9 A-Z code (len=6 by default)
   String _makeCode([int len = 6]) {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final r = Random.secure();
     return List.generate(len, (_) => chars[r.nextInt(chars.length)]).join();
+  }
+
+  int pointsForDifficulty(int difficulty) {
+    switch (difficulty) {
+      case 1: return 5;
+      case 2: return 10;
+      case 3: return 20;
+      case 4: return 35;
+      case 5: return 55;
+      default: return 10;
+    }
   }
 
   Member? get currentProfile {
@@ -260,12 +334,14 @@ Future<String> createFamily({
 
   /// Return the existing join code for the current family, creating one if missing.
   Future<String> createInvite() async {
-    if (_family == null) {
-      throw StateError('No family in AppState');
+    final fid = familyId ?? _familySnap?.id;
+    if (fid == null || fid.isEmpty) {
+      throw StateError('No family for invite');
     }
+
     final db = FirebaseFirestore.instance;
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    final famRef = db.collection('families').doc(_family!.id);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final famRef = db.collection('families').doc(fid);
 
     // read current code
     final snap = await famRef.get();
@@ -278,7 +354,7 @@ Future<String> createFamily({
     }
 
     await db.collection('joinCodes').doc(code).set({
-      'familyId': _family!.id,
+      'familyId': fid,
       'createdBy': uid,
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -440,6 +516,7 @@ Future<String> createFamily({
 void addChore({
   required String title,
   required int points,
+  required int difficulty,
   required ChoreSchedule schedule,
   Set<int>? daysOfWeek,
   required Set<String> assigneeIds,
@@ -450,6 +527,7 @@ void addChore({
     id: _id(),
     title: title,
     points: points,
+    difficulty: difficulty,
     schedule: schedule,
     daysOfWeek: daysOfWeek != null ? Set<int>.from(daysOfWeek) : {},
     assigneeIds: Set<String>.from(assigneeIds),
@@ -539,6 +617,7 @@ void addChore({
           id: '',
           title: '',
           points: 0,
+          difficulty: 3,
           schedule: ChoreSchedule.daily,
         ),
       );
@@ -601,6 +680,95 @@ void addChore({
 
     // Daily / Custom days: show on scheduled day
     return true;
+  }
+
+  Future<void> updateFamilyName(toSave) async {
+    final famId = _family?.id ?? (_userDoc?['familyId'] as String?);
+    if (famId == null || (toSave ?? '').toString().trim().isEmpty) return;
+
+    final name = toSave.toString().trim();
+    await _db.collection('families').doc(famId).set(
+      {'name': name},
+      SetOptions(merge: true),
+    );
+
+    // Update local cache
+    if (_family != null) _family = _family!.copyWith(name: name);
+    notifyListeners();
+  }
+
+  Future<void> rotateInviteCode() async {
+    final fid = familyId ?? _familySnap?.id;
+    if (fid == null || fid.isEmpty) {
+      throw StateError('No family for invite rotation');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final famRef = db.collection('families').doc(fid);
+
+    // read old
+    final snap = await famRef.get();
+    final oldCode = (snap.data()?['code'] as String?);
+    final newCode = _makeCode(6);
+
+    final batch = db.batch();
+    batch.set(famRef, {'code': newCode}, SetOptions(merge: true));
+
+    if (oldCode != null && oldCode.trim().isNotEmpty) {
+      batch.delete(db.collection('joinCodes').doc(oldCode));
+    }
+
+    batch.set(db.collection('joinCodes').doc(newCode), {
+      'familyId': fid,
+      'createdBy': FirebaseAuth.instance.currentUser?.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    await batch.commit();
+  }
+
+  Future<void> addChild({required String name, required String avatar}) async {
+    final famId = _family?.id ?? (_userDoc?['familyId'] as String?);
+    if (famId == null) return;
+
+    final membersCol = _db.collection('families').doc(famId).collection('members');
+    final doc = membersCol.doc(); // auto id
+
+    await doc.set({
+      'name': name.trim().isEmpty ? 'Child' : name.trim(),
+      'avatar': avatar,
+      'role': 'child',
+      'usesThisDevice': false,
+      'requiresPin': false,
+      'pin': null,
+    });
+
+    // Update local state (optional but keeps UI snappy)
+    _members.add(Member(
+      id: doc.id,
+      familyId: famId,
+      name: name.trim().isEmpty ? 'Child' : name.trim(),
+      avatar: avatar,
+      role: MemberRole.child,
+      usesThisDevice: false,
+      requiresPin: false,
+      pin: null,
+    ));
+    notifyListeners();
+  }
+
+  Future<void> removeChild({required String kidId}) async {
+    final famId = _family?.id ?? (_userDoc?['familyId'] as String?);
+    if (famId == null) return;
+
+    await _db.collection('families').doc(famId)
+        .collection('members').doc(kidId).delete();
+
+    _members.removeWhere((m) => m.id == kidId);
+    if (_currentProfileId == kidId) {
+      _currentProfileId = _members.isNotEmpty ? _members.first.id : null;
+    }
+    notifyListeners();
   }
 }
 

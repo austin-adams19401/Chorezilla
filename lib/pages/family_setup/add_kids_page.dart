@@ -59,7 +59,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
             )).toList(),
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(onPressed: _addKid, icon: const Icon(Icons.add), label: const Text('Add Kid')),
+          FilledButton.icon(onPressed: _addKid, icon: const Icon(Icons.add), label: const Text('Add Kids')),
           const SizedBox(height: 24),
           const Text('Family Members'),
           const SizedBox(height: 8),

@@ -1,11 +1,9 @@
-import 'package:chorezilla/components/difficulty_slider.dart';
-import 'package:chorezilla/components/inputs.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:chorezilla/components/icon_picker.dart';
+import 'package:chorezilla/models/chore_models.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../state/app_state.dart';
-import '../../models/chore_models.dart';
-import '../../models/family_models.dart';
+import 'package:chorezilla/components/difficulty_slider.dart';
+import 'package:chorezilla/state/app_state.dart';
 
 /// Parent assigns chores to kids; supports filters, search, etc.
 class AssignTab extends StatefulWidget {
@@ -16,20 +14,35 @@ class AssignTab extends StatefulWidget {
 }
 
 class _AssignTabState extends State<AssignTab> {
+  // FORM STATES
   final _form = GlobalKey<FormState>();
+
+  // CONTROLLERS
   final _title = TextEditingController();
-  final _difficultyLvl = TextEditingController(text: '5');
+
+  // VARIABLES
+  final Set<int> _days = {}; // 1..7 for weekly/custom
+  final Set<String> _selected = {};
 
   ChoreSchedule _schedule = ChoreSchedule.daily;
-  final Set<int> _days = {}; // 1..7 for weekly/custom
   bool _suggestionsOpen = false; // collapsed by default
-  final Set<String> _selected = {};
   IconData? _icon;
   Color? _iconColor;
+  int _difficulty = 3; //default difficulty value
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final app = context.watch<AppState>();
+
+    final String _choreName = _title.text.trim();
+
+    final query = _title.text.trim().toLowerCase();
+    final dupes = query.isEmpty
+        ? const <Chore>[]
+        : app.chores
+            .where((c) => c.title.toLowerCase().contains(query))
+            .toList();
     
     return Scaffold(
       appBar: AppBar(
@@ -66,7 +79,7 @@ class _AssignTabState extends State<AssignTab> {
                             final cs = Theme.of(context).colorScheme;
                             setState(() {
                               _title.text  = c.title;
-                              _difficultyLvl.text = c.points.toString();
+                              _difficulty = _difficulty;
                               _schedule    = c.schedule;
                               _days
                                 ..clear()
@@ -205,25 +218,233 @@ class _AssignTabState extends State<AssignTab> {
 
                   Consumer<AppState>(
                     builder: (context, app, _) {
-                      //final draft = app.choreDraft; // however you store your current draft
-                      //final difficulty = draft.difficulty ?? 3;
-
                       return DifficultySlider(
-                        value: 3,//difficulty,
+                        value: _difficulty,
                         helperText: "Set expectations: 1 is super quick, 5 is big effort.",
-                        onChanged: (value) => {},
-                        //onChanged: (v) => app.updateChoreDraft(difficulty: v), // implement this
+                        onChanged: (v) => setState(() => _difficulty = v.round()), 
                       );
                     },
-                  )
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  OutlinedButton.icon(
+                    icon: Icon(_icon ?? Icons.image_outlined),
+                    label: Text(_icon == null ? 'Pick icon' : 'Change icon',
+                      style: TextStyle(color: cs.onSecondaryContainer)),
+                    onPressed:() async {
+                      final picked = await pickChoreIcon(context, initial: _icon, initialColor: _iconColor);
+                      if(picked != null){
+                        setState(() {
+                          _icon = picked.$1;
+                          _iconColor = picked.$2;
+                        });
+                      }
+                    }, 
+                    ),
+                    if (_icon != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: CircleAvatar(
+                          backgroundColor: cs.secondaryContainer,
+                          child: Icon(_icon, color: _iconColor ?? cs.onSecondaryContainer),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 8),
+
+                    Text('Assign to', style: TextStyle(color: cs.onSurfaceVariant)),
+
+                    const SizedBox(height: 6,),
+
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: app.members.map((m) {
+                        final selected = _selected.contains(m.id);
+
+                        return FilterChip(
+                          label: Text(m.name), 
+                          selected: selected,
+                          onSelected: (v) {
+                            setState(() {
+                              if(v) {
+                                _selected.add(m.id);
+                              } else {
+                                _selected.remove(m.id);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+
+                    const SizedBox(height: 12,),
+
+                    if (dupes.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: cs.tertiaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text('Possible duplicates',
+                              style: TextStyle(
+                                color: cs.onTertiaryContainer,
+                                fontWeight: FontWeight.w700,
+                              )),
+                            const SizedBox(height: 8,),
+                            ...dupes.map((c) => ListTile(
+                              dense: true,
+                              leading: c.icon != null ? CircleAvatar(
+                                backgroundColor: cs.secondaryContainer,
+                                child: Icon(c.icon, color: c.iconColor ?? cs.onSecondaryContainer),
+                              ) : null,
+                            title: Text(c.title, style: TextStyle(color: cs.onTertiaryContainer)),
+                            subtitle: Text('${app.pointsForDifficulty(_difficulty)} pts • ${scheduleLabel(c)}', style: TextStyle(color: cs.onTertiaryContainer),),
+                            trailing: TextButton(
+                                    onPressed: _selected.isEmpty ? null : () {
+                                            app.assignMembersToChore(c.id, _selected);
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(content: Text('Assigned to ${_selected.length} member(s)')));
+                                          },
+                                    child: const Text('Assign selected'),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: FilledButton.icon(
+                        icon: const Icon(Icons.save),
+                        label: const Text('Save chore'),
+                        onPressed: () {
+                          if (!_form.currentState!.validate()) return;
+                          if (_choreName.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Please enter a chore name.')),
+                            );
+                          }
+                          if (_selected.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text('Select at least one assignee')),
+                            );
+                            return;
+                          }
+                          if (_schedule == ChoreSchedule.customDays &&
+                              _days.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Pick at least one weekday for custom schedule')),
+                            );
+                            return;
+                          }
+                          app.addChore(
+                            title: _title.text.trim(),
+                            points: app.pointsForDifficulty(_difficulty),
+                            difficulty: _difficulty,
+                            schedule: _schedule,
+                            daysOfWeek:
+                                (_schedule == ChoreSchedule.customDays ||
+                                        _schedule == ChoreSchedule.weeklyAny)
+                                    ? _days
+                                    : {},
+                            assigneeIds: _selected,
+                            icon: _icon,
+                            iconColor: _iconColor,
+                          );
+                          _title.clear();
+                          _difficulty = 3;
+                          _schedule = ChoreSchedule.daily;
+                          _days.clear();
+                          _selected.clear();
+                          _icon = null;
+                          _iconColor = null;
+                          setState(() {});
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Chore added')),
+                          );
+                        },
+                      ),
+                    ),
                   ],
-                ))
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Existing chores
+          if (app.chores.isNotEmpty)
+            Text('Existing chores',
+                style: Theme.of(context).textTheme.titleMedium),
+          for (final c in app.chores)
+            Card(
+              elevation: 0,
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: cs.surfaceContainerHighest),
+              ),
+              child: ExpansionTile(
+                leading: c.icon != null
+                    ? CircleAvatar(
+                        backgroundColor: cs.secondaryContainer,
+                        child: Icon(c.icon,
+                            color: c.iconColor ?? cs.onSecondaryContainer),
+                      )
+                    : null,
+                title: Text('${c.title} • ${c.points} pts'),
+                subtitle: Text(scheduleLabel(c)),
+                childrenPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: app.members.map((m) {
+                      final assigned = c.assigneeIds.contains(m.id);
+                      return FilterChip(
+                        label: Text(m.name),
+                        selected: assigned,
+                        onSelected: (_) => app.toggleAssignee(c.id, m.id),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Delete'),
+                      onPressed: () => app.deleteChore(c.id),
+                    ),
+                  ),
+                ],
               ),
             ),
         ],
       ),
-    );    
+    );
   }
+
+
+
   @override
   void dispose() {
     super.dispose();
@@ -268,10 +489,147 @@ class _ScheduleOptionTile extends StatelessWidget {
                     Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
                     if (subtitle != null)
                       Text(subtitle!, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+                    
                   ],
                 ),
         ),
       ],
+    );
+  }
+}
+
+// ---------- Reusable styling helpers ----------
+
+class SectionCard extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final EdgeInsetsGeometry margin;
+  final String? title;
+  final Widget? trailing;
+  const SectionCard({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(14),
+    this.margin = const EdgeInsets.symmetric(vertical: 8),
+    this.title,
+    this.trailing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: margin,
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,                 // M3 comfy surface
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+            color: cs.shadow.withOpacity(0.06),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: padding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (title != null) ...[
+              Row(
+                children: [
+                  Text(
+                    title!,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (trailing != null) trailing!,
+                ],
+              ),
+              const SizedBox(height: 10),
+              Divider(height: 1, color: cs.outlineVariant),
+              const SizedBox(height: 10),
+            ],
+            child,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class FieldLabel extends StatelessWidget {
+  final String text;
+  final String? hint;
+  const FieldLabel(this.text, {super.key, this.hint});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(text,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              )),
+          if (hint != null) ...[
+            const SizedBox(width: 8),
+            Text(hint!,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: cs.onSurfaceVariant,
+                )),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class PillButton extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onPressed;
+  final bool filled;
+  const PillButton({
+    super.key,
+    required this.child,
+    required this.onPressed,
+    this.filled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final bg = filled ? cs.primary : cs.surface;
+    final fg = filled ? cs.onPrimary : cs.primary;
+
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(999),
+      child: Ink(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: filled ? Colors.transparent : cs.primary),
+        ),
+        child: DefaultTextStyle.merge(
+          style: TextStyle(
+            color: fg,
+            fontWeight: FontWeight.w600,
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

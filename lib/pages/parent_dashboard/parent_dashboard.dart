@@ -27,7 +27,7 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
     ];
 
     final app = context.watch<AppState>();
-    final choresToCheckOff = 2; // app.chores.where((c) => c.assigneeIds.isNotEmpty).length;
+    final choresToCheckOff = app.chores.where((c) => c.assigneeIds.isNotEmpty).length;
 
     String _numberOfChoresReadyForCheckOff(int n) => n > 99 ? '99+' : '$n';
 
