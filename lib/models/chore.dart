@@ -1,92 +1,81 @@
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'common.dart';
 
-enum ChoreSchedule { daily, weeklyAny, customDays }
+class Recurrence {
+  final String type; // once | daily | weekly | custom
+  final List<int>? daysOfWeek; // 1..7 Mon..Sun
+  final String? timeOfDay; // HH:mm
 
-class Chore {
-  Chore({
-    required this.id,
-    required this.title,
-    required this.schedule,  // e.g. ['Mon','Thu']
-    this.icon,
-    this.requiresPhoto = false,
-  });
-
-  final String id;
-  final String title;
-  final List<String> schedule;
-  final String? icon;
-  final bool requiresPhoto;
-
-  factory Chore.fromMap(Map<String, dynamic> m, String id) => Chore(
-    id: id,
-    title: m['title'] as String,
-    schedule: List<String>.from(m['schedule'] ?? const []),
-    icon: m['icon'] as String?,
-    requiresPhoto: (m['requiresPhoto'] as bool?) ?? false,
-  );
+  const Recurrence({required this.type, this.daysOfWeek, this.timeOfDay});
 
   Map<String, dynamic> toMap() => {
-    'title': title,
-    'schedule': schedule,
-    'icon': icon,
-    'requiresPhoto': requiresPhoto,
-  };
+        'type': type,
+        'daysOfWeek': daysOfWeek,
+        'timeOfDay': timeOfDay,
+      };
+
+  factory Recurrence.fromMap(Map<String, dynamic>? data) {
+    if (data == null) return const Recurrence(type: 'once');
+    return Recurrence(
+      type: data['type'] as String? ?? 'once',
+      daysOfWeek: (data['daysOfWeek'] as List?)?.map((e) => (e as num).toInt()).toList(),
+      timeOfDay: data['timeOfDay'] as String?,
+    );
+  }
 }
 
-class ChoreCompletion {
+class Chore {
   final String id;
-  final String choreId;
-  final String memberId;
-  final DateTime completedAt;
-
-  ChoreCompletion({
-    required this.id,
-    required this.choreId,
-    required this.memberId,
-    required this.completedAt,
-  });
-}
-
-class ChoreTemplate {
   final String title;
-  final int points;
-  final ChoreSchedule schedule;
-  final Set<int> daysOfWeek; // empty unless customDays
-  final IconData icon;
-  const ChoreTemplate({
+  final String? description;
+  final String? icon;            // <-- NEW: icon key / name / url as you prefer
+  final int difficulty;          // 1..5
+  final int points;              // denormalized
+  final Recurrence? recurrence;
+  final String? createdByMemberId;
+  final bool active;
+  final DateTime? createdAt;
+
+  const Chore({
+    required this.id,
     required this.title,
+    this.description,
+    this.icon,                    // <-- NEW
+    required this.difficulty,
     required this.points,
-    required this.schedule,
-    this.daysOfWeek = const {},
-    required this.icon,
+    this.recurrence,
+    this.createdByMemberId,
+    this.active = true,
+    this.createdAt,
   });
+
+  Map<String, dynamic> toMap() => {
+        'title': title,
+        'description': description,
+        'icon': icon,             // <-- NEW
+        'difficulty': difficulty,
+        'points': points,
+        'recurrence': recurrence?.toMap(),
+        'createdByMemberId': createdByMemberId,
+        'active': active,
+        'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
+      };
+
+  factory Chore.fromDoc(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>? ?? {};
+    return Chore(
+      id: doc.id,
+      title: data['title'] as String? ?? 'Chore',
+      description: data['description'] as String?,
+      icon: data['icon'] as String?,   // <-- NEW
+      difficulty: (data['difficulty'] as num?)?.toInt() ?? 1,
+      points: (data['points'] as num?)?.toInt() ?? 0,
+      recurrence: data['recurrence'] == null
+          ? null
+          : Recurrence.fromMap(data['recurrence'] as Map<String, dynamic>),
+      createdByMemberId: data['createdByMemberId'] as String?,
+      active: (data['active'] as bool?) ?? true,
+      createdAt: tsAsDate(data['createdAt']),
+    );
+  }
 }
-
-const kSuggestedChores = <ChoreTemplate>[
-  ChoreTemplate(title: 'Make bed',       points: 5, schedule: ChoreSchedule.daily,      icon: Icons.bed_outlined),
-  ChoreTemplate(title: 'Brush teeth',    points: 3, schedule: ChoreSchedule.daily,      icon: Icons.brush),
-  ChoreTemplate(title: 'Dishes',         points: 7, schedule: ChoreSchedule.daily,      icon: Icons.local_dining),
-  ChoreTemplate(title: 'Take out trash', points: 6, schedule: ChoreSchedule.customDays, daysOfWeek: {1,4}, icon: Icons.delete_outline), // Mon/Thu
-  ChoreTemplate(title: 'Vacuum',         points: 8, schedule: ChoreSchedule.customDays, daysOfWeek: {6},   icon: Icons.cleaning_services),
-  ChoreTemplate(title: 'Laundry',        points: 8, schedule: ChoreSchedule.customDays, daysOfWeek: {3,6}, icon: Icons.local_laundry_service),
-  ChoreTemplate(title: 'Homework',       points: 10, schedule: ChoreSchedule.daily,     icon: Icons.school),
-  ChoreTemplate(title: 'Water plants',   points: 4, schedule: ChoreSchedule.customDays, daysOfWeek: {2},   icon: Icons.grass),
-];
-
-
-// String scheduleLabel(Chore c) {
-//   const names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-//   switch (c.schedule) {
-//     case ChoreSchedule.daily:
-//       return 'Daily';
-//     case ChoreSchedule.weeklyAny:
-//       if (c.daysOfWeek.isEmpty) return 'Weekly (any day)';
-//       final sorted = c.daysOfWeek.toList()..sort();
-//       if (sorted.length == 1) return 'Weekly (${names[sorted.first - 1]})';
-//       return 'Weekly (${sorted.map((d) => names[d - 1]).join(', ')})';
-//     case ChoreSchedule.customDays:
-//       final sorted = c.daysOfWeek.toList()..sort();
-//       return sorted.isEmpty ? 'Custom (none)'
-//                             : sorted.map((d)=>names[d-1]).join(', ');
-//   }
-// }

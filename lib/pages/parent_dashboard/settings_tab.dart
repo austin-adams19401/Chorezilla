@@ -1,213 +1,285 @@
-import 'package:chorezilla/navigation/transitions.dart';
-import 'package:chorezilla/pages/family_setup/edit_family.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import '../../state/app_state.dart';
+import 'package:provider/provider.dart';
+
+import 'package:chorezilla/state/app_state.dart';
+import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
+import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
+import 'package:chorezilla/auth/parent_join_page.dart';
 
 class SettingsTab extends StatelessWidget {
   const SettingsTab({super.key});
 
-  Future<String?> _getFamilyId() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return null;
-    final snap = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-    return (snap.data()?['familyId'] as String?);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<String?>(
-      future: _getFamilyId(),
-      builder: (context, familySnap) {
-        if (familySnap.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        final familyId = familySnap.data;
-        if (familyId == null) {
-          return _NoFamilyView(onGoToSetup: () {
-            Navigator.of(context).pushNamed('/family-setup');
-          });
-        }
-
-        final familyDoc = FirebaseFirestore.instance.collection('families').doc(familyId).snapshots();
-
-        return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-          stream: familyDoc,
-          builder: (context, snap) {
-            if (!snap.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final data = snap.data!.data() ?? {};
-            final code = (data['code'] ?? '—') as String;
-            final familyName = (data['name'] ?? 'Your Family') as String;
-
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Header
-                Text(familyName, style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 8),
-                Text('Settings & tools for your family', style: Theme.of(context).textTheme.bodyMedium),
-
-                const SizedBox(height: 24),
-
-                // Join Code card
-                Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text('Family Join Code', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SelectableText(
-                                code,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 28, letterSpacing: 3, fontWeight: FontWeight.w700),
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Copy',
-                              onPressed: () async {
-                                await Clipboard.setData(ClipboardData(text: code));
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Code copied to clipboard')),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.copy),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // QR (optional, small but scannable)
-                        Center(
-                          child: QrImageView(
-                            data: code,
-                            version: QrVersions.auto,
-                            size: 160,
-                            backgroundColor: Colors.white, // contrast in dark mode
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Kids can tap “Kid Login” and enter or scan this code to join.',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Theme toggle
-                _ThemeToggleTile(),
-
-                // Manage family
-                ListTile(
-                  leading: const Icon(Icons.group),
-                  title: const Text('Manage Family'),
-                  subtitle: const Text('Edit family name and members'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () {
-                    final fid = context.read<AppState>().familyId;
-                    if (fid == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Family not loaded yet')),
-                      );
-                      return;
-                    }
-                    Navigator.of(context).push(fadeThrough(const EditFamilyPage()));
-                  },
-                ),
-
-                // (Optional) Kid Login deep link
-                ListTile(
-                  leading: const Icon(Icons.vpn_key),
-                  title: const Text('Kid Login'),
-                  subtitle: const Text('Show the kid join screen on this device'),
-                  onTap: () {
-                    Navigator.of(context).pushNamed('/kid-join');
-                  },
-                  trailing: const Icon(Icons.chevron_right),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: const Text('Logout'),
-                  onTap: () async {
-                    await context.read<AppState>().logout();
-                    if (!context.mounted) return;
-                    Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
-                  },
-                  trailing: const Icon(Icons.chevron_right),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _NoFamilyView extends StatelessWidget {
-  final VoidCallback onGoToSetup;
-  const _NoFamilyView({required this.onGoToSetup});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.family_restroom, size: 64),
-          const SizedBox(height: 12),
-          const Text('No family linked yet'),
-          const SizedBox(height: 8),
-          FilledButton(
-            onPressed: onGoToSetup,
-            child: const Text('Create or Select Family'),
-          )
-        ],
-      ),
-    );
-  }
-}
-
-class _ThemeToggleTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    return ListTile(
-      leading: const Icon(Icons.dark_mode),
-      title: const Text('Appearance'),
-      subtitle: Text(
-        switch (app.themeMode) {
-          ThemeMode.light => 'Light',
-          ThemeMode.dark  => 'Dark',
-          _               => 'System',
-        },
-      ),
-      trailing: PopupMenuButton<ThemeMode>(
-        onSelected: (m) => context.read<AppState>().setThemeMode(m),
-        itemBuilder: (ctx) => const [
-          PopupMenuItem(value: ThemeMode.system, child: Text('System')),
-          PopupMenuItem(value: ThemeMode.light, child: Text('Light')),
-          PopupMenuItem(value: ThemeMode.dark,  child: Text('Dark')),
-        ],
-        child: const Icon(Icons.tune),
-      ),
+    final fam = app.family;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (fam != null)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.home_rounded),
+              title: Text(fam.name),
+              subtitle: Text('Family ID: ${fam.id}'),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.edit_rounded),
+            title: const Text('Edit family'),
+            subtitle: const Text('Rename & get invite code'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const EditFamilyPage())),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.child_care_rounded),
+            title: const Text('Manage kids'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const AddKidsPage())),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.group_add_rounded),
+            title: const Text('Join as a parent (code)'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ParentJoinPage())),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Center(
+          child: OutlinedButton.icon(
+            icon: const Icon(Icons.logout_rounded),
+            label: const Text('Sign out'),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 }
+
+// import 'package:chorezilla/navigation/transitions.dart';
+// import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
+// import 'package:flutter/material.dart';
+// import 'package:flutter/services.dart';
+// import 'package:provider/provider.dart';
+// import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:qr_flutter/qr_flutter.dart';
+// import '../../z_archive/app_state_old.dart';
+
+// class SettingsTab extends StatelessWidget {
+//   const SettingsTab({super.key});
+
+//   Future<String?> _getFamilyId() async {
+//     final uid = FirebaseAuth.instance.currentUser?.uid;
+//     if (uid == null) return null;
+//     final snap = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+//     return (snap.data()?['familyId'] as String?);
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return FutureBuilder<String?>(
+//       future: _getFamilyId(),
+//       builder: (context, familySnap) {
+//         if (familySnap.connectionState != ConnectionState.done) {
+//           return const Center(child: CircularProgressIndicator());
+//         }
+//         final familyId = familySnap.data;
+//         if (familyId == null) {
+//           return _NoFamilyView(onGoToSetup: () {
+//             Navigator.of(context).pushNamed('/family-setup');
+//           });
+//         }
+
+//         final familyDoc = FirebaseFirestore.instance.collection('families').doc(familyId).snapshots();
+
+//         return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+//           stream: familyDoc,
+//           builder: (context, snap) {
+//             if (!snap.hasData) {
+//               return const Center(child: CircularProgressIndicator());
+//             }
+//             final data = snap.data!.data() ?? {};
+//             final code = (data['code'] ?? '—') as String;
+//             final familyName = (data['name'] ?? 'Your Family') as String;
+
+//             return ListView(
+//               padding: const EdgeInsets.all(16),
+//               children: [
+//                 // Header
+//                 Text(familyName, style: Theme.of(context).textTheme.headlineSmall),
+//                 const SizedBox(height: 8),
+//                 Text('Settings & tools for your family', style: Theme.of(context).textTheme.bodyMedium),
+
+//                 const SizedBox(height: 24),
+
+//                 // Join Code card
+//                 Card(
+//                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+//                   child: Padding(
+//                     padding: const EdgeInsets.all(16),
+//                     child: Column(
+//                       crossAxisAlignment: CrossAxisAlignment.stretch,
+//                       children: [
+//                         Text('Family Join Code', style: Theme.of(context).textTheme.titleMedium),
+//                         const SizedBox(height: 12),
+//                         Row(
+//                           children: [
+//                             Expanded(
+//                               child: SelectableText(
+//                                 code,
+//                                 textAlign: TextAlign.center,
+//                                 style: const TextStyle(fontSize: 28, letterSpacing: 3, fontWeight: FontWeight.w700),
+//                               ),
+//                             ),
+//                             IconButton(
+//                               tooltip: 'Copy',
+//                               onPressed: () async {
+//                                 await Clipboard.setData(ClipboardData(text: code));
+//                                 if (context.mounted) {
+//                                   ScaffoldMessenger.of(context).showSnackBar(
+//                                     const SnackBar(content: Text('Code copied to clipboard')),
+//                                   );
+//                                 }
+//                               },
+//                               icon: const Icon(Icons.copy),
+//                             ),
+//                           ],
+//                         ),
+//                         const SizedBox(height: 16),
+//                         // QR (optional, small but scannable)
+//                         Center(
+//                           child: QrImageView(
+//                             data: code,
+//                             version: QrVersions.auto,
+//                             size: 160,
+//                             backgroundColor: Colors.white, // contrast in dark mode
+//                           ),
+//                         ),
+//                         const SizedBox(height: 8),
+//                         Text(
+//                           'Kids can tap “Kid Login” and enter or scan this code to join.',
+//                           textAlign: TextAlign.center,
+//                           style: Theme.of(context).textTheme.bodySmall,
+//                         ),
+//                       ],
+//                     ),
+//                   ),
+//                 ),
+
+//                 const SizedBox(height: 16),
+
+//                 // Theme toggle
+//                 _ThemeToggleTile(),
+
+//                 // Manage family
+//                 ListTile(
+//                   leading: const Icon(Icons.group),
+//                   title: const Text('Manage Family'),
+//                   subtitle: const Text('Edit family name and members'),
+//                   trailing: const Icon(Icons.chevron_right),
+//                   onTap: () {
+//                     final fid = context.read<AppState>().familyId;
+//                     if (fid == null) {
+//                       ScaffoldMessenger.of(context).showSnackBar(
+//                         const SnackBar(content: Text('Family not loaded yet')),
+//                       );
+//                       return;
+//                     }
+//                     Navigator.of(context).push(fadeThrough(const EditFamilyPage()));
+//                   },
+//                 ),
+
+//                 // (Optional) Kid Login deep link
+//                 ListTile(
+//                   leading: const Icon(Icons.vpn_key),
+//                   title: const Text('Kid Login'),
+//                   subtitle: const Text('Show the kid join screen on this device'),
+//                   onTap: () {
+//                     Navigator.of(context).pushNamed('/kid-join');
+//                   },
+//                   trailing: const Icon(Icons.chevron_right),
+//                 ),
+//                 ListTile(
+//                   leading: const Icon(Icons.logout),
+//                   title: const Text('Logout'),
+//                   onTap: () async {
+//                     await context.read<AppState>().logout();
+//                     if (!context.mounted) return;
+//                     Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil('/login', (route) => false);
+//                   },
+//                   trailing: const Icon(Icons.chevron_right),
+//                 ),
+//               ],
+//             );
+//           },
+//         );
+//       },
+//     );
+//   }
+// }
+
+// class _NoFamilyView extends StatelessWidget {
+//   final VoidCallback onGoToSetup;
+//   const _NoFamilyView({required this.onGoToSetup});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Center(
+//       child: Column(
+//         mainAxisSize: MainAxisSize.min,
+//         children: [
+//           const Icon(Icons.family_restroom, size: 64),
+//           const SizedBox(height: 12),
+//           const Text('No family linked yet'),
+//           const SizedBox(height: 8),
+//           FilledButton(
+//             onPressed: onGoToSetup,
+//             child: const Text('Create or Select Family'),
+//           )
+//         ],
+//       ),
+//     );
+//   }
+// }
+
+// class _ThemeToggleTile extends StatelessWidget {
+//   @override
+//   Widget build(BuildContext context) {
+//     final app = context.watch<AppState>();
+//     return ListTile(
+//       leading: const Icon(Icons.dark_mode),
+//       title: const Text('Appearance'),
+//       subtitle: Text(
+//         switch (app.themeMode) {
+//           ThemeMode.light => 'Light',
+//           ThemeMode.dark  => 'Dark',
+//           _               => 'System',
+//         },
+//       ),
+//       trailing: PopupMenuButton<ThemeMode>(
+//         onSelected: (m) => context.read<AppState>().setThemeMode(m),
+//         itemBuilder: (ctx) => const [
+//           PopupMenuItem(value: ThemeMode.system, child: Text('System')),
+//           PopupMenuItem(value: ThemeMode.light, child: Text('Light')),
+//           PopupMenuItem(value: ThemeMode.dark,  child: Text('Dark')),
+//         ],
+//         child: const Icon(Icons.tune),
+//       ),
+//     );
+//   }
+// }
