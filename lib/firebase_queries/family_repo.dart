@@ -262,6 +262,40 @@ class FamilyRepo {
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
 
+  // Watch assignments due in [start, end). We only query by "due" to avoid composite index requirements.
+  // We filter to status==assigned in memory.
+  Stream<List<Assignment>> watchAssignmentsDueRange(
+    String familyId, {
+    required DateTime start,
+    required DateTime end,
+  }) {
+    final q = assignmentsColl(db, familyId)
+        .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('due', isLessThan: Timestamp.fromDate(end))
+        .orderBy('due'); // single-field index only
+    return q.snapshots().map((s) => s.docs
+        .map(Assignment.fromDoc)
+        .where((a) => a.status == AssignmentStatus.assigned)
+        .toList());
+  }
+
+  // Assignments due today (filters status in memory to avoid composite indexes)
+  Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = start.add(const Duration(days: 1));
+    final q = assignmentsColl(db, familyId)
+        .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('due', isLessThan: Timestamp.fromDate(end))
+        .orderBy('due');
+    return q.snapshots().map((s) => s.docs
+        .map(Assignment.fromDoc)
+        .where((a) => a.status == AssignmentStatus.assigned)
+        .toList());
+  }
+
+
+
   Stream<List<Assignment>> watchReviewQueue(String familyId) {
     return assignmentsColl(db, familyId)
         .where('status', isEqualTo: statusToString(AssignmentStatus.completed))

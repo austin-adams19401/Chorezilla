@@ -1,106 +1,202 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:chorezilla/state/app_state.dart';
-import 'package:chorezilla/models/common.dart';
-import 'package:chorezilla/models/member.dart';
+import 'package:chorezilla/models/assignment.dart';
 
-class ParentHomeTab extends StatelessWidget {
+enum HomeGroupBy { kid, chore }
+
+class ParentHomeTab extends StatefulWidget {
   const ParentHomeTab({super.key});
 
   @override
+  State<ParentHomeTab> createState() => _ParentHomeTabState();
+}
+
+class _ParentHomeTabState extends State<ParentHomeTab> {
+  static const _prefsKey = 'homeGroupBy';
+  HomeGroupBy _groupBy = HomeGroupBy.kid;
+
+  Stream<List<Assignment>>? _todayStream;
+  String? _boundFamilyId;
+  bool _loadedPref = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final app = context.read<AppState>();
+    if (!app.isReady) return;
+
+    if (!_loadedPref) {
+      _loadGroupingPref();
+    }
+    if (_boundFamilyId != app.familyId) {
+      _boundFamilyId = app.familyId;
+      _todayStream = app.repo.watchAssignmentsDueToday(_boundFamilyId!);
+    }
+  }
+
+  Future<void> _loadGroupingPref() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_prefsKey);
+    setState(() {
+      _groupBy = s == 'chore' ? HomeGroupBy.chore : HomeGroupBy.kid;
+      _loadedPref = true;
+    });
+  }
+
+  Future<void> _saveGroupingPref(HomeGroupBy g) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_prefsKey, g == HomeGroupBy.chore ? 'chore' : 'kid');
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final kids = app.members.where((m) => m.role == FamilyRole.child && m.active).toList();
-    final reviewCount = app.reviewQueue.length;
+    final appReady = context.select((AppState s) => s.isReady);
+    if (!appReady || _todayStream == null || !_loadedPref) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _QuickStatsRow(
-          kids: kids.length,
-          chores: app.chores.length,
-          pending: reviewCount,
-        ),
-        const SizedBox(height: 16),
+    return StreamBuilder<List<Assignment>>(
+      stream: _todayStream,
+      builder: (context, snap) {
+        final items = snap.data ?? const <Assignment>[];
 
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.fact_check_rounded),
-            title: const Text('Review completed chores'),
-            subtitle: Text(reviewCount == 0 ? 'Nothing to review' : '$reviewCount waiting'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => DefaultTabController.of(context).animateTo(2),
-          ),
-        ),
-        const SizedBox(height: 12),
+        if (snap.connectionState == ConnectionState.waiting && items.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (items.isEmpty) {
+          return _EmptyToday(onToggle: _toggleGroup);
+        }
 
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.playlist_add_check_rounded),
-            title: const Text('Assign chores'),
-            subtitle: const Text('Pick kids, choose chores, set due date'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => DefaultTabController.of(context).animateTo(1),
-          ),
-        ),
-        const SizedBox(height: 12),
+        final groups = _groupBy == HomeGroupBy.kid
+            ? _groupByKey(items, (a) => (a.memberName.isNotEmpty ? a.memberName : 'Kid'), key: (a) => a.memberId)
+            : _groupByKey(items, (a) => a.choreTitle, key: (a) => a.choreId);
 
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.person_add_alt_1_rounded),
-            title: const Text('Invite another parent'),
-            subtitle: const Text('Share a one-time join code'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => DefaultTabController.of(context).animateTo(3),
-          ),
-        ),
-      ],
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  Text('Due today', style: Theme.of(context).textTheme.titleLarge),
+                  const Spacer(),
+                  SegmentedButton<HomeGroupBy>(
+                    segments: const [
+                      ButtonSegment(value: HomeGroupBy.kid, label: Text('By Kid')),
+                      ButtonSegment(value: HomeGroupBy.chore, label: Text('By Chore')),
+                    ],
+                    selected: {_groupBy},
+                    onSelectionChanged: (s) async {
+                      final g = s.first;
+                      setState(() => _groupBy = g);
+                      await _saveGroupingPref(g);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                itemCount: groups.length,
+                itemBuilder: (_, i) {
+                  final g = groups[i];
+                  return Card(
+                    elevation: 0,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(g.title, style: Theme.of(context).textTheme.titleMedium),
+                          const SizedBox(height: 6),
+                          ...g.items.map((a) => ListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                leading: Text(
+                                  a.choreIcon?.isNotEmpty == true ? a.choreIcon! : '🧩',
+                                  style: const TextStyle(fontSize: 20),
+                                ),
+                                title: Text(a.choreTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                subtitle: Text('${a.points} pts • due ${_dueLabel(a.due)}'),
+                              )),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  void _toggleGroup() {
+    final next = _groupBy == HomeGroupBy.kid ? HomeGroupBy.chore : HomeGroupBy.kid;
+    setState(() => _groupBy = next);
+    _saveGroupingPref(next);
+  }
+
+  String _dueLabel(DateTime? d) {
+    if (d == null) return 'today';
+    return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  }
+
+  List<_Group> _groupByKey(
+    List<Assignment> src,
+    String Function(Assignment) titleOf, {
+    required String Function(Assignment) key,
+  }) {
+    final map = <String, _Group>{};
+    for (final a in src) {
+      final k = key(a);
+      map.putIfAbsent(k, () => _Group(title: titleOf(a), items: []));
+      map[k]!.items.add(a);
+    }
+    final out = map.values.toList();
+    out.sort((a, b) => a.title.compareTo(b.title));
+    for (final g in out) {
+      g.items.sort((a, b) => (a.due ?? DateTime(2100)).compareTo(b.due ?? DateTime(2100)));
+    }
+    return out;
   }
 }
 
-class _QuickStatsRow extends StatelessWidget {
-  const _QuickStatsRow({required this.kids, required this.chores, required this.pending});
-  final int kids;
-  final int chores;
-  final int pending;
+class _Group {
+  _Group({required this.title, required this.items});
+  final String title;
+  final List<Assignment> items;
+}
+
+class _EmptyToday extends StatelessWidget {
+  const _EmptyToday({required this.onToggle});
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        _StatCard(label: 'Kids', value: kids.toString(), color: cs.tertiaryContainer, onColor: cs.onTertiaryContainer),
-        const SizedBox(width: 12),
-        _StatCard(label: 'Chores', value: chores.toString(), color: cs.secondaryContainer, onColor: cs.onSecondaryContainer),
-        const SizedBox(width: 12),
-        _StatCard(label: 'Pending', value: pending.toString(), color: cs.primaryContainer, onColor: cs.onPrimaryContainer),
-      ],
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value, required this.color, required this.onColor});
-  final String label;
-  final String value;
-  final Color color;
-  final Color onColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final ts = Theme.of(context).textTheme;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(14)),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(label, style: ts.labelMedium?.copyWith(color: onColor)),
-            const SizedBox(height: 4),
-            Text(value, style: ts.titleLarge?.copyWith(color: onColor, fontWeight: FontWeight.w700)),
+            Text('🎉', style: Theme.of(context).textTheme.displaySmall),
+            const SizedBox(height: 8),
+            const Text('Nothing due today'),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: onToggle,
+              icon: const Icon(Icons.swap_horiz_rounded),
+              label: const Text('Switch grouping'),
+              style: TextButton.styleFrom(foregroundColor: cs.primary),
+            ),
           ],
         ),
       ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/assignment.dart';
 
@@ -17,71 +16,75 @@ class _CheckoffTabState extends State<CheckoffTab> {
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final items = app.reviewQueue;
+    final app = context.read<AppState>();
 
-    if (items.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('No completed chores waiting for review.'),
-        ),
-      );
-    }
+    return ValueListenableBuilder<List<Assignment>>(
+      valueListenable: app.reviewQueueVN,
+      builder: (_, items, _) {
+        if (items.isEmpty) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text('No completed chores waiting for review.'),
+            ),
+          );
+        }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (_, i) {
-        final a = items[i];
-        return Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(a.choreIcon?.isNotEmpty == true ? a.choreIcon! : '🧩', style: const TextStyle(fontSize: 22)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(a.choreTitle, style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 2),
-                      Text('From: ${a.memberName} • ${a.points} pts'),
-                      if (a.proof?.note?.isNotEmpty == true) ...[
-                        const SizedBox(height: 6),
-                        Text('Note: ${a.proof!.note!}'),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Column(
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+          itemCount: items.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          itemBuilder: (_, i) {
+            final a = items[i];
+            return Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    FilledButton.icon(
-                      icon: _busyApprove.contains(a.id)
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.thumb_up_alt_rounded),
-                      label: const Text('Approve'),
-                      onPressed: _busyApprove.contains(a.id) ? null : () => _approve(a),
+                    Text(a.choreIcon?.isNotEmpty == true ? a.choreIcon! : '🧩', style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(a.choreTitle, style: Theme.of(context).textTheme.titleMedium),
+                          const SizedBox(height: 2),
+                          Text('From: ${a.memberName} • ${a.points} pts'),
+                          if (a.proof?.note?.isNotEmpty == true) ...[
+                            const SizedBox(height: 6),
+                            Text('Note: ${a.proof!.note!}'),
+                          ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 8),
-                    OutlinedButton.icon(
-                      icon: _busyReject.contains(a.id)
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.thumb_down_alt_rounded),
-                      label: const Text('Reject'),
-                      onPressed: _busyReject.contains(a.id) ? null : () => _reject(a),
+                    const SizedBox(width: 12),
+                    Column(
+                      children: [
+                        FilledButton.icon(
+                          icon: _busyApprove.contains(a.id)
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.thumb_up_alt_rounded),
+                          label: const Text('Approve'),
+                          onPressed: _busyApprove.contains(a.id) ? null : () => _approve(a),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          icon: _busyReject.contains(a.id)
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.thumb_down_alt_rounded),
+                          label: const Text('Reject'),
+                          onPressed: _busyReject.contains(a.id) ? null : () => _reject(a),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

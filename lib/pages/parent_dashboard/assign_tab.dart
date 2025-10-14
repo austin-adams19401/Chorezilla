@@ -1,10 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/common.dart';
-import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/chore.dart';
+import 'package:chorezilla/models/family.dart';
+import 'package:chorezilla/models/member.dart';
 
 class AssignTab extends StatefulWidget {
   const AssignTab({super.key});
@@ -14,116 +16,305 @@ class AssignTab extends StatefulWidget {
 }
 
 class _AssignTabState extends State<AssignTab> {
-  final Set<String> _selectedKidIds = {};
-  final Set<String> _selectedChoreIds = {};
-  DateTime _due = DateTime.now().add(const Duration(days: 1));
-  bool _busy = false;
-  String _searchChore = '';
+  String _q = '';
+  Timer? _deb;
+
+  @override
+  void dispose() {
+    _deb?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
-    final kids = app.members.where((m) => m.role == FamilyRole.child && m.active).toList();
-    final chores = app.chores
-        .where((c) => c.active)
-        .where((c) => _searchChore.isEmpty || c.title.toLowerCase().contains(_searchChore.toLowerCase()))
-        .toList();
+    final app = context.read<AppState>(); // read (not watch)
+    return Scaffold(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: TextField(
+              decoration: const InputDecoration(
+                hintText: 'Search chores',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+              onChanged: (v) {
+                _deb?.cancel();
+                _deb = Timer(const Duration(milliseconds: 200), () {
+                  if (mounted) setState(() => _q = v);
+                });
+              },
+            ),
+          ),
+          Expanded(
+            child: ValueListenableBuilder<List<Chore>>(
+              valueListenable: app.choresVN,
+              builder: (_, choresList, __) {
+                final chores = choresList
+                    .where((c) => c.active)
+                    .where((c) => _q.isEmpty || c.title.toLowerCase().contains(_q.toLowerCase()))
+                    .toList();
 
-    final canAssign = _selectedKidIds.isNotEmpty && _selectedChoreIds.isNotEmpty;
+                if (chores.isEmpty) {
+                  return const Center(child: Text('No chores yet — add one.'));
+                }
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  decoration: const InputDecoration(
-                    hintText: 'Search chores',
-                    prefixIcon: Icon(Icons.search_rounded),
-                  ),
-                  onChanged: (v) => setState(() => _searchChore = v),
-                ),
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                onPressed: _busy || !canAssign ? null : () => _assign(context),
-                icon: _busy
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.send_rounded),
-                label: const Text('Assign'),
-              ),
-            ],
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+                  itemCount: chores.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final c = chores[i];
+                    return Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      child: ListTile(
+                        leading: Text(c.icon?.isNotEmpty == true ? c.icon! : '🧩', style: const TextStyle(fontSize: 22)),
+                        title: Text(c.title),
+                        subtitle: Text('${c.points} pts • ${_difficultyName(c.difficulty)}'
+                            '${c.recurrence != null ? ' • ${c.recurrence!.type}' : ''}'),
+                        trailing: FilledButton.tonal(
+                          onPressed: () => _openAssignSheet(context, c),
+                          child: const Text('Assign'),
+                        ),
+                        onTap: () => _openAssignSheet(context, c),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              Expanded(
-                child: _DuePicker(
-                  initial: _due,
-                  onChanged: (d) => setState(() => _due = d),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Text('${_selectedKidIds.length} kid(s) • ${_selectedChoreIds.length} chore(s)'),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Row(
-            children: [
-              _Pane(
-                title: 'Kids',
-                child: _KidList(
-                  kids: kids,
-                  selectedIds: _selectedKidIds,
-                  onToggle: (id) => setState(() {
-                    if (_selectedKidIds.contains(id)) {
-                      _selectedKidIds.remove(id);
-                    } else {
-                      _selectedKidIds.add(id);
-                    }
-                  }),
-                ),
-              ),
-              _Pane(
-                title: 'Chores',
-                child: _ChoreList(
-                  chores: chores,
-                  selectedIds: _selectedChoreIds,
-                  onToggle: (id) => setState(() {
-                    if (_selectedChoreIds.contains(id)) {
-                      _selectedChoreIds.remove(id);
-                    } else {
-                      _selectedChoreIds.add(id);
-                    }
-                  }),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openNewChoreSheet(context),
+        icon: const Icon(Icons.add_task_rounded),
+        label: const Text('New chore'),
+      ),
     );
   }
 
-  Future<void> _assign(BuildContext context) async {
+  String _difficultyName(int d) {
+    switch (d) {
+      case 1: return 'Very easy';
+      case 2: return 'Easy';
+      case 3: return 'Medium';
+      case 4: return 'Hard';
+      case 5: return 'Epic';
+      default: return 'Custom';
+    }
+  }
+
+  Future<void> _openNewChoreSheet(BuildContext context) async {
     final app = context.read<AppState>();
+    final fam = app.family!;
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _ChoreEditorSheet(family: fam),
+    );
+    if (!mounted) return;
+    if (created == true) {
+      setState(() {}); // refresh filters immediately so the new chore appears
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chore created')));
+    }
+  }
+
+  Future<void> _openAssignSheet(BuildContext context, Chore chore) async {
+    final ok = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _AssignSheet(chore: chore),
+    );
+    if (ok == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Assigned!')));
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New chore sheet: emoji picker + readable difficulty names
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ChoreEditorSheet extends StatefulWidget {
+  const _ChoreEditorSheet({required this.family});
+  final Family family;
+
+  @override
+  State<_ChoreEditorSheet> createState() => _ChoreEditorSheetState();
+}
+
+class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
+  final _title = TextEditingController();
+  final _desc = TextEditingController();
+  final _icon = TextEditingController(text: '🧹');
+  int _difficulty = 2;
+  String _recType = 'once'; // once | daily | weekly | custom
+  final Set<int> _days = {}; // 1..7
+  String? _timeOfDay;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _title.dispose(); _desc.dispose(); _icon.dispose();
+    super.dispose();
+  }
+
+  int get _points => widget.family.settings.pointsPerDifficulty[_difficulty] ?? _difficulty * 10;
+
+  @override
+  Widget build(BuildContext context) {
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: viewInsets),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(children: [
+                  const Icon(Icons.add_task_rounded),
+                  const SizedBox(width: 8),
+                  Text('New chore', style: Theme.of(context).textTheme.titleLarge),
+                ]),
+                const SizedBox(height: 12),
+
+                TextField(controller: _title, decoration: const InputDecoration(labelText: 'Title')),
+                const SizedBox(height: 8),
+                TextField(controller: _desc, decoration: const InputDecoration(labelText: 'Description (optional)')),
+                const SizedBox(height: 8),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _icon,
+                        decoration: InputDecoration(
+                          labelText: 'Icon (emoji)',
+                          suffixIcon: IconButton(
+                            tooltip: 'Pick',
+                            icon: const Icon(Icons.emoji_emotions_rounded),
+                            onPressed: _openEmojiPicker,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonFormField<int>(
+                        initialValue: _difficulty,
+                        items: const [
+                          DropdownMenuItem(value: 1, child: Text('Very easy')),
+                          DropdownMenuItem(value: 2, child: Text('Easy')),
+                          DropdownMenuItem(value: 3, child: Text('Medium')),
+                          DropdownMenuItem(value: 4, child: Text('Hard')),
+                          DropdownMenuItem(value: 5, child: Text('Epic')),
+                        ],
+                        onChanged: (v) => setState(() => _difficulty = v ?? 2),
+                        decoration: const InputDecoration(labelText: 'Difficulty'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Worth $_points pts'),
+                ),
+
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Wrap(
+                    spacing: 6,
+                    children: [
+                      for (final t in const ['once','daily','weekly','custom'])
+                        ChoiceChip(
+                          label: Text(t[0].toUpperCase() + t.substring(1)),
+                          selected: _recType == t,
+                          onSelected: (_) => setState(() => _recType = t),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_recType == 'weekly' || _recType == 'custom') ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Wrap(
+                      spacing: 6,
+                      children: [
+                        for (var i = 1; i <= 7; i++)
+                          FilterChip(
+                            label: Text(['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i-1]),
+                            selected: _days.contains(i),
+                            onSelected: (sel) => setState(() => sel ? _days.add(i) : _days.remove(i)),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.schedule_rounded),
+                    label: Text(_timeOfDay == null ? 'Pick time (optional)' : 'Time: $_timeOfDay'),
+                    onPressed: () async {
+                      final now = TimeOfDay.now();
+                      final picked = await showTimePicker(context: context, initialTime: now);
+                      if (picked != null) setState(() => _timeOfDay = picked.format(context));
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                FilledButton(
+                  onPressed: _busy ? null : _save,
+                  child: _busy
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Create chore'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openEmojiPicker() async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      builder: (_) => const _EmojiPicker(),
+    );
+    if (picked != null && mounted) {
+      setState(() => _icon.text = picked);
+    }
+  }
+
+  Future<void> _save() async {
+    if (_title.text.trim().isEmpty) return;
     setState(() => _busy = true);
     try {
-      final members = _selectedKidIds.toList();
-      for (final choreId in _selectedChoreIds) {
-        await app.assignChore(choreId: choreId, memberIds: members, due: _due);
-      }
+      final app = context.read<AppState>();
+      final rec = Recurrence(
+        type: _recType,
+        daysOfWeek: (_recType == 'weekly' || _recType == 'custom') ? _days.toList() : null,
+        timeOfDay: _timeOfDay,
+      );
+      await app.createChore(
+        title: _title.text.trim(),
+        description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
+        iconKey: _icon.text.trim().isEmpty ? null : _icon.text.trim(),
+        difficulty: _difficulty,
+        recurrence: rec,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Assigned!')));
-      setState(() {
-        _selectedKidIds.clear();
-        _selectedChoreIds.clear();
-      });
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -133,123 +324,170 @@ class _AssignTabState extends State<AssignTab> {
   }
 }
 
-class _Pane extends StatelessWidget {
-  const _Pane({required this.title, required this.child});
-  final String title;
-  final Widget child;
+class _EmojiPicker extends StatelessWidget {
+  const _EmojiPicker();
+
+  static const _emojis = [
+    '🧹','🧼','🧽','🧺','🪣','🧻','🧯','🪥','🪠',
+    '🛏️','🪑','🧊','🍽️','🍳','🍞','🧃','🐶','🐱','🌿',
+    '📚','🧠','🧩','🎒','👟','🧤','🧢','🧦','🧴',
+  ];
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Expanded(
+    return SafeArea(
       child: Container(
-        margin: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: cs.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        padding: const EdgeInsets.all(12),
+        height: 280,
+        child: GridView.builder(
+          itemCount: _emojis.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 6, mainAxisSpacing: 8, crossAxisSpacing: 8,
+          ),
+          itemBuilder: (_, i) {
+            final e = _emojis[i];
+            return InkWell(
+              onTap: () => Navigator.of(context).pop(e),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(e, style: const TextStyle(fontSize: 24)),
               ),
-              child: Text(title, style: Theme.of(context).textTheme.titleSmall),
-            ),
-            Expanded(child: child),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _KidList extends StatelessWidget {
-  const _KidList({required this.kids, required this.selectedIds, required this.onToggle});
-  final List<Member> kids;
-  final Set<String> selectedIds;
-  final void Function(String id) onToggle;
+// ─────────────────────────────────────────────────────────────────────────────
+// Assign sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AssignSheet extends StatefulWidget {
+  const _AssignSheet({required this.chore});
+  final Chore chore;
+
+  @override
+  State<_AssignSheet> createState() => _AssignSheetState();
+}
+
+class _AssignSheetState extends State<_AssignSheet> {
+  final Set<String> _kidIds = {};
+  DateTime _due = DateTime.now().add(const Duration(days: 1));
+  bool _busy = false;
 
   @override
   Widget build(BuildContext context) {
-    if (kids.isEmpty) {
-      return const Center(child: Text('No kids yet'));
-    }
-    return ListView.builder(
-      itemCount: kids.length,
-      itemBuilder: (_, i) {
-        final k = kids[i];
-        final selected = selectedIds.contains(k.id);
-        return CheckboxListTile(
-          value: selected,
-          onChanged: (_) => onToggle(k.id),
-          title: Text(k.displayName),
-          subtitle: Text('Level ${k.level} • ${k.xp} XP • ${k.coins} coins'),
+    final app = context.read<AppState>();
+    return ValueListenableBuilder<List<Member>>(
+      valueListenable: app.membersVN,
+      builder: (_, members, _) {
+        final kids = members.where((m) => m.role == FamilyRole.child && m.active).toList();
+        final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+
+        return Padding(
+          padding: EdgeInsets.only(bottom: viewInsets),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(children: [
+                      Text(widget.chore.icon?.isNotEmpty == true ? widget.chore.icon! : '🧩', style: const TextStyle(fontSize: 22)),
+                      const SizedBox(width: 8),
+                      Text('Assign "${widget.chore.title}"', style: Theme.of(context).textTheme.titleLarge),
+                    ]),
+                    const SizedBox(height: 8),
+                    Align(alignment: Alignment.centerLeft, child: Text('${_difficultyName(widget.chore.difficulty)} • ${widget.chore.points} pts')),
+
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: kids.map((k) {
+                          final sel = _kidIds.contains(k.id);
+                          return FilterChip(
+                            label: Text(k.displayName),
+                            selected: sel,
+                            onSelected: (v) => setState(() => v ? _kidIds.add(k.id) : _kidIds.remove(k.id)),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule_rounded),
+                        const SizedBox(width: 8),
+                        TextButton(
+                          onPressed: () async {
+                            final now = DateTime.now();
+                            final picked = await showDatePicker(
+                              context: context, initialDate: _due,
+                              firstDate: DateTime(now.year - 1), lastDate: DateTime(now.year + 3),
+                            );
+                            if (picked != null) setState(() => _due = DateTime(picked.year, picked.month, picked.day));
+                          },
+                          child: Text('Due: ${_due.month}/${_due.day}'),
+                        ),
+                        const Spacer(),
+                        FilledButton(
+                          onPressed: _busy || _kidIds.isEmpty ? null : _assign,
+                          child: _busy
+                              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Text('Assign to selected'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         );
       },
     );
   }
-}
 
-class _ChoreList extends StatelessWidget {
-  const _ChoreList({required this.chores, required this.selectedIds, required this.onToggle});
-  final List<Chore> chores;
-  final Set<String> selectedIds;
-  final void Function(String id) onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    if (chores.isEmpty) {
-      return const Center(child: Text('No chores yet'));
+  String _difficultyName(int d) {
+    switch (d) {
+      case 1: return 'Very easy';
+      case 2: return 'Easy';
+      case 3: return 'Medium';
+      case 4: return 'Hard';
+      case 5: return 'Epic';
+      default: return 'Custom';
     }
-    return ListView.builder(
-      itemCount: chores.length,
-      itemBuilder: (_, i) {
-        final c = chores[i];
-        final selected = selectedIds.contains(c.id);
-        return CheckboxListTile(
-          value: selected,
-          onChanged: (_) => onToggle(c.id),
-          title: Text(c.title),
-          subtitle: Text('${c.points} pts • difficulty ${c.difficulty}'),
-          secondary: Text(c.icon?.isNotEmpty == true ? c.icon! : '🧩', style: const TextStyle(fontSize: 18)),
-        );
-      },
-    );
   }
-}
 
-class _DuePicker extends StatelessWidget {
-  const _DuePicker({required this.initial, required this.onChanged});
-  final DateTime initial;
-  final void Function(DateTime) onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final ts = Theme.of(context).textTheme;
-    return InkWell(
-      onTap: () async {
-        final now = DateTime.now();
-        final picked = await showDatePicker(
-          context: context,
-          firstDate: DateTime(now.year - 1),
-          lastDate: DateTime(now.year + 3),
-          initialDate: initial,
-        );
-        if (picked != null) onChanged(DateTime(picked.year, picked.month, picked.day));
-      },
-      child: Row(
-        children: [
-          const Icon(Icons.schedule_rounded),
-          const SizedBox(width: 8),
-          Text('Due: ${initial.month}/${initial.day}', style: ts.bodyMedium),
-        ],
-      ),
-    );
+  Future<void> _assign() async {
+    setState(() => _busy = true);
+    try {
+      final app = context.read<AppState>();
+      await app.assignChore(
+        choreId: widget.chore.id,
+        memberIds: _kidIds,
+        due: _due,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }
 
