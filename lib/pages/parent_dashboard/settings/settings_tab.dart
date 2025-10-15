@@ -30,7 +30,7 @@ class SettingsTab extends StatelessWidget {
             subtitle: const Text('Toggle app theme'),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
 
         // 2) Edit family
         Card(
@@ -44,7 +44,7 @@ class SettingsTab extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 3),
 
         // 3) Manage kids — add a subtle subtitle to keep tile heights consistent
         Card(
@@ -58,7 +58,7 @@ class SettingsTab extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 3),
         Card(
           child: ListTile(
             leading: const Icon(Icons.devices_other_rounded),
@@ -70,7 +70,7 @@ class SettingsTab extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 3),
 
         // 4) Join using a code
         Card(
@@ -84,7 +84,7 @@ class SettingsTab extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 3),
 
         // 5) Enter Kid Mode
         Card(

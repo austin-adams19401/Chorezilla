@@ -71,12 +71,24 @@ class _AssignTabState extends State<AssignTab> {
                       child: ListTile(
                         leading: Text(c.icon?.isNotEmpty == true ? c.icon! : '🧩', style: const TextStyle(fontSize: 22)),
                         title: Text(c.title),
-                        subtitle: Text('${c.points} pts • ${_difficultyName(c.difficulty)}'
+                        subtitle: Text('${_difficultyName(c.difficulty)}'
                             '${c.recurrence != null ? ' • ${c.recurrence!.type}' : ''}'),
-                        trailing: FilledButton.tonal(
-                          onPressed: () => _openAssignSheet(context, c),
-                          child: const Text('Assign'),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.edit_outlined),
+                              tooltip: 'Edit',
+                              onPressed: () => _openEditChoreSheet(context, c),
+                            ),
+                            const SizedBox(width: 4),
+                            FilledButton.tonal(
+                              onPressed: () => _openAssignSheet(context, c),
+                              child: const Text('Assign'),
+                            ),
+                          ],
                         ),
+
                         onTap: () => _openAssignSheet(context, c),
                       ),
                     );
@@ -131,6 +143,23 @@ class _AssignTabState extends State<AssignTab> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Assigned!')));
     }
   }
+
+  Future<void> _openEditChoreSheet(BuildContext context, Chore chore) async {
+    final app = context.read<AppState>();
+    final fam = app.family!;
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _ChoreEditorSheet(family: fam, chore: chore), // 👈 pass chore
+    );
+    if (!mounted) return;
+    if (saved == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chore updated')),
+      );
+      setState(() {}); // refresh list
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -138,8 +167,9 @@ class _AssignTabState extends State<AssignTab> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ChoreEditorSheet extends StatefulWidget {
-  const _ChoreEditorSheet({required this.family});
+  const _ChoreEditorSheet({required this.family, this.chore});
   final Family family;
+  final Chore? chore;
 
   @override
   State<_ChoreEditorSheet> createState() => _ChoreEditorSheetState();
@@ -149,11 +179,28 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
   final _title = TextEditingController();
   final _desc = TextEditingController();
   final _icon = TextEditingController(text: '🧹');
-  int _difficulty = 2;
-  String _recType = 'once'; // once | daily | weekly | custom
+  int _difficulty = 3;
+  String _recType = 'daily'; // once | daily | weekly | custom
   final Set<int> _days = {}; // 1..7
   String? _timeOfDay;
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final c = widget.chore;
+    if (c != null) {
+      _title.text = c.title;
+      _desc.text  = c.description ?? '';
+      _icon.text  = c.icon ?? '🧹';
+      _difficulty = c.difficulty;
+      _recType    = c.recurrence?.type ?? 'once';
+      _days
+        ..clear()
+        ..addAll(c.recurrence?.daysOfWeek ?? const []);
+      _timeOfDay  = c.recurrence?.timeOfDay;
+    }
+  }
 
   @override
   void dispose() {
@@ -161,10 +208,11 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
     super.dispose();
   }
 
-  int get _points => widget.family.settings.pointsPerDifficulty[_difficulty] ?? _difficulty * 10;
+  int get _xp => widget.family.settings.difficultyToXP[_difficulty] ?? _difficulty * 10;
 
   @override
   Widget build(BuildContext context) {
+    final isEdit = widget.chore != null;
     final viewInsets = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets),
@@ -177,8 +225,7 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
               children: [
                 Row(children: [
                   const Icon(Icons.add_task_rounded),
-                  const SizedBox(width: 8),
-                  Text('New chore', style: Theme.of(context).textTheme.titleLarge),
+                  Text(isEdit ? '  Edit chore' : '  New chore', style: Theme.of(context).textTheme.titleLarge),
                 ]),
                 const SizedBox(height: 12),
 
@@ -222,7 +269,7 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
                 const SizedBox(height: 6),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Worth $_points pts'),
+                  child: Text('Worth $_xp XP'),
                 ),
 
                 const SizedBox(height: 12),
@@ -271,12 +318,15 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-
                 FilledButton(
                   onPressed: _busy ? null : _save,
                   child: _busy
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Create chore'),
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Text(isEdit ? 'Update chore' : 'Create chore'),
                 ),
               ],
             ),
@@ -306,13 +356,24 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
         daysOfWeek: (_recType == 'weekly' || _recType == 'custom') ? _days.toList() : null,
         timeOfDay: _timeOfDay,
       );
-      await app.createChore(
-        title: _title.text.trim(),
-        description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
-        iconKey: _icon.text.trim().isEmpty ? null : _icon.text.trim(),
-        difficulty: _difficulty,
-        recurrence: rec,
-      );
+      if (widget.chore == null) {
+        await app.createChore(
+          title: _title.text.trim(),
+          description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
+          iconKey: _icon.text,
+          difficulty: _difficulty,
+          recurrence: rec,
+        );
+      } else {
+        await app.updateChore(
+          choreId: widget.chore!.id,
+          title: _title.text.trim(),
+          description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
+          iconKey: _icon.text,
+          difficulty: _difficulty,
+          recurrence: rec,
+        );
+      }
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (e) {
@@ -406,7 +467,7 @@ class _AssignSheetState extends State<_AssignSheet> {
                       Text('Assign "${widget.chore.title}"', style: Theme.of(context).textTheme.titleLarge),
                     ]),
                     const SizedBox(height: 8),
-                    Align(alignment: Alignment.centerLeft, child: Text('${_difficultyName(widget.chore.difficulty)} • ${widget.chore.points} pts')),
+                    Align(alignment: Alignment.centerLeft, child: Text(_difficultyName(widget.chore.difficulty))),
 
                     const SizedBox(height: 12),
                     Align(

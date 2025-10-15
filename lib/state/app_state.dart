@@ -178,7 +178,7 @@ class AppState extends ChangeNotifier {
       'createdAt': FieldValue.serverTimestamp(),
       'settings': {
         'pointsPerDifficulty': {
-          '1': 10, '2': 20, '3': 30, '4': 40, '5': 50,
+          '1': 10, '2': 20, '3': 35, '4': 55, '5': 80,
         }
       },
       'active': true,
@@ -243,6 +243,11 @@ class AppState extends ChangeNotifier {
       reviewQueueVN.value = list;
     });
   }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Assignment streams
+  // ───────────────────────────────────────────────────────────────────────────
+
 
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -349,6 +354,11 @@ class AppState extends ChangeNotifier {
     await repo.updateMember(famId, memberId, patch);
   }
 
+  Future<void> removeMember(String memberId) async {
+    final famId = _familyId!;
+    await repo.removeMember(famId, memberId);
+  }
+
   /// Create chore template directly in Firestore (repo variant seems missing in your file).
   Future<void> createChore({
     required String title,
@@ -361,7 +371,7 @@ class AppState extends ChangeNotifier {
     final db = FirebaseFirestore.instance;
     final choresRef = db.collection('families').doc(famId).collection('chores').doc();
 
-    final points = _family?.settings.pointsPerDifficulty[difficulty] ??
+    final points = _family?.settings.difficultyToXP[difficulty] ??
         (difficulty.clamp(1, 5) * 10);
 
     await choresRef.set({
@@ -377,7 +387,28 @@ class AppState extends ChangeNotifier {
     }, SetOptions(merge: true));
   }
 
-  /// Assign a chore to 1..N members with a due date (direct Firestore write).
+  Future<void> updateChore({
+    required String choreId,
+    required String title,
+    String? description,
+    String? iconKey,
+    required int difficulty,
+    Recurrence? recurrence,
+  }) async {
+    final fam = family!;
+    await repo.updateChoreTemplate(
+      fam.id,
+      choreId: choreId,
+      title: title,
+      description: description,
+      iconKey: iconKey,
+      difficulty: difficulty,
+      settings: fam.settings,
+      recurrence: recurrence,
+    );
+  }
+
+
   Future<void> assignChore({
     required String choreId,
     required Iterable<String> memberIds,
@@ -402,7 +433,6 @@ class AppState extends ChangeNotifier {
         'choreIcon': chore.icon,
         'memberId': m.id,
         'memberName': m.displayName,
-        'points': chore.points,
         'status': 'assigned',
         'due': Timestamp.fromDate(DateTime(due.year, due.month, due.day)),
         'createdAt': FieldValue.serverTimestamp(),

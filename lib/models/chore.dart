@@ -28,11 +28,11 @@ class Chore {
   final String id;
   final String title;
   final String? description;
-  final String? icon;            // <-- NEW: icon key / name / url as you prefer
-  final int difficulty;          // 1..5
-  final int points;              // denormalized
+  final String? icon;           
+  final int difficulty;          
   final Recurrence? recurrence;
   final String? createdByMemberId;
+  final bool requiresApproval;
   final bool active;
   final DateTime? createdAt;
 
@@ -42,9 +42,9 @@ class Chore {
     this.description,
     this.icon,                    // <-- NEW
     required this.difficulty,
-    required this.points,
     this.recurrence,
     this.createdByMemberId,
+    this.requiresApproval = false,
     this.active = true,
     this.createdAt,
   });
@@ -54,9 +54,9 @@ class Chore {
         'description': description,
         'icon': icon,             // <-- NEW
         'difficulty': difficulty,
-        'points': points,
         'recurrence': recurrence?.toMap(),
         'createdByMemberId': createdByMemberId,
+        'requiresApproval' : requiresApproval,
         'active': active,
         'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
       };
@@ -69,11 +69,11 @@ class Chore {
       description: data['description'] as String?,
       icon: data['icon'] as String?,   // <-- NEW
       difficulty: (data['difficulty'] as num?)?.toInt() ?? 1,
-      points: (data['points'] as num?)?.toInt() ?? 0,
       recurrence: data['recurrence'] == null
           ? null
           : Recurrence.fromMap(data['recurrence'] as Map<String, dynamic>),
       createdByMemberId: data['createdByMemberId'] as String?,
+      requiresApproval:  (data['requiresApproval'] as bool?) ?? false,
       active: (data['active'] as bool?) ?? true,
       createdAt: tsAsDate(data['createdAt']),
     );

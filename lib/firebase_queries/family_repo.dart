@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:chorezilla/models/award.dart';
 import '../models/common.dart';
 import '../models/user_profile.dart';
 import '../models/family.dart';
@@ -271,11 +272,11 @@ class FamilyRepo {
   }) {
     final q = assignmentsColl(db, familyId)
         .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('due', isLessThan: Timestamp.fromDate(end))
-        .orderBy('due'); // single-field index only
+        .where('due', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .orderBy('due');
+
     return q.snapshots().map((s) => s.docs
         .map(Assignment.fromDoc)
-        .where((a) => a.status == AssignmentStatus.assigned)
         .toList());
   }
 
@@ -286,15 +287,12 @@ class FamilyRepo {
     final end = start.add(const Duration(days: 1));
     final q = assignmentsColl(db, familyId)
         .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('due', isLessThan: Timestamp.fromDate(end))
-        .orderBy('due');
+        .where('due', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .orderBy('due');  
     return q.snapshots().map((s) => s.docs
         .map(Assignment.fromDoc)
-        .where((a) => a.status == AssignmentStatus.assigned)
         .toList());
   }
-
-
 
   Stream<List<Assignment>> watchReviewQueue(String familyId) {
     return assignmentsColl(db, familyId)
@@ -335,58 +333,97 @@ class FamilyRepo {
     await membersColl(db, familyId).doc(memberId).update(patch);
   }
 
+  Future<void> removeMember(String familyId, String memberId) async {
+    await membersColl(db, familyId).doc(memberId).delete();
+  }
+
   // ---------------------------
   // Writes: Chores & Assignments
   // ---------------------------
   Future<String> createChoreTemplate(
-  String familyId, {
-  required String title,
-  String? description,
-  String? iconKey,                 // <-- NEW (optional)
-  required int difficulty,
-  required FamilySettings settings,
-  String? createdByMemberId,
-  Recurrence? recurrence,
-}) async {
-  final points = settings.pointsPerDifficulty[difficulty] ?? (difficulty * 10);
-  final ref = choresColl(db, familyId).doc();
-  await ref.set({
-    'title': title,
-    'description': description,
-    'icon': iconKey,               // <-- NEW (saved in Firestore)
-    'difficulty': difficulty,
-    'points': points,
-    'recurrence': recurrence?.toMap(),
-    'createdByMemberId': createdByMemberId,
-    'active': true,
-    'createdAt': FieldValue.serverTimestamp(),
-  });
-  return ref.id;
-}
+    String familyId, {
+    required String title,
+    String? description,
+    String? iconKey,                
+    required int difficulty,
+    required FamilySettings settings,
+    String? createdByMemberId,
+    Recurrence? recurrence,
+  }) async {
+    final awards = calcAwards(difficulty: difficulty, settings: settings);
+    final ref = choresColl(db, familyId).doc();
+    await ref.set({
+      'title': title,
+      'description': description,
+      'icon': iconKey,               
+      'difficulty': difficulty,
+      'xp': awards.xp,
+      'coins' : awards.coins,
+      'recurrence': recurrence?.toMap(),
+      'createdByMemberId': createdByMemberId,
+      'active': true,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+    return ref.id;
+  }
+
+  Future<void> updateChoreTemplate(
+    String familyId, {
+    required String choreId,
+    String? title,
+    String? description,
+    String? iconKey,
+    int? difficulty,
+    FamilySettings? settings,
+    Recurrence? recurrence,
+    bool? active,
+  }) async {
+    final patch = <String, dynamic>{};
+    if (title != null) patch['title'] = title;
+    if (description != null) patch['description'] = description;
+    if (iconKey != null) patch['icon'] = iconKey;
+    if (difficulty != null) {
+      patch['difficulty'] = difficulty;
+      if (settings != null) {
+        final awards = calcAwards(difficulty: difficulty, settings: settings);
+        patch['xp'] = awards.xp;
+        patch['coins'] = awards.coins;
+      }
+    }
+    if (recurrence != null) patch['recurrence'] = recurrence.toMap();
+    if (active != null) patch['active'] = active;
+    await choresColl(db, familyId).doc(choreId).update(patch);
+  }
+
 
 Future<List<String>> assignChoreToMembers(
   String familyId, {
   required Chore chore,
   required List<Member> members,
   required DateTime due,
+  required FamilySettings settings,
 }) async {
   final batch = db.batch();
   final createdIds = <String>[];
   for (final m in members) {
     final ref = assignmentsColl(db, familyId).doc();
+    final awards = calcAwards(difficulty: chore.difficulty, settings: settings);
     createdIds.add(ref.id);
     batch.set(ref, {
-      'memberId': m.id,
-      'memberName': m.displayName,
-      'choreId': chore.id,
-      'choreTitle': chore.title,
-      'choreIcon': chore.icon,  // <-- NEW
-      'difficulty': chore.difficulty,
-      'points': chore.points,
-      'status': 'assigned',
-      'assignedAt': FieldValue.serverTimestamp(),
-      'due': Timestamp.fromDate(due),
-      'proof': null,
+      'familyId'          : familyId,
+      'memberId'          : m.id,
+      'memberName'        : m.displayName,
+      'choreId'           : chore.id,
+      'choreTitle'        : chore.title,
+      'choreIcon'         : chore.icon,
+      'difficulty'        : chore.difficulty,
+      'xp'                : awards.xp,
+      'coins'             : awards.coins,
+      'requiresApproval'  : false,
+      'status'            : 'assigned',
+      'assignedAt'        : FieldValue.serverTimestamp(),
+      'due'               : Timestamp.fromDate(due),
+      'proof'             : null,
     });
   }
   await batch.commit();
@@ -430,7 +467,7 @@ Future<List<String>> assignChoreToMembers(
       final memSnap = await tx.get(memberRef);
       if (!memSnap.exists) throw Exception('Member not found');
 
-      final coins = (asn.points * family.settings.coinPerPoint).round();
+      final coins = (asn.xp * family.settings.coinPerPoint).round();
 
       tx.update(asnRef, {
         'status': 'approved',
@@ -438,7 +475,7 @@ Future<List<String>> assignChoreToMembers(
       });
 
       tx.update(memberRef, {
-        'xp': FieldValue.increment(asn.points),
+        'xp': FieldValue.increment(asn.xp),
         'coins': FieldValue.increment(coins),
       });
 
@@ -449,7 +486,7 @@ Future<List<String>> assignChoreToMembers(
         'targetMemberId': asn.memberId,
         'payload': {
           'assignmentId': asn.id,
-          'points': asn.points,
+          'xp': asn.xp,
           'coins': coins,
         },
         'createdAt': FieldValue.serverTimestamp(),

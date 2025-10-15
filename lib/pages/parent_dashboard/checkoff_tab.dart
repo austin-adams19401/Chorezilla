@@ -52,7 +52,7 @@ class _CheckoffTabState extends State<CheckoffTab> {
                         children: [
                           Text(a.choreTitle, style: Theme.of(context).textTheme.titleMedium),
                           const SizedBox(height: 2),
-                          Text('From: ${a.memberName} • ${a.points} pts'),
+                          Text('From: ${a.memberName} • ${a.xp} pts'),
                           if (a.proof?.note?.isNotEmpty == true) ...[
                             const SizedBox(height: 6),
                             Text('Note: ${a.proof!.note!}'),

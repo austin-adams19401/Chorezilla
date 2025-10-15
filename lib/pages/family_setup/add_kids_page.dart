@@ -110,6 +110,26 @@ class _AddKidsPageState extends State<AddKidsPage> {
     }
   }
 
+  Future<void> _removeKidFromFamily(Member m) async {
+    final app = context.read<AppState>();
+    final familyId = app.family?.id;
+    if(familyId == null || familyId.isEmpty) return;
+
+    setState(() {
+      _busy = true; _error = null;
+    });
+
+    try {
+      await app.removeMember(m.id);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      if(mounted) {
+        setState(() { _busy = false; });
+      }
+    }
+  }
+
   Future<void> _deactivateKid(Member m) async {
     final app = context.read<AppState>();
     final familyId = app.family?.id;
@@ -341,7 +361,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
                           ),
                           IconButton(
                             tooltip: 'Remove',
-                            onPressed: _busy ? null : () => _deactivateKid(m),
+                            onPressed: _busy ? null : () => _removeKidFromFamily(m),
                             icon: const Icon(Icons.block),
                           ),
                         ],

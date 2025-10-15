@@ -41,7 +41,6 @@ class ChoreCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            _PointsBadge(points: chore.points),
           ],
         ),
       ),

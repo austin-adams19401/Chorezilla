@@ -2,18 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'common.dart';
 
 class FamilySettings {
-  final Map<int, int> pointsPerDifficulty; // 1..5 -> points
+  final Map<int, int> difficultyToXP; // 1..5 -> points
   final int dayStartHour; // 0-23
   final double coinPerPoint; // e.g., 0.2 means 5 points -> 1 coin
 
   const FamilySettings({
-    this.pointsPerDifficulty = const {1: 10, 2: 20, 3: 35, 4: 55, 5: 80},
-    this.dayStartHour = 4,
+    this.difficultyToXP = const {1: 10, 2: 20, 3: 35, 4: 55, 5: 80},
+    this.dayStartHour = 0,
     this.coinPerPoint = 0.2,
   });
 
   Map<String, dynamic> toMap() => {
-        'pointsPerDifficulty': mapIntIntToStringInt(pointsPerDifficulty),
+        'xpPerDifficulty': mapIntIntToStringInt(difficultyToXP),
         'dayStartHour': dayStartHour,
         'coinPerPoint': coinPerPoint,
       };
@@ -21,8 +21,8 @@ class FamilySettings {
   factory FamilySettings.fromMap(Map<String, dynamic>? data) {
     if (data == null) return const FamilySettings();
     return FamilySettings(
-      pointsPerDifficulty: mapStringIntToIntInt(data['pointsPerDifficulty'] as Map<String, dynamic>?),
-      dayStartHour: (data['dayStartHour'] as num?)?.toInt() ?? 4,
+      difficultyToXP: mapStringIntToIntInt(data['xpPerDifficulty'] as Map<String, dynamic>?),
+      dayStartHour: (data['dayStartHour'] as num?)?.toInt() ?? 0,
       coinPerPoint: (data['coinPerPoint'] as num?)?.toDouble() ?? 0.2,
     );
   }

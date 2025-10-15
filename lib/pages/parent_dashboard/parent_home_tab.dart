@@ -1,3 +1,4 @@
+import 'package:chorezilla/models/common.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,6 +24,12 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
   bool _loadedPref = false;
 
   @override
+  void initState() {
+    super.initState();
+    _loadGroupingPref(); 
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final app = context.read<AppState>();
@@ -34,6 +41,7 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
     if (_boundFamilyId != app.familyId) {
       _boundFamilyId = app.familyId;
       _todayStream = app.repo.watchAssignmentsDueToday(_boundFamilyId!);
+      setState(() { });
     }
   }
 
@@ -106,24 +114,49 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
                   return Card(
                     elevation: 0,
                     margin: const EdgeInsets.only(bottom: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side:BorderSide(
+                        color: Theme.of(context).colorScheme.primary,
+                        width: 2,
+                      )
+                      ),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(g.title, style: Theme.of(context).textTheme.titleMedium),
-                          const SizedBox(height: 6),
-                          ...g.items.map((a) => ListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                leading: Text(
-                                  a.choreIcon?.isNotEmpty == true ? a.choreIcon! : '🧩',
-                                  style: const TextStyle(fontSize: 20),
+                          Text(
+                            g.title,
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: .2,
+                            ),                              
+                          ),
+                          const SizedBox(height: 6),                          
+                          ...g.items.map((a) {
+                            final done = a.status.isDone; // uses the extension above
+                            return ListTile(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              leading: Text(
+                                (a.choreIcon?.isNotEmpty ?? false) ? a.choreIcon! : '🧩',
+                                style: const TextStyle(fontSize: 30),
+                              ),
+                              title: Text(
+                                a.choreTitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  decoration: done ? TextDecoration.lineThrough : TextDecoration.none,
+                                  // optional: dim completed items a bit
+                                  color: done ? Theme.of(context).hintColor : null,
                                 ),
-                                title: Text(a.choreTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                subtitle: Text('${a.points} pts • due ${_dueLabel(a.due)}'),
-                              )),
+                              ),
+                              subtitle: Text(a.status.label), // ← no cast; display-friendly text
+                            );
+                          }),
                         ],
                       ),
                     ),
@@ -141,11 +174,6 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
     final next = _groupBy == HomeGroupBy.kid ? HomeGroupBy.chore : HomeGroupBy.kid;
     setState(() => _groupBy = next);
     _saveGroupingPref(next);
-  }
-
-  String _dueLabel(DateTime? d) {
-    if (d == null) return 'today';
-    return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
   }
 
   List<_Group> _groupByKey(

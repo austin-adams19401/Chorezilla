@@ -22,13 +22,16 @@ class Proof {
 
 class Assignment {
   final String id;
+  final String familyId;
   final String memberId;
   final String memberName;
   final String choreId;
   final String choreTitle;
   final String? choreIcon;
   final int difficulty;
-  final int points;
+  final int xp;
+  final int coinAward;
+  final bool requiresApproval;
   final AssignmentStatus status;
   final DateTime? assignedAt;
   final DateTime? due;
@@ -39,12 +42,15 @@ class Assignment {
 
   const Assignment({
     required this.id,
+    required this.familyId,
     required this.memberId,
     required this.memberName,
     required this.choreId,
     required this.choreTitle,
     required this.difficulty,
-    required this.points,
+    required this.xp,
+    required this.coinAward,
+    this.requiresApproval = false,
     this.choreIcon,
     this.status = AssignmentStatus.assigned,
     this.assignedAt,
@@ -56,13 +62,16 @@ class Assignment {
   });
 
   Map<String, dynamic> toMap() => {
+        'familyId' : familyId,
         'memberId': memberId,
         'memberName': memberName,
         'choreId': choreId,
         'choreTitle': choreTitle,
         'difficulty': difficulty,
         'choreIcon' : choreIcon,
-        'points': points,
+        'xp': xp,
+        'coinAward' : coinAward,
+        'requiresApproval' : requiresApproval,
         'status': statusToString(status),
         'assignedAt': assignedAt == null ? null : Timestamp.fromDate(assignedAt!),
         'due': due == null ? null : Timestamp.fromDate(due!),
@@ -76,13 +85,16 @@ class Assignment {
     final data = doc.data() as Map<String, dynamic>? ?? {};
     return Assignment(
       id: doc.id,
+      familyId: data['familyId'] as String? ?? '',
       memberId: data['memberId'] as String? ?? '',
       memberName: data['memberName'] as String? ?? '',
       choreId: data['choreId'] as String? ?? '',
       choreTitle: data['choreTitle'] as String? ?? '',
       difficulty: (data['difficulty'] as num?)?.toInt() ?? 1,
-      points: (data['points'] as num?)?.toInt() ?? 0,
+      xp: (data['xp'] as num?)?.toInt() ?? 0,
+      coinAward: (data['coinAward'] as num?)?.toInt() ?? 0,
       choreIcon: data['choreIcon'] as String?,
+      requiresApproval: (data['requiresApproval'] as bool?) ?? false,
       status: statusFromString(data['status'] as String? ?? 'assigned'),
       assignedAt: tsAsDate(data['assignedAt']),
       due: tsAsDate(data['due']),

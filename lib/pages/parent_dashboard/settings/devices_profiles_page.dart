@@ -64,9 +64,7 @@ class _DevicesProfilesPageState extends State<DevicesProfilesPage> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-
-    // TODO: update to your actual family id accessor
-    final String? familyId = app.familyId; // or app.currentFamilyId
+    final String? familyId = app.familyId;
 
     return Scaffold(
       appBar: AppBar(

@@ -344,7 +344,7 @@ class _AssignmentTile extends StatelessWidget {
                     children: [
                       Icon(Icons.monetization_on_rounded, size: 16, color: cs.secondary),
                       const SizedBox(width: 4),
-                      Text('${assignment.points} pts', style: ts.bodySmall),
+                      Text('${assignment.xp} pts', style: ts.bodySmall),
                       if (dueText != null) ...[
                         const SizedBox(width: 10),
                         Icon(Icons.schedule_rounded, size: 16, color: overdue ? cs.error : cs.onSurfaceVariant),
