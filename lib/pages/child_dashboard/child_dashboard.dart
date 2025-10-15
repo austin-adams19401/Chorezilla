@@ -140,10 +140,10 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   // ---- Actions --------------------------------------------------------------
 
   Future<void> _completeAssignment(Assignment a) async {
-    final app = context.read<AppState>();
+    // final app = context.read<AppState>();
     setState(() => _busyIds.add(a.id));
     try {
-      final note = await _promptNote(context);
+      // final note = await _promptNote(context);
       if (!mounted) return;
       // await app.completeAssignment(a.id, note: note);
       // Streams will update lists automatically
@@ -193,27 +193,27 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     }
   }
 
-  Future<String?> _promptNote(BuildContext context) async {
-    final controller = TextEditingController();
-    final result = await showDialog<String?>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add a note?'),
-        content: TextField(
-          controller: controller,
-          maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Optional — anything you want to tell your parent',
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(null), child: const Text('Skip')),
-          FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Submit')),
-        ],
-      ),
-    );
-    return result?.isEmpty == true ? null : result;
-  }
+  // Future<String?> _promptNote(BuildContext context) async {
+  //   final controller = TextEditingController();
+  //   final result = await showDialog<String?>(
+  //     context: context,
+  //     builder: (ctx) => AlertDialog(
+  //       title: const Text('Add a note?'),
+  //       content: TextField(
+  //         controller: controller,
+  //         maxLines: 3,
+  //         decoration: const InputDecoration(
+  //           hintText: 'Optional — anything you want to tell your parent',
+  //         ),
+  //       ),
+  //       actions: [
+  //         TextButton(onPressed: () => Navigator.of(ctx).pop(null), child: const Text('Skip')),
+  //         FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Submit')),
+  //       ],
+  //     ),
+  //   );
+  //   return result?.isEmpty == true ? null : result;
+  // }
 
   @override
   bool get wantKeepAlive => true;

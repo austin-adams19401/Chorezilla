@@ -619,16 +619,16 @@ Future<void> markCompleted({
   return now.isBefore(candidate) ? candidate.subtract(const Duration(days: 1)) : candidate;
 }
 
-  DateTime _endOfLocalDayWithHour(int hour) =>
-      _startOfLocalDayWithHour(hour).add(const Duration(days: 1));
+  // DateTime _endOfLocalDayWithHour(int hour) =>
+  //     _startOfLocalDayWithHour(hour).add(const Duration(days: 1));
 
   String _yyyymmdd(DateTime d) =>
       '${d.year.toString().padLeft(4,'0')}${d.month.toString().padLeft(2,'0')}${d.day.toString().padLeft(2,'0')}';
 
   // Combine a date with HH:mm from recurrence.timeOfDay (or fallback to dayStartHour)
-  DateTime _combineDateAndTime(DateTime dayStart, String? hhmm, int dayStartHour) {
-    if (hhmm == null) return DateTime(dayStart.year, dayStart.month, dayStart.day, dayStartHour);
-    final p = hhmm.split(':');
-    return DateTime(dayStart.year, dayStart.month, dayStart.day, int.parse(p[0]), int.parse(p[1]));
-  }
+  // DateTime _combineDateAndTime(DateTime dayStart, String? hhmm, int dayStartHour) {
+  //   if (hhmm == null) return DateTime(dayStart.year, dayStart.month, dayStart.day, dayStartHour);
+  //   final p = hhmm.split(':');
+  //   return DateTime(dayStart.year, dayStart.month, dayStart.day, int.parse(p[0]), int.parse(p[1]));
+  // }
 }

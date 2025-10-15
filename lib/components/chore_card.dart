@@ -164,29 +164,29 @@ class _AvatarContent extends StatelessWidget {
   }
 }
 
-class _PointsBadge extends StatelessWidget {
-  const _PointsBadge({required this.points});
-  final int points;
+// class _PointsBadge extends StatelessWidget {
+//   const _PointsBadge({required this.points});
+//   final int points;
 
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.secondaryContainer,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      child: Text(
-        '$points pts',
-        style: TextStyle(
-          color: cs.onSecondaryContainer,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
+//   @override
+//   Widget build(BuildContext context) {
+//     final cs = Theme.of(context).colorScheme;
+//     return Container(
+//       decoration: BoxDecoration(
+//         color: cs.secondaryContainer,
+//         borderRadius: BorderRadius.circular(12),
+//       ),
+//       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+//       child: Text(
+//         '$points pts',
+//         style: TextStyle(
+//           color: cs.onSecondaryContainer,
+//           fontWeight: FontWeight.w600,
+//         ),
+//       ),
+//     );
+//   }
+// }
 
 
 
