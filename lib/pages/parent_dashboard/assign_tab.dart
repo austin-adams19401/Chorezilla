@@ -149,7 +149,7 @@ class _AssignTabState extends State<AssignTab> {
       isScrollControlled: true,
       builder: (_) => _ChoreEditorSheet(family: fam),
     );
-    if (!mounted) return;
+    if (!context.mounted) return;
     if (created == true) {
       setState(() {}); // refresh filters immediately so the new chore appears
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Chore created')));
@@ -162,7 +162,8 @@ class _AssignTabState extends State<AssignTab> {
       isScrollControlled: true,
       builder: (_) => _AssignSheet(chore: chore),
     );
-    if (ok == true && mounted) {
+    if(!context.mounted) return;
+    if (ok == true) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Assigned!')));
     }
   }
@@ -175,7 +176,7 @@ class _AssignTabState extends State<AssignTab> {
       isScrollControlled: true,
       builder: (_) => _ChoreEditorSheet(family: fam, chore: chore), // 👈 pass chore
     );
-    if (!mounted) return;
+    if (!context.mounted) return;
     if (saved == true) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Chore updated')),
