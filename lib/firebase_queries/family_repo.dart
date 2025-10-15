@@ -430,20 +430,58 @@ Future<List<String>> assignChoreToMembers(
   return createdIds;
 }
 
-  Future<void> completeAssignment(
-    String familyId,
-    String assignmentId, {
-    String? note,
-    String? photoUrl,
-  }) async {
-    await assignmentsColl(db, familyId).doc(assignmentId).update({
-      'status': 'completed',
+Future<void> updateChoreDefaultAssignees(
+  String familyId, {
+  required String choreId,
+  required List<String> memberIds,
+}) {
+  return choresColl(db, familyId)
+      .doc(choreId)
+      .update({'defaultAssignees': memberIds});
+}
+
+Future<void> markCompleted({
+  required String familyId,
+  required String choreId,
+  required String memberId,
+  required int dayStartHour,
+}) {
+  final start = _startOfLocalDayWithHour(dayStartHour);
+  final dayKey = _yyyymmdd(start);
+  final id = '${choreId}_${memberId}_$dayKey';
+  final ref = eventsColl(db, familyId).doc(id);
+  return ref.set({
+    'familyId': familyId,
+    'choreId': choreId,
+    'memberId': memberId,
+    'dayKey': dayKey,
+    'status': 'done',
+    'completedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+}
+
+// Future<void> markApproved(...) => /* same, status: 'approved' */;
+// Future<void> markSkipped(...)  => /* same, status: 'skipped'  */;
+
+
+  Future<void> completeAssignment({
+    required String familyId,
+    required String choreId,
+    required String memberId,
+    required int dayStartHour,
+  }) {
+    final start = _startOfLocalDayWithHour(dayStartHour);
+    final dayKey = _yyyymmdd(start);
+    final id = '${choreId}_${memberId}_$dayKey';
+    final ref = eventsColl(db, familyId).doc(id);
+    return ref.set({
+      'familyId': familyId,
+      'choreId': choreId,
+      'memberId': memberId,
+      'dayKey': dayKey,
+      'status': 'done',
       'completedAt': FieldValue.serverTimestamp(),
-      'proof': {
-        'photoUrl': photoUrl,
-        'note': note,
-      }
-    });
+    }, SetOptions(merge: true));
   }
 
   // Parent approves: update assignment + increment kid xp/coins + add event
@@ -573,5 +611,24 @@ Future<List<String>> assignChoreToMembers(
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
+  }
+
+  DateTime _startOfLocalDayWithHour(int hour) {
+  final now = DateTime.now();
+  final candidate = DateTime(now.year, now.month, now.day, hour);
+  return now.isBefore(candidate) ? candidate.subtract(const Duration(days: 1)) : candidate;
+}
+
+  DateTime _endOfLocalDayWithHour(int hour) =>
+      _startOfLocalDayWithHour(hour).add(const Duration(days: 1));
+
+  String _yyyymmdd(DateTime d) =>
+      '${d.year.toString().padLeft(4,'0')}${d.month.toString().padLeft(2,'0')}${d.day.toString().padLeft(2,'0')}';
+
+  // Combine a date with HH:mm from recurrence.timeOfDay (or fallback to dayStartHour)
+  DateTime _combineDateAndTime(DateTime dayStart, String? hhmm, int dayStartHour) {
+    if (hhmm == null) return DateTime(dayStart.year, dayStart.month, dayStart.day, dayStartHour);
+    final p = hhmm.split(':');
+    return DateTime(dayStart.year, dayStart.month, dayStart.day, int.parse(p[0]), int.parse(p[1]));
   }
 }

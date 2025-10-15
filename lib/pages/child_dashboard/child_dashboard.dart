@@ -145,7 +145,7 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     try {
       final note = await _promptNote(context);
       if (!mounted) return;
-      await app.completeAssignment(a.id, note: note);
+      // await app.completeAssignment(a.id, note: note);
       // Streams will update lists automatically
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

@@ -130,24 +130,24 @@ class _AddKidsPageState extends State<AddKidsPage> {
     }
   }
 
-  Future<void> _deactivateKid(Member m) async {
-    final app = context.read<AppState>();
-    final familyId = app.family?.id;
-    if (familyId == null || familyId.isEmpty) return;
+  // Future<void> _deactivateKid(Member m) async {
+  //   final app = context.read<AppState>();
+  //   final familyId = app.family?.id;
+  //   if (familyId == null || familyId.isEmpty) return;
 
-    setState(() { _busy = true; _error = null; });
-    try {
-      await _repo.updateMember(familyId, m.id, {'active': false});
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Removed ${m.displayName}')),
-      );
-    } catch (e) {
-      setState(() => _error = e.toString());
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
+  //   setState(() { _busy = true; _error = null; });
+  //   try {
+  //     await _repo.updateMember(familyId, m.id, {'active': false});
+  //     if (!mounted) return;
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(content: Text('Removed ${m.displayName}')),
+  //     );
+  //   } catch (e) {
+  //     setState(() => _error = e.toString());
+  //   } finally {
+  //     if (mounted) setState(() => _busy = false);
+  //   }
+  // }
 
   void _startEdit(Member m) {
     setState(() {

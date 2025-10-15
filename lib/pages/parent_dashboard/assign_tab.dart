@@ -18,6 +18,7 @@ class AssignTab extends StatefulWidget {
 class _AssignTabState extends State<AssignTab> {
   String _q = '';
   Timer? _deb;
+  
 
   @override
   void dispose() {
@@ -49,7 +50,7 @@ class _AssignTabState extends State<AssignTab> {
           Expanded(
             child: ValueListenableBuilder<List<Chore>>(
               valueListenable: app.choresVN,
-              builder: (_, choresList, __) {
+              builder: (_, choresList, _) {
                 final chores = choresList
                     .where((c) => c.active)
                     .where((c) => _q.isEmpty || c.title.toLowerCase().contains(_q.toLowerCase()))
@@ -60,7 +61,7 @@ class _AssignTabState extends State<AssignTab> {
                 }
 
                 return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+                  padding: const EdgeInsets.all(8),
                   itemCount: chores.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (_, i) {
@@ -69,26 +70,48 @@ class _AssignTabState extends State<AssignTab> {
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       child: ListTile(
-                        leading: Text(c.icon?.isNotEmpty == true ? c.icon! : '🧩', style: const TextStyle(fontSize: 22)),
+                        leading: Text(c.icon?.isNotEmpty == true ? c.icon! : '🧩', style: const TextStyle(fontSize: 30)),
                         title: Text(c.title),
-                        subtitle: Text('${_difficultyName(c.difficulty)}'
-                            '${c.recurrence != null ? ' • ${c.recurrence!.type}' : ''}'),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('${_difficultyName(c.difficulty)}'
+                                '${c.recurrence != null ? ' • ${c.recurrence!.type}' : ''}'),
+                            Wrap(
+                              spacing: 2,
+                              runSpacing: 2,
+                              children: [
+                                Icon(Icons.person),// TODO: replace Icons with avatars, read in from firebase
+                              ],
+                            )
+                          ],
+                        ),
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            FilledButton.tonal(
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal:4, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              onPressed: () => _openAssignSheet(context, c),
+                              child: const Text('Assign'),
+                            ),
                             IconButton(
                               icon: const Icon(Icons.edit_outlined),
                               tooltip: 'Edit',
                               onPressed: () => _openEditChoreSheet(context, c),
                             ),
-                            const SizedBox(width: 4),
-                            FilledButton.tonal(
-                              onPressed: () => _openAssignSheet(context, c),
-                              child: const Text('Assign'),
+                            IconButton(
+                              icon: const Icon(Icons.delete),
+                              tooltip: 'Deactivate',
+                              onPressed: () => _openEditChoreSheet(context, c),
                             ),
                           ],
                         ),
-
                         onTap: () => _openAssignSheet(context, c),
                       ),
                     );

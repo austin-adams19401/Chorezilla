@@ -441,10 +441,19 @@ class AppState extends ChangeNotifier {
     await batch.commit();
   }
 
-  Future<void> completeAssignment(String assignmentId, {String? note}) async {
-    final famId = _familyId!;
-    await repo.completeAssignment(famId, assignmentId, note: note);
-  }
+  Future<void> updateChoreDefaultAssignees({
+    required String choreId,
+    required List<String> memberIds,
+    }) async {
+      await repo.updateChoreDefaultAssignees(familyId!, choreId: choreId, memberIds: memberIds);
+      // Optional: refresh caches if you keep a local chores list
+    }
+
+
+  // Future<void> completeAssignment(String assignmentId, {String? note}) async {
+  //   final famId = _familyId!;
+  //   await repo.completeAssignment(famId, assignmentId, note: note);
+  // }
 
   Future<void> approveAssignment(String assignmentId, {String? parentMemberId}) async {
     final famId = _familyId!;
