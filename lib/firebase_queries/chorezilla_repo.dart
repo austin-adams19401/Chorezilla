@@ -10,7 +10,7 @@ import '../models/assignment.dart';
 import '../models/reward.dart';
 
 // Firestore path helpers
-DocumentReference userDoc(FirebaseFirestore db, String uid) => db.doc('users/$uid');
+DocumentReference userDoc(FirebaseFirestore db, String userId) => db.doc('users/$userId');
 DocumentReference familyDoc(FirebaseFirestore db, String familyId) => db.doc('families/$familyId');
 CollectionReference membersColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/members');
 CollectionReference choresColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/chores');
@@ -19,116 +19,124 @@ CollectionReference rewardsColl(FirebaseFirestore db, String familyId) => db.col
 CollectionReference devicesColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/devices');
 CollectionReference eventsColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/events');
 
-class FamilyRepo {
-  final FirebaseFirestore db;
-  FamilyRepo({required this.db});
+class ChorezillaRepo {
+  final FirebaseFirestore firebaseDB;
+  ChorezillaRepo({required this.firebaseDB});
 
   // ---------------------------
   // Bootstrap / Profiles
   // ---------------------------
-  Future<UserProfile> ensureUserProfile(
-    String uid, {
-    String? displayName,
-    String? email,
-  }) async {
-    final ref = userDoc(db, uid);
-    final snap = await ref.get();
+Future<UserProfile> ensureUserProfile(
+  String userID, {
+  String? displayName,
+  String? email,
+}) async {
+  final userData = userDoc(firebaseDB, userID);      // assumes you have `db` on repo
+  final docSnapshot = await userData.get();
 
-    if (!snap.exists) {
-      await ref.set({
-        'displayName': displayName,
-        'email': email,
-        'defaultFamilyId': null,
-        'memberships': {},
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastSignInAt': FieldValue.serverTimestamp(),
-      });
-    } else {
-      await ref.update({'lastSignInAt': FieldValue.serverTimestamp()});
-    }
-
-    var profile = UserProfile.fromDoc(await ref.get());
-
-    if (profile.defaultFamilyId == null || profile.defaultFamilyId!.isEmpty) {
-      // Create a new family and parent member for this user
-      final newFamId = await _createFamilyWithOwner(
-        ownerUid: uid,
-        familyName: displayName == null || displayName.isEmpty
-            ? 'My Family'
-            : "${displayName.split(' ').first}'s Family",
-        parentDisplayName: displayName ?? 'Parent',
-      );
-
-      // Update user profile with default family + membership (placeholder)
-      await db.runTransaction((tx) async {
-        final uSnap = await tx.get(ref);
-        final existing = UserProfile.fromDoc(uSnap);
-        final memberships = Map<String, Membership>.from(existing.memberships);
-        memberships[newFamId] = const Membership(memberId: 'mem_parent_owner', role: FamilyRole.parent);
-        tx.update(ref, {
-          'defaultFamilyId': newFamId,
-          'memberships.$newFamId': {
-            'memberId': 'mem_parent_owner', // will be corrected below
-            'role': 'parent',
-          },
-        });
-      });
-
-      // Correct the membership with real memberId
-      final parentMemberId = await _findFirstParentMemberId(newFamId, uid);
-      await ref.update({'memberships.$newFamId.memberId': parentMemberId});
-
-      profile = UserProfile.fromDoc(await ref.get());
-    }
-
-    return profile;
+  if (!docSnapshot.exists) {
+    await userData.set({
+      'displayName': displayName,
+      'email': email,
+      'defaultFamilyId': null,
+      'memberships': {},
+      'createdAt': FieldValue.serverTimestamp(),
+      'lastSignInAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  } else {
+    await userData.update({'lastSignInAt': FieldValue.serverTimestamp()});
   }
 
+  var profile = UserProfile.fromDoc(await userData.get());
+
+  if (profile.defaultFamilyId == null || profile.defaultFamilyId!.isEmpty) {
+    // Create the family + parent member and wire memberships in one atomic batch
+    await _createFamilyWithOwner(
+      ownerUid: userID,
+      parentDisplayName: (displayName == null || displayName.isEmpty)
+          ? 'Parent'
+          : displayName,
+      familyName: (displayName == null || displayName.isEmpty)
+          ? 'Your Family'
+          : "${displayName.split(' ').first}'s Family",
+    );
+
+    // Re-fetch with the new defaultFamilyId and memberships
+    profile = UserProfile.fromDoc(await userData.get());
+    // (optional) sanity: ensure profile.defaultFamilyId == famId
+  }
+
+  return profile;
+}
+
+
   Future<String> _findFirstParentMemberId(String familyId, String ownerUid) async {
-    final q = await membersColl(db, familyId).where('userUid', isEqualTo: ownerUid).limit(1).get();
+    final q = await membersColl(firebaseDB, familyId).where('userUid', isEqualTo: ownerUid).limit(1).get();
     if (q.docs.isEmpty) return 'mem_parent_owner';
     return q.docs.first.id;
   }
 
-  Future<String> _createFamilyWithOwner({
-    required String ownerUid,
-    required String familyName,
-    required String parentDisplayName,
-  }) async {
-    final famRef = db.collection('families').doc();
-    final membersRef = membersColl(db, famRef.id).doc();
+Future<String> _createFamilyWithOwner({
+  required String ownerUid,
+  required String parentDisplayName,
+  String? familyName,
+}) async {
+  final topLevel = FirebaseFirestore.instance;
 
-    final batch = db.batch();
-    batch.set(famRef, {
-      'name': familyName,
-      'ownerUid': ownerUid,
-      'joinCode': null,
-      'settings': const FamilySettings().toMap(),
-      'stats': const FamilyStats().toMap(),
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+  final familyDoc = topLevel.collection('families').doc();
+  final memberRef = familyDoc.collection('members').doc(); // real member id available now
+  final userRef = topLevel.collection('users').doc(ownerUid);
 
-    batch.set(membersRef, {
-      'displayName': parentDisplayName,
-      'role': 'parent',
-      'userUid': ownerUid,
-      'avatarKey': null,
-      'pinHash': null,
-      'level': 1,
-      'xp': 0,
-      'coins': 0,
-      'badges': [],
-      'createdAt': FieldValue.serverTimestamp(),
-      'active': true,
-    });
+  final ownerFirst = parentDisplayName.trim().isEmpty
+      ? 'Parent'
+      : parentDisplayName.trim().split(' ').first;
 
-    await batch.commit();
-    return famRef.id;
-  }
+  final famName = (familyName == null || familyName.trim().isEmpty)
+      ? '$ownerFirst Family'
+      : familyName.trim();
+
+  final batch = topLevel.batch();
+
+  // Family
+  batch.set(familyDoc, {
+    'name': famName,
+    'ownerUid': ownerUid,
+    'createdAt': FieldValue.serverTimestamp(),
+    'active': true,
+    'settings': {
+      'pointsPerDifficulty': {'1': 10, '2': 20, '3': 35, '4': 55, '5': 80},
+    },
+  }, SetOptions(merge: true));
+
+  // Parent member
+  batch.set(memberRef, {
+    'userId': ownerUid,
+    'displayName': parentDisplayName.trim().isEmpty ? 'Parent' : parentDisplayName.trim(),
+    'role': 'parent',
+    'active': true,
+    'createdAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+
+  // User profile: default family + membership (using real member id)
+  batch.set(userRef, {
+    'defaultFamilyId': familyDoc.id,
+    'memberships': {
+      familyDoc.id: {
+        'memberId': memberRef.id,
+        'role': 'parent',
+      }
+    },
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
+
+  await batch.commit();
+  return familyDoc.id;
+}
+
 
   // Update family fields (e.g., name)
   Future<void> updateFamily(String familyId, Map<String, dynamic> patch) async {
-    await familyDoc(db, familyId).set(patch, SetOptions(merge: true));
+    await familyDoc(firebaseDB, familyId).set(patch, SetOptions(merge: true));
   }
 
   /// Join a family as a Parent (idempotent)
@@ -141,20 +149,20 @@ class FamilyRepo {
     String? displayName,
   }) async {
     // Already a member?
-    final existing = await membersColl(db, familyId)
+    final existing = await membersColl(firebaseDB, familyId)
         .where('userUid', isEqualTo: uid)
         .limit(1)
         .get();
     if (existing.docs.isNotEmpty) {
       // ensure defaultFamilyId points here
-      await userDoc(db, uid).set({'defaultFamilyId': familyId}, SetOptions(merge: true));
+      await userDoc(firebaseDB, uid).set({'defaultFamilyId': familyId}, SetOptions(merge: true));
       return existing.docs.first.id;
     }
 
-    final memberRef = membersColl(db, familyId).doc();
-    final userRef = userDoc(db, uid);
+    final memberRef = membersColl(firebaseDB, familyId).doc();
+    final userRef = userDoc(firebaseDB, uid);
 
-    await db.runTransaction((tx) async {
+    await firebaseDB.runTransaction((tx) async {
       // create member (parent)
       tx.set(memberRef, {
         'displayName': (displayName == null || displayName.trim().isEmpty) ? 'Parent' : displayName.trim(),
@@ -187,7 +195,7 @@ class FamilyRepo {
   // Generate or return existing join code for a family.
   // Backwards compatible: reads 'joinCode' or legacy 'code' on the family doc.
   Future<String> ensureJoinCode(String familyId) async {
-    final famRef = familyDoc(db, familyId);
+    final famRef = familyDoc(firebaseDB, familyId);
     final snap = await famRef.get();
     final data = snap.data() as Map<String, dynamic>? ?? {};
 
@@ -203,7 +211,7 @@ class FamilyRepo {
     }
 
     // mirror in /joinCodes/{code} for lookup
-    await db.collection('joinCodes').doc(code).set({
+    await firebaseDB.collection('joinCodes').doc(code).set({
       'familyId': familyId,
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -215,7 +223,7 @@ class FamilyRepo {
   Future<String?> redeemJoinCode(String code) async {
     code = code.trim().toUpperCase();
     if (code.isEmpty) return null;
-    final doc = await db.collection('joinCodes').doc(code).get();
+    final doc = await firebaseDB.collection('joinCodes').doc(code).get();
     if (!doc.exists) return null;
     return (doc.data()?['familyId'] as String?);
   }
@@ -236,16 +244,16 @@ class FamilyRepo {
   // ---------------------------
   // Watchers (Streams)
   // ---------------------------
-  Stream<Family> watchFamily(String familyId) => familyDoc(db, familyId).snapshots().map(Family.fromDoc);
+  Stream<Family> watchFamily(String familyId) => familyDoc(firebaseDB, familyId).snapshots().map(Family.fromDoc);
 
   Stream<List<Member>> watchMembers(String familyId, {bool? activeOnly = true}) {
-    Query q = membersColl(db, familyId);
+    Query q = membersColl(firebaseDB, familyId);
     if (activeOnly == true) q = q.where('active', isEqualTo: true);
     return q.snapshots().map((s) => s.docs.map(Member.fromDoc).toList());
   }
 
   Stream<List<Chore>> watchChores(String familyId, {bool? activeOnly = true}) {
-    Query q = choresColl(db, familyId);
+    Query q = choresColl(firebaseDB, familyId);
     if (activeOnly == true) q = q.where('active', isEqualTo: true);
     return q.snapshots().map((s) => s.docs.map(Chore.fromDoc).toList());
   }
@@ -255,7 +263,7 @@ class FamilyRepo {
     required String memberId,
     List<AssignmentStatus>? statuses,
   }) {
-    Query q = assignmentsColl(db, familyId).where('memberId', isEqualTo: memberId);
+    Query q = assignmentsColl(firebaseDB, familyId).where('memberId', isEqualTo: memberId);
     if (statuses != null && statuses.isNotEmpty) {
       q = q.where('status', whereIn: statuses.map(statusToString).toList());
     }
@@ -270,7 +278,7 @@ class FamilyRepo {
     required DateTime start,
     required DateTime end,
   }) {
-    final q = assignmentsColl(db, familyId)
+    final q = assignmentsColl(firebaseDB, familyId)
         .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
         .where('due', isLessThanOrEqualTo: Timestamp.fromDate(end))
         .orderBy('due');
@@ -285,7 +293,7 @@ class FamilyRepo {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day);
     final end = start.add(const Duration(days: 1));
-    final q = assignmentsColl(db, familyId)
+    final q = assignmentsColl(firebaseDB, familyId)
         .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
         .where('due', isLessThanOrEqualTo: Timestamp.fromDate(end))
         .orderBy('due');  
@@ -295,7 +303,7 @@ class FamilyRepo {
   }
 
   Stream<List<Assignment>> watchReviewQueue(String familyId) {
-    return assignmentsColl(db, familyId)
+    return assignmentsColl(firebaseDB, familyId)
         .where('status', isEqualTo: statusToString(AssignmentStatus.completed))
         .orderBy('completedAt', descending: true)
         .snapshots()
@@ -303,7 +311,7 @@ class FamilyRepo {
   }
 
   Stream<List<Reward>> watchRewards(String familyId, {bool? activeOnly = true}) {
-    Query q = rewardsColl(db, familyId);
+    Query q = rewardsColl(firebaseDB, familyId);
     if (activeOnly == true) q = q.where('active', isEqualTo: true);
     return q.snapshots().map((s) => s.docs.map(Reward.fromDoc).toList());
   }
@@ -312,7 +320,7 @@ class FamilyRepo {
   // Writes: Members
   // ---------------------------
   Future<String> addChild(String familyId, {required String displayName, String? avatarKey, String? pinHash}) async {
-    final ref = membersColl(db, familyId).doc();
+    final ref = membersColl(firebaseDB, familyId).doc();
     await ref.set({
       'displayName': displayName,
       'role': 'child',
@@ -330,11 +338,11 @@ class FamilyRepo {
   }
 
   Future<void> updateMember(String familyId, String memberId, Map<String, dynamic> patch) async {
-    await membersColl(db, familyId).doc(memberId).update(patch);
+    await membersColl(firebaseDB, familyId).doc(memberId).update(patch);
   }
 
   Future<void> removeMember(String familyId, String memberId) async {
-    await membersColl(db, familyId).doc(memberId).delete();
+    await membersColl(firebaseDB, familyId).doc(memberId).delete();
   }
 
   // ---------------------------
@@ -351,7 +359,7 @@ class FamilyRepo {
     Recurrence? recurrence,
   }) async {
     final awards = calcAwards(difficulty: difficulty, settings: settings);
-    final ref = choresColl(db, familyId).doc();
+    final ref = choresColl(firebaseDB, familyId).doc();
     await ref.set({
       'title': title,
       'description': description,
@@ -392,7 +400,20 @@ class FamilyRepo {
     }
     if (recurrence != null) patch['recurrence'] = recurrence.toMap();
     if (active != null) patch['active'] = active;
-    await choresColl(db, familyId).doc(choreId).update(patch);
+    await choresColl(firebaseDB, familyId).doc(choreId).update(patch);
+  }
+
+  Future<void> updateChoreAssignees(
+    String familyId, {
+    required String choreId,
+    required List<String> memberIds,
+  }) async {
+    // de-dupe, drop empties, keep stable order
+    final ids = memberIds.where((e) => e.isNotEmpty).toSet().toList()..sort();
+
+    await choresColl(firebaseDB, familyId)
+        .doc(choreId)
+        .set({'assignees': ids}, SetOptions(merge: true));
   }
 
 
@@ -403,10 +424,10 @@ Future<List<String>> assignChoreToMembers(
   required DateTime due,
   required FamilySettings settings,
 }) async {
-  final batch = db.batch();
+  final batch = firebaseDB.batch();
   final createdIds = <String>[];
   for (final m in members) {
-    final ref = assignmentsColl(db, familyId).doc();
+    final ref = assignmentsColl(firebaseDB, familyId).doc();
     final awards = calcAwards(difficulty: chore.difficulty, settings: settings);
     createdIds.add(ref.id);
     batch.set(ref, {
@@ -435,7 +456,7 @@ Future<void> updateChoreDefaultAssignees(
   required String choreId,
   required List<String> memberIds,
 }) {
-  return choresColl(db, familyId)
+  return choresColl(firebaseDB, familyId)
       .doc(choreId)
       .update({'defaultAssignees': memberIds});
 }
@@ -449,7 +470,7 @@ Future<void> markCompleted({
   final start = _startOfLocalDayWithHour(dayStartHour);
   final dayKey = _yyyymmdd(start);
   final id = '${choreId}_${memberId}_$dayKey';
-  final ref = eventsColl(db, familyId).doc(id);
+  final ref = eventsColl(firebaseDB, familyId).doc(id);
   return ref.set({
     'familyId': familyId,
     'choreId': choreId,
@@ -473,7 +494,7 @@ Future<void> markCompleted({
     final start = _startOfLocalDayWithHour(dayStartHour);
     final dayKey = _yyyymmdd(start);
     final id = '${choreId}_${memberId}_$dayKey';
-    final ref = eventsColl(db, familyId).doc(id);
+    final ref = eventsColl(firebaseDB, familyId).doc(id);
     return ref.set({
       'familyId': familyId,
       'choreId': choreId,
@@ -486,10 +507,10 @@ Future<void> markCompleted({
 
   // Parent approves: update assignment + increment kid xp/coins + add event
   Future<void> approveAssignment(String familyId, String assignmentId, {String? parentMemberId}) async {
-    final famRef = familyDoc(db, familyId);
-    final asnRef = assignmentsColl(db, familyId).doc(assignmentId);
+    final famRef = familyDoc(firebaseDB, familyId);
+    final asnRef = assignmentsColl(firebaseDB, familyId).doc(assignmentId);
 
-    await db.runTransaction((tx) async {
+    await firebaseDB.runTransaction((tx) async {
       final famSnap = await tx.get(famRef);
       final asnSnap = await tx.get(asnRef);
       if (!asnSnap.exists) throw Exception('Assignment not found');
@@ -501,7 +522,7 @@ Future<void> markCompleted({
         throw Exception('Only completed assignments can be approved');
       }
 
-      final memberRef = membersColl(db, familyId).doc(asn.memberId);
+      final memberRef = membersColl(firebaseDB, familyId).doc(asn.memberId);
       final memSnap = await tx.get(memberRef);
       if (!memSnap.exists) throw Exception('Member not found');
 
@@ -517,7 +538,7 @@ Future<void> markCompleted({
         'coins': FieldValue.increment(coins),
       });
 
-      final evRef = eventsColl(db, familyId).doc();
+      final evRef = eventsColl(firebaseDB, familyId).doc();
       tx.set(evRef, {
         'type': 'assignment_approved',
         'actorMemberId': parentMemberId,
@@ -538,8 +559,8 @@ Future<void> markCompleted({
     String? parentMemberId,
     String? reason,
   }) async {
-    final asnRef = assignmentsColl(db, familyId).doc(assignmentId);
-    await db.runTransaction((tx) async {
+    final asnRef = assignmentsColl(firebaseDB, familyId).doc(assignmentId);
+    await firebaseDB.runTransaction((tx) async {
       final asnSnap = await tx.get(asnRef);
       if (!asnSnap.exists) throw Exception('Assignment not found');
       final asn = Assignment.fromDoc(asnSnap);
@@ -547,7 +568,7 @@ Future<void> markCompleted({
         throw Exception('Only completed assignments can be rejected');
       }
       tx.update(asnRef, {'status': 'rejected'});
-      final evRef = eventsColl(db, familyId).doc();
+      final evRef = eventsColl(firebaseDB, familyId).doc();
       tx.set(evRef, {
         'type': 'assignment_rejected',
         'actorMemberId': parentMemberId,
@@ -563,7 +584,7 @@ Future<void> markCompleted({
   // Rewards (coins store)
   // ---------------------------
   Future<String> createReward(String familyId, {required String name, required int priceCoins, int? stock}) async {
-    final ref = rewardsColl(db, familyId).doc();
+    final ref = rewardsColl(firebaseDB, familyId).doc();
     await ref.set({
       'name': name,
       'priceCoins': priceCoins,
@@ -575,10 +596,10 @@ Future<void> markCompleted({
   }
 
   Future<void> purchaseReward(String familyId, {required String memberId, required Reward reward}) async {
-    final memberRef = membersColl(db, familyId).doc(memberId);
-    final rewardRef = rewardsColl(db, familyId).doc(reward.id);
+    final memberRef = membersColl(firebaseDB, familyId).doc(memberId);
+    final rewardRef = rewardsColl(firebaseDB, familyId).doc(reward.id);
 
-    await db.runTransaction((tx) async {
+    await firebaseDB.runTransaction((tx) async {
       final memSnap = await tx.get(memberRef);
       if (!memSnap.exists) throw Exception('Member not found');
       final member = Member.fromDoc(memSnap);
@@ -598,7 +619,7 @@ Future<void> markCompleted({
         tx.update(rewardRef, {'stock': newStock});
       }
 
-      final evRef = eventsColl(db, familyId).doc();
+      final evRef = eventsColl(firebaseDB, familyId).doc();
       tx.set(evRef, {
         'type': 'reward_purchased',
         'actorMemberId': memberId,

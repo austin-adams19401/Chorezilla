@@ -3,14 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/assignment.dart';
 
-class CheckoffTab extends StatefulWidget {
-  const CheckoffTab({super.key});
+class ReviewTab extends StatefulWidget {
+  const ReviewTab({super.key});
 
   @override
-  State<CheckoffTab> createState() => _CheckoffTabState();
+  State<ReviewTab> createState() => _ReviewTabState();
 }
 
-class _CheckoffTabState extends State<CheckoffTab> {
+class _ReviewTabState extends State<ReviewTab> {
   final Set<String> _busyApprove = {};
   final Set<String> _busyReject = {};
 

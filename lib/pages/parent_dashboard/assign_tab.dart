@@ -18,7 +18,6 @@ class AssignTab extends StatefulWidget {
 class _AssignTabState extends State<AssignTab> {
   String _q = '';
   Timer? _deb;
-  
 
   @override
   void dispose() {
@@ -82,7 +81,7 @@ class _AssignTabState extends State<AssignTab> {
                               spacing: 2,
                               runSpacing: 2,
                               children: [
-                                Icon(Icons.person),// TODO: replace Icons with avatars, read in from firebase
+                                Icon(Icons.person), // TODO:replace Icons with avatars, read in from firebase
                               ],
                             )
                           ],
@@ -467,6 +466,16 @@ class _AssignSheetState extends State<_AssignSheet> {
   DateTime _due = DateTime.now().add(const Duration(days: 1));
   bool _busy = false;
 
+  
+  @override
+  void initState() {
+    super.initState();
+    // Preselect from the chore’s stored assignees
+    _kidIds
+      ..clear()
+      ..addAll(widget.chore.defaultAssignees);
+  }
+
   @override
   Widget build(BuildContext context) {
     final app = context.read<AppState>();
@@ -499,14 +508,22 @@ class _AssignSheetState extends State<_AssignSheet> {
                       child: Wrap(
                         spacing: 6,
                         runSpacing: 6,
-                        children: kids.map((k) {
-                          final sel = _kidIds.contains(k.id);
-                          return FilterChip(
-                            label: Text(k.displayName),
-                            selected: sel,
-                            onSelected: (v) => setState(() => v ? _kidIds.add(k.id) : _kidIds.remove(k.id)),
-                          );
-                        }).toList(),
+                          children: [
+                            for (final k in kids)
+                              FilterChip(
+                                label: Text(k.displayName),
+                                selected: _kidIds.contains(k.id),
+                                onSelected: (sel) {
+                                  setState(() {
+                                    if (sel) {
+                                      _kidIds.add(k.id);
+                                    } else {
+                                      _kidIds.remove(k.id);
+                                    }
+                                  });
+                                },
+                              ),
+                          ],
                       ),
                     ),
 
@@ -528,10 +545,31 @@ class _AssignSheetState extends State<_AssignSheet> {
                         ),
                         const Spacer(),
                         FilledButton(
-                          onPressed: _busy || _kidIds.isEmpty ? null : _assign,
+                          onPressed: _busy ? null : () async {
+                            setState(() => _busy = true);
+                            try {
+                              final app = context.read<AppState>();
+                              await app.updateChoreAssignees(
+                                choreId: widget.chore.id,
+                                memberIds: _kidIds.toList(),
+                              );
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Assignees saved')),
+                              );
+                              Navigator.of(context).pop(true); // close sheet, signal success
+                            } catch (e) {
+                              if (!mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to save: $e')),
+                              );
+                            } finally {
+                              if (mounted) setState(() => _busy = false);
+                            }
+                          },
                           child: _busy
                               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Text('Assign to selected'),
+                              : const Text('Save assignees'), // 👈 clear label
                         ),
                       ],
                     ),
