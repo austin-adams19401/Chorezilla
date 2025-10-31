@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:chorezilla/components/auth_scaffold.dart';
 import 'package:chorezilla/components/inputs.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 
 class RegisterPage extends StatefulWidget {
@@ -32,20 +31,9 @@ Future<void> _register() async {
       password: _password.text,
     );
 
-    await userCredentials.user?.updateDisplayName(_name.text.trim());
+    final displayName = _name.text.trim();
 
-    // 3) Create minimal profile doc expected by your app bootstrap
-    final userId = userCredentials.user!.uid;
-    await FirebaseFirestore.instance.collection('users').doc(userId).set({
-      'role': 'parent',
-      'familyId': null,        
-      'memberId': null,
-      'displayName': _name.text.trim(),
-      'email': _email.text.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
+    await userCredentials.user?.updateDisplayName(displayName);
     if (!mounted) return;
 
     // 4) Bounce back to root so AuthGate takes over
@@ -59,6 +47,7 @@ Future<void> _register() async {
     if (mounted) setState(() { _busy = false; });
   }
 }
+
 @override
 void dispose() {
   _name.dispose();

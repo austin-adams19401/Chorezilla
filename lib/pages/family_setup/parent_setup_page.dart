@@ -1,3 +1,4 @@
+import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -33,6 +34,11 @@ class _ParentSetupPageState extends State<ParentSetupPage> {
     final app = context.watch<AppState>();
     final family = app.family;
     final kids = app.members.where((m) => m.role == FamilyRole.child && m.active).toList();
+    final familyId = app.familyId;
+
+    if(familyId == null || familyId.isEmpty){
+      return const SizedBox.shrink();
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Family Setup')),
@@ -73,14 +79,39 @@ class _ParentSetupPageState extends State<ParentSetupPage> {
               ),
             ),
             const Spacer(),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ParentDashboardPage()));
+            StreamBuilder<List<Member>>(
+              stream: app.watchActiveKids(familyId),
+              builder: (context, snap) {
+                if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+                final kids = snap.data!;
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Add or add another
+                    FilledButton(
+                      onPressed: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const AddKidsPage()),
+                        );
+                      },
+                      child: Text(kids.isEmpty ? 'Add a kid to get started' : 'Add another kid'),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    FilledButton(
+                      onPressed: kids.isNotEmpty
+                          ? () => Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(builder: (_) => const ParentDashboardPage()),
+                              )
+                          : null,
+                      child: Text(kids.isNotEmpty ? 'Continue to assigning chores' : 'Add at least one kid'),
+                    ),
+                    SizedBox(height: 45,)
+                  ],
+                );
               },
-              child: Text(
-                kids.isEmpty 
-              ? 'Add a kid to get started'
-              : 'Assign chores'),
             ),
           ],
         ),

@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Enums shared across models
-enum FamilyRole { parent, child }
+enum FamilyRole { owner, parent, child }
 enum AssignmentStatus { assigned, completed, pending, approved, rejected }
 enum AuthState { unknown, signedOut, needsFamilySetup, ready }
 

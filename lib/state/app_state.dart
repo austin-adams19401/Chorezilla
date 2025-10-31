@@ -68,8 +68,8 @@ class AppState extends ChangeNotifier {
 
   bool get isReady => auth.currentUser != null && _familyId != null && _family != null;
   // Boot flags to avoid false "setup" routing during hot restart
-  bool _familyLoaded = false;
-  bool _membersLoaded = false;
+  bool familyLoaded = false;
+  bool membersLoaded = false;
 
   // Active member selection for child dashboard/profile header
   String? _currentMemberId;
@@ -149,15 +149,15 @@ Future<void> _getUserProfile(User user) async {
   _bootLoaded = false;
   notifyListeners();
 
-  final profile = await repo.ensureUserProfile(user.uid, displayName: user.displayName, email: user.email);
+  final profile = await repo.checkUserProfile(user.uid, displayName: user.displayName, email: user.email);
 
   _currentUser = profile;
 
-  final famId = profile.defaultFamilyId; // guaranteed set by ensureUserProfile
+  final famId = profile.defaultFamilyId;
 
   if (_familyId != famId) {
     _familyId = famId;
-    _startFamilyStreams(famId!);
+    startFamilyStreams(famId!);
   }
 
   _bootLoaded = true;
@@ -240,17 +240,27 @@ Future<void> _postSignInBootstrap(User? user) async {
   // ───────────────────────────────────────────────────────────────────────────
   // Family streams (bind once per family)
   // ───────────────────────────────────────────────────────────────────────────
-  void _startFamilyStreams(String familyId) {
+
+  // Active members stream
+  Stream<List<Member>> watchActiveMembers(String familyId) =>
+      repo.watchMembers(familyId, activeOnly: true);
+
+  // Active kids stream
+  Stream<List<Member>> watchActiveKids(String familyId) =>
+      watchActiveMembers(familyId)
+          .map((ms) => ms.where((m) => m.role == FamilyRole.child && m.active == true).toList());
+
+  void startFamilyStreams(String familyId) {
     // Reset boot flags whenever we bind to a (new) family
-    _familyLoaded = false;
-    _membersLoaded = false;
+    familyLoaded = false;
+    membersLoaded = false;
 
     // Family doc (rare changes — name/settings)
     _familySub?.cancel();
     _familySub = repo.watchFamily(familyId).listen((fam) {
       _family = fam;
-      if (!_familyLoaded) {
-        _familyLoaded = true;
+      if (!familyLoaded) {
+        familyLoaded = true;
         notifyListeners(); // notify once when family is first loaded
       } else {
         notifyListeners(); // fine: a few widgets read name/settings
@@ -261,8 +271,8 @@ Future<void> _postSignInBootstrap(User? user) async {
     _membersSub?.cancel();
     _membersSub = repo.watchMembers(familyId).listen((list) {
       membersVN.value = list;
-      if (!_membersLoaded) {
-        _membersLoaded = true;
+      if (!membersLoaded) {
+        membersLoaded = true;
         notifyListeners(); // let router know members are ready
       }
     });
@@ -350,11 +360,11 @@ Future<void> _postSignInBootstrap(User? user) async {
   Future<void> refreshAfterProfileChange() async {
     final u = auth.currentUser;
     if (u == null) return;
-    final profile = await repo.ensureUserProfile(u.uid, displayName: u.displayName, email: u.email);
+    final profile = await repo.checkUserProfile(u.uid, displayName: u.displayName, email: u.email);
     _currentUser = profile;
     if (_familyId != profile.defaultFamilyId && profile.defaultFamilyId != null) {
       _familyId = profile.defaultFamilyId;
-      _startFamilyStreams(_familyId!);
+      startFamilyStreams(_familyId!);
     }
     notifyListeners();
   }
@@ -529,14 +539,17 @@ Future<void> updateChoreAssignees({
     _family = null;
     _familyId = null;
     _currentMemberId = null;
-    _familyLoaded = false;
-    _membersLoaded = false;
+    familyLoaded = false;
+    membersLoaded = false;
 
 
     await _familySub?.cancel();
     await _membersSub?.cancel();
     await _choresSub?.cancel();
     await _reviewSub?.cancel();
+    await _membersSub?.cancel();
+    await _authSub?.cancel();
+
     _familySub = _membersSub = _choresSub = _reviewSub = null;
 
     for (final s in _kidAssignedSubs.values) {

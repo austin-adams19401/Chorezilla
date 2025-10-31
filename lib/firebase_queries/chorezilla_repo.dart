@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:chorezilla/models/award.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/common.dart';
 import '../models/user_profile.dart';
 import '../models/family.dart';
@@ -26,120 +27,129 @@ class ChorezillaRepo {
   // ---------------------------
   // Bootstrap / Profiles
   // ---------------------------
-Future<UserProfile> ensureUserProfile(
+Future<UserProfile> checkUserProfile(
   String userID, {
   String? displayName,
   String? email,
 }) async {
-  final userData = userDoc(firebaseDB, userID);      // assumes you have `db` on repo
-  final docSnapshot = await userData.get();
+  final user = userDoc(firebaseDB, userID);
+  // final docSnapshot = await user.get();
 
-  if (!docSnapshot.exists) {
-    await userData.set({
-      'displayName': displayName,
-      'email': email,
-      'defaultFamilyId': null,
-      'memberships': {},
-      'createdAt': FieldValue.serverTimestamp(),
-      'lastSignInAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  } else {
-    await userData.update({'lastSignInAt': FieldValue.serverTimestamp()});
-  }
+  await user.set({
+    'uid': userID,
+    'displayName': displayName,
+    'email': email,
+    'createdAt': FieldValue.serverTimestamp(),
+    'lastSignInAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
 
-  var profile = UserProfile.fromDoc(await userData.get());
+  var profile = UserProfile.fromDoc(await user.get());
 
   if (profile.defaultFamilyId == null || profile.defaultFamilyId!.isEmpty) {
-    // Create the family + parent member and wire memberships in one atomic batch
-    await _createFamilyWithOwner(
-      ownerUid: userID,
-      parentDisplayName: (displayName == null || displayName.isEmpty)
-          ? 'Parent'
-          : displayName,
-      familyName: (displayName == null || displayName.isEmpty)
-          ? 'Your Family'
-          : "${displayName.split(' ').first}'s Family",
-    );
-
-    // Re-fetch with the new defaultFamilyId and memberships
-    profile = UserProfile.fromDoc(await userData.get());
-    // (optional) sanity: ensure profile.defaultFamilyId == famId
+    await _getOrCreateFamilyWithOwner(userID, email: email);
+    profile = UserProfile.fromDoc(await user.get());
   }
 
   return profile;
 }
 
+  Future<UserProfile> _getOrCreateFamilyWithOwner(String ownerUId, { String? email}) async {
+    final topLevel = FirebaseFirestore.instance;
+    final authName = FirebaseAuth.instance.currentUser?.displayName;
+    final userDoc = topLevel.collection('users').doc(ownerUId);
 
-  Future<String> _findFirstParentMemberId(String familyId, String ownerUid) async {
-    final q = await membersColl(firebaseDB, familyId).where('userUid', isEqualTo: ownerUid).limit(1).get();
-    if (q.docs.isEmpty) return 'mem_parent_owner';
-    return q.docs.first.id;
-  }
+    await topLevel.runTransaction((tx) async {
+      final userSnap = await tx.get(userDoc);
+      final userData = userSnap.data() ?? {};
+      final currentFamId = (userData['defaultFamilyId'] as String?)?.trim();
 
-Future<String> _createFamilyWithOwner({
-  required String ownerUid,
-  required String parentDisplayName,
-  String? familyName,
-}) async {
-  final topLevel = FirebaseFirestore.instance;
-
-  final familyDoc = topLevel.collection('families').doc();
-  final memberRef = familyDoc.collection('members').doc(); // real member id available now
-  final userRef = topLevel.collection('users').doc(ownerUid);
-
-  final ownerFirst = parentDisplayName.trim().isEmpty
-      ? 'Parent'
-      : parentDisplayName.trim().split(' ').first;
-
-  final famName = (familyName == null || familyName.trim().isEmpty)
-      ? '$ownerFirst Family'
-      : familyName.trim();
-
-  final batch = topLevel.batch();
-
-  // Family
-  batch.set(familyDoc, {
-    'name': famName,
-    'ownerUid': ownerUid,
-    'createdAt': FieldValue.serverTimestamp(),
-    'active': true,
-    'settings': {
-      'pointsPerDifficulty': {'1': 10, '2': 20, '3': 35, '4': 55, '5': 80},
-    },
-  }, SetOptions(merge: true));
-
-  // Parent member
-  batch.set(memberRef, {
-    'userId': ownerUid,
-    'displayName': parentDisplayName.trim().isEmpty ? 'Parent' : parentDisplayName.trim(),
-    'role': 'parent',
-    'active': true,
-    'createdAt': FieldValue.serverTimestamp(),
-  }, SetOptions(merge: true));
-
-  // User profile: default family + membership (using real member id)
-  batch.set(userRef, {
-    'defaultFamilyId': familyDoc.id,
-    'memberships': {
-      familyDoc.id: {
-        'memberId': memberRef.id,
-        'role': 'parent',
+      // If no user exists, create one, or update last sign in time
+      if(!userSnap.exists){
+        tx.set(userDoc, {
+        'displayName': authName,
+        'email': email,
+        'defaultFamilyId': null,
+        'memberships': {},
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastSignInAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      } else {
+        tx.update(userDoc, {'lastSignInAt' : FieldValue.serverTimestamp(),
+        });
       }
-    },
-    'updatedAt': FieldValue.serverTimestamp(),
-  }, SetOptions(merge: true));
 
-  await batch.commit();
-  return familyDoc.id;
-}
+      if(currentFamId != null && currentFamId.isNotEmpty){
+        
+        final ownerMemberDoc = topLevel.collection('families')
+          .doc(currentFamId)
+          .collection('members')
+          .doc(ownerUId);
 
+        final ownerMemberData = await tx.get(ownerMemberDoc);
+        if (!ownerMemberData.exists) {
+          tx.set(ownerMemberDoc, {
+            'userUid': ownerUId,
+            'displayName': (authName ?? userData['displayName'] ?? 'Parent').toString(),
+            'role': 'owner',
+            'active': true,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+        }
+        return;
+      }
+
+      final famDoc = topLevel.collection('families').doc(ownerUId);
+      final memberDoc = famDoc.collection('members').doc(ownerUId);
+
+      final ownerFirstName = (authName == null || authName.trim().isEmpty)
+      ? 'Parent'
+      : authName.trim().split(' ').first;
+
+      final familyName = (authName == null || authName.trim().isEmpty)
+      ? '$ownerFirstName Family'
+      : "$ownerFirstName's Family";
+
+      tx.set(famDoc, {
+        'name' : familyName,
+        'ownerUid': ownerUId,
+        'active': true,
+        'settings' : {
+          'pointsPerDifficulty': {'1': 10, '2': 20, '3': 35, '4': 55, '5': 80},
+        },
+        'createdAt' : FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      
+      tx.set(memberDoc, {
+        'userUid': ownerUId,
+        'displayName': (authName == null || authName.trim().isEmpty)
+          ? 'Parent'
+          : authName.trim(),
+        'role': 'owner',
+        'active': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      tx.set(userDoc, {
+        'defaultFamilyId': famDoc.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+        'memberships.${famDoc.id}': {
+          'memberId': memberDoc.id,
+          'role': 'owner',
+        },
+      }, SetOptions(merge: true));
+      });
+
+    final snap = await userDoc.get();
+
+    return UserProfile.fromDoc(snap);
+  }
 
   // Update family fields (e.g., name)
   Future<void> updateFamily(String familyId, Map<String, dynamic> patch) async {
     await familyDoc(firebaseDB, familyId).set(patch, SetOptions(merge: true));
   }
 
-  /// Join a family as a Parent (idempotent)
+  /// Join a family as a Parent
   /// - Creates a parent Member linked to this user (if not already present)
   /// - Updates users/{uid} memberships + defaultFamilyId
   /// - Returns the memberId
@@ -518,8 +528,8 @@ Future<void> markCompleted({
       final family = Family.fromDoc(famSnap);
       final asn = Assignment.fromDoc(asnSnap);
 
-      if (asn.status != AssignmentStatus.completed) {
-        throw Exception('Only completed assignments can be approved');
+      if (asn.status != AssignmentStatus.pending) {
+        throw Exception('Only pending assignments can be approved');
       }
 
       final memberRef = membersColl(firebaseDB, familyId).doc(asn.memberId);

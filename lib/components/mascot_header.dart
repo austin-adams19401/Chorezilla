@@ -13,55 +13,48 @@ class MascotHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.fromLTRB(8, 48, 24, 48),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 32, 16, 32),
       decoration: BoxDecoration(
         color: cs.secondary,
-        
-        borderRadius: BorderRadius.circular(24)
+        borderRadius: BorderRadius.circular(24),
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Mascot inside a soft circle
           Container(
-            width: 100,
-            height: 100,
+            width: 125,
+            height: 125,
             decoration: BoxDecoration(
               color: cs.secondary,
               shape: BoxShape.circle,
             ),
+            clipBehavior: Clip.antiAlias,
             child: _MascotImage(),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: cs.onPrimary,
-                        fontWeight: FontWeight.w700,
-                        height: 1.15,
-                      ),
+          const SizedBox(width: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
+                height: 1.15,
+              ),
+        ),
+          const SizedBox(height: 6),
+
+          // Subtitle
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.white,
+                  height: 1.5,
                 ),
-                ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: cs.onPrimary.withValues(alpha: .90),
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ],
-            ),
           ),
         ],
       ),

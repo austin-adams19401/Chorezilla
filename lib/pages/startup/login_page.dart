@@ -6,7 +6,7 @@ import 'package:chorezilla/state/app_state.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import 'package:chorezilla/auth/google_sign_in.dart';
+import 'package:chorezilla/components/google_sign_in.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

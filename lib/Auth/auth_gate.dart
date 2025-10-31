@@ -6,8 +6,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:chorezilla/state/app_state.dart';
 
-
-import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
 import 'package:chorezilla/pages/family_setup/parent_setup_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_dashboard.dart';
 import 'package:chorezilla/pages/startup/login_page.dart';
@@ -20,7 +18,7 @@ class AuthGate extends StatelessWidget {
     final app = context.watch<AppState>();
 
     return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.idTokenChanges(),
+      stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snap) {
         final user = snap.data;
 
@@ -30,7 +28,7 @@ class AuthGate extends StatelessWidget {
         }
 
         // 2) Signed in but app still booting streams → splash loader
-        if (!app.bootLoaded) {
+        if (!app.bootLoaded || !app.familyLoaded || !app.membersLoaded) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -47,7 +45,7 @@ class AuthGate extends StatelessWidget {
           (m) => m.role == FamilyRole.child && m.active,
         );
         if (!hasKids) {
-          return const AddKidsPage();
+          return const ParentSetupPage();
         }
 
         // 5) All set → dashboard
