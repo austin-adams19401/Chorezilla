@@ -2,10 +2,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Adjust these paths to your project layout if needed
-import 'package:chorezilla/firebase_queries/family_repo.dart' as repo_file;
+import 'package:chorezilla/firebase_queries/chorezilla_repo.dart' as repo_file;
 import 'package:chorezilla/models/user_profile.dart';
 import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/member.dart';
@@ -23,13 +24,11 @@ class AppState extends ChangeNotifier {
     required this.repo,
     ThemeMode initialThemeMode = ThemeMode.system,
   })  : _themeMode = initialThemeMode {
-    // Attach by default (main.dart may also call attachAuthListener(), which is idempotent)
     _authSub = auth.authStateChanges().listen(_onAuthChanged);
 
-    // Hot-reload / already signed-in case
     final u = auth.currentUser;
     if (u != null) {
-      _bootstrapForUser(u);
+      _getUserProfile(u);
     }
   }
 
@@ -37,7 +36,12 @@ class AppState extends ChangeNotifier {
   // Dependencies
   // ───────────────────────────────────────────────────────────────────────────
   final FirebaseAuth auth;
-  final repo_file.FamilyRepo repo;
+  SetupPrefill? pendingSetupPrefill;
+  AuthState authState = AuthState.unknown;
+  final repo_file.ChorezillaRepo repo;
+
+  bool _bootLoaded = false;
+  bool get bootLoaded => _bootLoaded;
 
   // ───────────────────────────────────────────────────────────────────────────
   // Theme
@@ -53,8 +57,8 @@ class AppState extends ChangeNotifier {
   // ───────────────────────────────────────────────────────────────────────────
   // User & Family (rare changes)
   // ───────────────────────────────────────────────────────────────────────────
-  UserProfile? _user;
-  UserProfile? get user => _user;
+  UserProfile? _currentUser;
+  UserProfile? get user => _currentUser;
 
   String? _familyId;
   String? get familyId => _familyId;
@@ -64,10 +68,8 @@ class AppState extends ChangeNotifier {
 
   bool get isReady => auth.currentUser != null && _familyId != null && _family != null;
   // Boot flags to avoid false "setup" routing during hot restart
-  bool _familyLoaded = false;
-  bool _membersLoaded = false;
-  bool get bootLoaded => _familyLoaded && _membersLoaded;
-
+  bool familyLoaded = false;
+  bool membersLoaded = false;
 
   // Active member selection for child dashboard/profile header
   String? _currentMemberId;
@@ -122,99 +124,143 @@ class AppState extends ChangeNotifier {
   final Map<String, StreamSubscription<List<Assignment>>> _kidAssignedSubs = {};
   final Map<String, StreamSubscription<List<Assignment>>> _kidCompletedSubs = {};
 
-  // Allow main.dart to call this explicitly; safe to call more than once.
   void attachAuthListener() {
-    _authSub ??= auth.authStateChanges().listen(_onAuthChanged);
+    if (_authSub != null) {
+      debugPrint('[Auth] listener already attached');
+      return;
+    }
+    debugPrint('[Auth] attaching listener');
+    _authSub = auth.idTokenChanges().listen(_onAuthChanged);
   }
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // Auth flow
   // ───────────────────────────────────────────────────────────────────────────
-  Future<void> _onAuthChanged(User? u) async {
-    if (u == null) {
+  Future<void> _onAuthChanged(User? user) async {
+    if (user == null) {
       await _teardown();
       return;
     }
-    await _bootstrapForUser(u);
+    await _getUserProfile(user);
   }
 
-  Future<void> _bootstrapForUser(User u) async {
-    // 1) Ensure profile exists & fetch it
-    final profile = await repo.ensureUserProfile(
-      u.uid,
-      displayName: u.displayName,
-      email: u.email,
-    );
-    _user = profile;
+Future<void> _getUserProfile(User user) async {
+  _bootLoaded = false;
+  notifyListeners();
 
-    // 2) Decide current family; if none, create a new family + owner membership
-    String? famId = profile.defaultFamilyId;
-    famId ??= await _createFamilyWithOwner(u);
+  final profile = await repo.checkUserProfile(user.uid, displayName: user.displayName, email: user.email);
 
-    // 3) Bind streams if changed
-    if (_familyId != famId) {
-      _familyId = famId;
-      _startFamilyStreams(famId);
+  _currentUser = profile;
+
+  final famId = profile.defaultFamilyId;
+
+  if (_familyId != famId) {
+    _familyId = famId;
+    startFamilyStreams(famId!);
+  }
+
+  _bootLoaded = true;
+  notifyListeners();
+}
+
+  Future<void> signInWithGoogle() async {
+    try {
+      UserCredential uc;
+
+      // Android/iOS
+      final googleUser = await GoogleSignIn(scopes: const ['email']).signIn();
+      if (googleUser == null) return; // user canceled
+      final googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      uc = await auth.signInWithCredential(credential);
+
+      await _postSignInBootstrap(uc.user);
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Google sign-in failed: ${e.code} ${e.message}');
+      // surface a toast/snackbar in your UI if you’d like
+    } catch (e) {
+      debugPrint('Google sign-in error: $e');
     }
-
-    notifyListeners(); // structural change (user/family)
   }
 
-  // Create a family + owner member, and set defaultFamilyId on user
-  Future<String> _createFamilyWithOwner(User u) async {
-    final db = FirebaseFirestore.instance;
-    final famRef = db.collection('families').doc();
-    final ownerName = u.displayName?.trim().isNotEmpty == true ? u.displayName!.trim() : 'Parent';
-    final familyName = '${ownerName.split(' ').first} Family';
+Future<void> _postSignInBootstrap(User? user) async {
+  if (user == null) return;
+  final db = FirebaseFirestore.instance;
 
-    final memberRef = famRef.collection('members').doc(); // auto id for member
+  final uid = user.uid;
+  final userRef = repo_file.userDoc(db, uid);
+  final now = FieldValue.serverTimestamp();
 
-    final userRef = db.collection('users').doc(u.uid);
-
-    final batch = db.batch();
-    batch.set(famRef, {
-      'name': familyName,
-      'ownerUid': u.uid,
-      'createdAt': FieldValue.serverTimestamp(),
-      'settings': {
-        'pointsPerDifficulty': {
-          '1': 10, '2': 20, '3': 35, '4': 55, '5': 80,
-        }
-      },
-      'active': true,
+  // 1) Upsert users/{uid} (UserProfile)
+  final snap = await userRef.get();
+  if (!snap.exists) {
+    await userRef.set({
+      'displayName': user.displayName,
+      'email': user.email,
+      'photoURL': user.photoURL,
+      'defaultFamilyId': null,
+      'memberships': {}, // familyId -> { memberId, role }
+      'createdAt': now,
+      'lastSignInAt': now,
+      'provider': 'google',
     }, SetOptions(merge: true));
-
-    batch.set(memberRef, {
-      'userId': u.uid,
-      'displayName': ownerName,
-      'role': 'parent',
-      'active': true,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    // store defaultFamilyId on the user profile so next boot picks it
-    batch.set(userRef, {
-      'defaultFamilyId': famRef.id,
-    }, SetOptions(merge: true));
-
-    await batch.commit();
-    return famRef.id;
+  } else {
+    await userRef.set({'lastSignInAt': now, 'displayName': user.displayName, 'photoURL': user.photoURL}, SetOptions(merge: true));
   }
+
+  // 2) Decide where to go (needs setup vs ready)
+  final data = (await userRef.get()).data() as Map<String, dynamic>? ?? {};
+  final String? defaultFamilyId = data['defaultFamilyId'] as String?;
+  final Map<String, dynamic> memberships = (data['memberships'] as Map<String, dynamic>? ?? {});
+
+  if ((defaultFamilyId == null || defaultFamilyId.isEmpty) && memberships.isEmpty) {
+    // New account → Setup
+    pendingSetupPrefill = SetupPrefill(
+      displayName: user.displayName,
+      email: user.email,
+      photoUrl: user.photoURL,
+    );
+    authState = AuthState.needsFamilySetup;
+    notifyListeners();
+    // Your router should show the Parent/Family Setup screen when authState==needsFamilySetup
+  } else {
+    // Returning user with a family → proceed to home bootstrap
+    authState = AuthState.ready;
+    notifyListeners();
+    // Load family, members, chores, etc. (your existing watchers)
+  }
+}
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // Family streams (bind once per family)
   // ───────────────────────────────────────────────────────────────────────────
-  void _startFamilyStreams(String familyId) {
+
+  // Active members stream
+  Stream<List<Member>> watchActiveMembers(String familyId) =>
+      repo.watchMembers(familyId, activeOnly: true);
+
+  // Active kids stream
+  Stream<List<Member>> watchActiveKids(String familyId) =>
+      watchActiveMembers(familyId)
+          .map((ms) => ms.where((m) => m.role == FamilyRole.child && m.active == true).toList());
+
+  void startFamilyStreams(String familyId) {
     // Reset boot flags whenever we bind to a (new) family
-    _familyLoaded = false;
-    _membersLoaded = false;
+    familyLoaded = false;
+    membersLoaded = false;
 
     // Family doc (rare changes — name/settings)
     _familySub?.cancel();
     _familySub = repo.watchFamily(familyId).listen((fam) {
       _family = fam;
-      if (!_familyLoaded) {
-        _familyLoaded = true;
+      if (!familyLoaded) {
+        familyLoaded = true;
         notifyListeners(); // notify once when family is first loaded
       } else {
         notifyListeners(); // fine: a few widgets read name/settings
@@ -225,8 +271,8 @@ class AppState extends ChangeNotifier {
     _membersSub?.cancel();
     _membersSub = repo.watchMembers(familyId).listen((list) {
       membersVN.value = list;
-      if (!_membersLoaded) {
-        _membersLoaded = true;
+      if (!membersLoaded) {
+        membersLoaded = true;
         notifyListeners(); // let router know members are ready
       }
     });
@@ -299,6 +345,8 @@ class AppState extends ChangeNotifier {
         return 'assigned';
       case AssignmentStatus.completed:
         return 'completed';
+      case AssignmentStatus.pending:
+        return 'pending';
       case AssignmentStatus.approved:
         return 'approved';
       case AssignmentStatus.rejected:
@@ -312,11 +360,11 @@ class AppState extends ChangeNotifier {
   Future<void> refreshAfterProfileChange() async {
     final u = auth.currentUser;
     if (u == null) return;
-    final profile = await repo.ensureUserProfile(u.uid, displayName: u.displayName, email: u.email);
-    _user = profile;
+    final profile = await repo.checkUserProfile(u.uid, displayName: u.displayName, email: u.email);
+    _currentUser = profile;
     if (_familyId != profile.defaultFamilyId && profile.defaultFamilyId != null) {
       _familyId = profile.defaultFamilyId;
-      _startFamilyStreams(_familyId!);
+      startFamilyStreams(_familyId!);
     }
     notifyListeners();
   }
@@ -441,13 +489,31 @@ class AppState extends ChangeNotifier {
     await batch.commit();
   }
 
-  Future<void> updateChoreDefaultAssignees({
-    required String choreId,
-    required List<String> memberIds,
-    }) async {
-      await repo.updateChoreDefaultAssignees(familyId!, choreId: choreId, memberIds: memberIds);
-      // Optional: refresh caches if you keep a local chores list
-    }
+// Save which kids are assigned to a chore on its scheduled days.
+Future<void> updateChoreAssignees({
+  required String choreId,
+  required List<String> memberIds,
+}) async {
+  final id = familyId;
+  if (id == null) {
+    throw StateError('updateChoreAssignees called before family is loaded');
+  }
+
+  await repo.updateChoreAssignees(
+    id,
+    choreId: choreId,
+    memberIds: memberIds,
+  );
+
+  // Optional: if you cache chores locally, update that cache here and notifyListeners().
+  // final idx = _chores.indexWhere((c) => c.id == choreId);
+  // if (idx != -1) {
+  //   final c = _chores[idx];
+  //   _chores[idx] = c.copyWith(assignees: [...memberIds]);
+  //   notifyListeners();
+  // }
+}
+
 
 
   // Future<void> completeAssignment(String assignmentId, {String? note}) async {
@@ -469,18 +535,21 @@ class AppState extends ChangeNotifier {
   // Teardown / dispose
   // ───────────────────────────────────────────────────────────────────────────
   Future<void> _teardown() async {
-    _user = null;
+    _currentUser = null;
     _family = null;
     _familyId = null;
     _currentMemberId = null;
-    _familyLoaded = false;
-    _membersLoaded = false;
+    familyLoaded = false;
+    membersLoaded = false;
 
 
     await _familySub?.cancel();
     await _membersSub?.cancel();
     await _choresSub?.cancel();
     await _reviewSub?.cancel();
+    await _membersSub?.cancel();
+    await _authSub?.cancel();
+
     _familySub = _membersSub = _choresSub = _reviewSub = null;
 
     for (final s in _kidAssignedSubs.values) {
@@ -520,4 +589,11 @@ class AppState extends ChangeNotifier {
     reviewQueueVN.dispose();
     super.dispose();
   }
+}
+
+class SetupPrefill {
+  final String? displayName;
+  final String? email;
+  final String? photoUrl;
+  const SetupPrefill({this.displayName, this.email, this.photoUrl});
 }

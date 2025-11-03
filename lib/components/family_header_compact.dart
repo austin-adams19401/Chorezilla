@@ -29,7 +29,7 @@ class FamilyHeaderCompact extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: kids.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (_, i) {
           final m = kids[i];
           final icon = (m.avatarKey ?? '').trim();

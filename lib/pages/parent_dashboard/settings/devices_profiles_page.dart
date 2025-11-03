@@ -107,8 +107,11 @@ class _LinkThisDeviceCard extends StatelessWidget {
   final String familyId;
   final String? localDeviceId;
 
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context).platform.toString().split('.').last;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -164,7 +167,7 @@ class _LinkThisDeviceCard extends StatelessWidget {
                     await ref.set({
                       'deviceId': id,
                       'name': 'Device ${id.substring(0, 5)}',
-                      'platform': Theme.of(context).platform.toString().split('.').last,
+                      'platform': theme,
                       'lastSeen': FieldValue.serverTimestamp(),
                       'assignedMemberIds': FieldValue.arrayUnion([]),
                     }, SetOptions(merge: true));
@@ -241,7 +244,7 @@ class _DevicesList extends StatelessWidget {
 
         return ListView.separated(
           itemCount: docs.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, i) {
             final d = docs[i].data();
             final id = d['deviceId'] as String? ?? docs[i].id;

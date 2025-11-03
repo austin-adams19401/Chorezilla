@@ -249,7 +249,7 @@ class _TodoList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final a = items[i];
         return _AssignmentTile(
@@ -283,7 +283,7 @@ class _SubmittedList extends StatelessWidget {
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       itemCount: items.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         final a = items[i];
         return _AssignmentTile(

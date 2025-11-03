@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Enums shared across models
-enum FamilyRole { parent, child }
-enum AssignmentStatus { assigned, completed, approved, rejected }
+enum FamilyRole { owner, parent, child }
+enum AssignmentStatus { assigned, completed, pending, approved, rejected }
 enum AuthState { unknown, signedOut, needsFamilySetup, ready }
 
 // Enum <-> String helpers
@@ -32,6 +32,7 @@ extension AssignmentStatusUi on AssignmentStatus {
     switch (this) {
       case AssignmentStatus.assigned:  return 'Assigned';
       case AssignmentStatus.completed: return 'Completed';
+      case AssignmentStatus.pending: return 'Pending';
       case AssignmentStatus.approved:  return 'Approved';
       case AssignmentStatus.rejected:  return 'Rejected';
     }

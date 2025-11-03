@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:chorezilla/firebase_queries/family_repo.dart';
+import 'package:chorezilla/firebase_queries/chorezilla_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -30,7 +30,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
   String? _editingMemberId;
 
   // Repo for Firestore writes (so we get the memberId back)
-  final FamilyRepo _repo = FamilyRepo(db: FirebaseFirestore.instance);
+  final ChorezillaRepo _repo = ChorezillaRepo(firebaseDB: FirebaseFirestore.instance);
 
   @override
   void dispose() {
@@ -81,11 +81,11 @@ class _AddKidsPageState extends State<AddKidsPage> {
         }
 
         _clearFormAndRefocus();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Kid added')),
-          );
-        }
+        // if (mounted) {
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //     const SnackBar(content: Text('Kid added')),
+        //   );
+        // }
       } else {
         // EDIT: Update existing child
         final patch = <String, dynamic>{
@@ -98,9 +98,9 @@ class _AddKidsPageState extends State<AddKidsPage> {
 
         _clearFormAndRefocus();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Kid updated')),
-          );
+          // ScaffoldMessenger.of(context).showSnackBar(
+          //   const SnackBar(content: Text('Kid updated')),
+          // );
         }
       }
     } catch (e) {
@@ -129,25 +129,6 @@ class _AddKidsPageState extends State<AddKidsPage> {
       }
     }
   }
-
-  // Future<void> _deactivateKid(Member m) async {
-  //   final app = context.read<AppState>();
-  //   final familyId = app.family?.id;
-  //   if (familyId == null || familyId.isEmpty) return;
-
-  //   setState(() { _busy = true; _error = null; });
-  //   try {
-  //     await _repo.updateMember(familyId, m.id, {'active': false});
-  //     if (!mounted) return;
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text('Removed ${m.displayName}')),
-  //     );
-  //   } catch (e) {
-  //     setState(() => _error = e.toString());
-  //   } finally {
-  //     if (mounted) setState(() => _busy = false);
-  //   }
-  // }
 
   void _startEdit(Member m) {
     setState(() {
@@ -207,12 +188,10 @@ class _AddKidsPageState extends State<AddKidsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ---------- Stacked Form ----------
               Form(
                 key: _formKey,
                 child: Column(
                   children: [
-                    // Preview avatar at top
                     Center(
                       child: Column(
                         children: [
