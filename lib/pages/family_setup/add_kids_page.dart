@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:chorezilla/firebase_queries/family_repo.dart';
+import 'package:chorezilla/firebase_queries/chorezilla_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -30,7 +30,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
   String? _editingMemberId;
 
   // Repo for Firestore writes (so we get the memberId back)
-  final FamilyRepo _repo = FamilyRepo(db: FirebaseFirestore.instance);
+  final ChorezillaRepo _repo = ChorezillaRepo(firebaseDB: FirebaseFirestore.instance);
 
   @override
   void dispose() {

@@ -5,13 +5,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Adjust these paths to your project layout if needed
-import 'package:chorezilla/firebase_queries/family_repo.dart' as repo_file;
+import 'package:chorezilla/firebase_queries/chorezilla_repo.dart' as repo_file;
 import 'package:chorezilla/models/user_profile.dart';
 import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/assignment.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 /// Central app state.
 /// - Slow/structural state stays on this ChangeNotifier (user/family/theme).
@@ -37,7 +38,8 @@ class AppState extends ChangeNotifier {
   // Dependencies
   // ───────────────────────────────────────────────────────────────────────────
   final FirebaseAuth auth;
-  final repo_file.FamilyRepo repo;
+  final repo_file.ChorezillaRepo repo;
+  AuthState authState = AuthState.unknown;
 
   // ───────────────────────────────────────────────────────────────────────────
   // Theme
@@ -138,9 +140,81 @@ class AppState extends ChangeNotifier {
     await _bootstrapForUser(u);
   }
 
+  Future<void> signInWithGoogle() async {
+    try {
+      //UserCredential uc;
+
+      // Android/iOS
+      final googleUser = await GoogleSignIn(scopes: const ['email']).signIn();
+      if (googleUser == null) return; // user canceled
+      final googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      await auth.signInWithCredential(credential);
+
+      //await _postSignInBootstrap(uc.user);
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Google sign-in failed: ${e.code} ${e.message}');
+      // surface a toast/snackbar in your UI if you’d like
+    } catch (e) {
+      debugPrint('Google sign-in error: $e');
+    }
+  }
+
+  Future<void> _postSignInBootstrap(User? user) async {
+  if (user == null) return;
+    final db = FirebaseFirestore.instance;
+
+    final uid = user.uid;
+    final userRef = repo_file.userDoc(db, uid);
+    final now = FieldValue.serverTimestamp();
+
+    // 1) Upsert users/{uid} (UserProfile)
+    final snap = await userRef.get();
+    if (!snap.exists) {
+      await userRef.set({
+        'displayName': user.displayName,
+        'email': user.email,
+        'photoURL': user.photoURL,
+        'defaultFamilyId': null,
+        'memberships': {}, // familyId -> { memberId, role }
+        'createdAt': now,
+        'lastSignInAt': now,
+        'provider': 'google',
+      }, SetOptions(merge: true));
+    } else {
+      await userRef.set({'lastSignInAt': now, 'displayName': user.displayName, 'photoURL': user.photoURL}, SetOptions(merge: true));
+    }
+
+  // 2) Decide where to go (needs setup vs ready)
+  // final data = (await userRef.get()).data() as Map<String, dynamic>? ?? {};
+  // final String? defaultFamilyId = data['defaultFamilyId'] as String?;
+  // final Map<String, dynamic> memberships = (data['memberships'] as Map<String, dynamic>? ?? {});
+
+  // if ((defaultFamilyId == null || defaultFamilyId.isEmpty) && memberships.isEmpty) {
+  //   // New account → Setup
+  //   pendingSetupPrefill = SetupPrefill(
+  //     displayName: user.displayName,
+  //     email: user.email,
+  //     photoUrl: user.photoURL,
+  //   );
+  //   authState = AuthState.needsFamilySetup;
+  //   notifyListeners();
+  //   // Your router should show the Parent/Family Setup screen when authState==needsFamilySetup
+  // } else {
+  //   // Returning user with a family → proceed to home bootstrap
+  //   authState = AuthState.ready;
+  //   notifyListeners();
+  //   // Load family, members, chores, etc. (your existing watchers)
+  // }
+}
+
   Future<void> _bootstrapForUser(User u) async {
     // 1) Ensure profile exists & fetch it
-    final profile = await repo.ensureUserProfile(
+    final profile = await repo.checkForUserProfile(
       u.uid,
       displayName: u.displayName,
       email: u.email,
@@ -312,7 +386,7 @@ class AppState extends ChangeNotifier {
   Future<void> refreshAfterProfileChange() async {
     final u = auth.currentUser;
     if (u == null) return;
-    final profile = await repo.ensureUserProfile(u.uid, displayName: u.displayName, email: u.email);
+    final profile = await repo.checkForUserProfile(u.uid, displayName: u.displayName, email: u.email);
     _user = profile;
     if (_familyId != profile.defaultFamilyId && profile.defaultFamilyId != null) {
       _familyId = profile.defaultFamilyId;

@@ -15,6 +15,7 @@ class ParentSetupPage extends StatelessWidget {
     final app = context.watch<AppState>();
     final family = app.family;
     final kids = app.members.where((m) => m.role == FamilyRole.child && m.active).toList();
+    debugPrint(kids.toString());
 
     return Scaffold(
       appBar: AppBar(title: const Text('Family Setup')),

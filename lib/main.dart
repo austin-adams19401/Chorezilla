@@ -1,27 +1,30 @@
 //Auth
-import 'package:chorezilla/Auth/auth_gate.dart';
-import 'package:chorezilla/Auth/kid_join_page.dart';
-import 'package:chorezilla/Auth/parent_join_page.dart';
-import 'package:chorezilla/auth/login_page.dart';
-import 'package:chorezilla/auth/register_page.dart';
+import 'package:chorezilla/auth/auth_gate.dart';
+import 'package:chorezilla/pages/family_setup/parent_setup_screen.dart';
 //Pages
+import 'package:chorezilla/pages/startup/login_page.dart';
+import 'package:chorezilla/pages/startup/kid_join_page.dart';
+import 'package:chorezilla/pages/startup/parent_join_page.dart';
+import 'package:chorezilla/pages/startup/register_page.dart';
+
 import 'package:chorezilla/pages/child_dashboard/child_dashboard.dart';
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
 import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
-import 'package:chorezilla/pages/family_setup/parent_setup_screen.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_dashboard.dart';
 import 'package:chorezilla/themes/app_theme.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+
 //Flutter libraries
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 //Firebase
+import 'package:chorezilla/firebase_queries/chorezilla_repo.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:chorezilla/firebase_options.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 //App State
 import 'package:chorezilla/state/app_state.dart';
-import 'package:chorezilla/firebase_queries/family_repo.dart';
+import 'package:chorezilla/firebase_queries/chorezilla_repo.dart';
 
 
 Future<void> main() async {
@@ -30,7 +33,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  final repo = FamilyRepo(db: FirebaseFirestore.instance);
+  final repo = ChorezillaRepo(firebaseDB: FirebaseFirestore.instance);
   final auth = FirebaseAuth.instance;
 
   runApp(
@@ -47,7 +50,7 @@ class Chorezilla extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    app.attachAuthListener();
+
     return MaterialApp(
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
@@ -56,15 +59,19 @@ class Chorezilla extends StatelessWidget {
       title: 'Chorezilla',
       home: const AuthGate(),
       routes: {
+        // Logins
         '/login': (_) => const LoginPage(),
         '/register': (_) => const RegisterPage(),
+        // Family Setup
         '/parent-setup': (_) => const ParentSetupPage(),
-        '/edit': (_) => const EditFamilyPage(),
         '/add-kids': (_) => const AddKidsPage(),
-        '/kid-join': (_) => const KidJoinPage(),
-        '/parent-join': (_) => const ParentJoinPage(),
+        '/edit': (_) => const EditFamilyPage(),
+        // Dashboards
         '/parent': (_) => const ParentDashboardPage(),
         '/kids' : (_) => const ChildDashboardPage(),
+        // Join family with a code
+        '/kid-join': (_) => const KidJoinPage(),
+        '/parent-join': (_) => const ParentJoinPage(),
       },
     );
   }
