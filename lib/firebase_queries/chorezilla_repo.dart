@@ -27,39 +27,34 @@ class ChorezillaRepo {
   // ---------------------------
   // Bootstrap / Profiles
   // ---------------------------
-  Future<UserProfile> checkForUserProfile(
-    String userID, {
-    String? displayName,
-    String? email,
-  }) async {
+  Future<UserProfile> checkForUserProfile(String userID, { String? displayName, String? email }) async {
     final user = userDoc(firebaseDB, userID);
-    // final docSnapshot = await user.get();
-
-    await user.set({
-      'uid': userID,
-      'displayName': displayName,
-      'email': email,
-      'createdAt': FieldValue.serverTimestamp(),
-      'lastSignInAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-
     var profile = UserProfile.fromDoc(await user.get());
 
+    if(profile.email!.isEmpty || profile.email == null) {
+      await user.set({
+        'uid': userID,
+        'displayName': displayName,
+        'email': email,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastSignInAt': FieldValue.serverTimestamp(),
+        'defaultFamilyId' : null,
+      }, SetOptions(merge: true));
+    } else {
+      await user.set({
+        'lastSignInAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
     if (profile.defaultFamilyId == null || profile.defaultFamilyId!.isEmpty) {
-      await _getOrCreateFamilyWithOwner(userID, email: email);
+      await _getOrCreateFamilyWithOwner(userID, displayName, email: email);
       profile = UserProfile.fromDoc(await user.get());
     }
 
     return profile;
   }
 
-  // Future<String> _findFirstParentMemberId(String familyId, String ownerUid) async {
-  //   final q = await membersColl(firebaseDB, familyId).where('userUid', isEqualTo: ownerUid).limit(1).get();
-  //   if (q.docs.isEmpty) return 'mem_parent_owner';
-  //   return q.docs.first.id;
-  // }
-
-  Future<UserProfile> _getOrCreateFamilyWithOwner(String ownerUId, { String? email}) async {
+  Future<UserProfile> _getOrCreateFamilyWithOwner(String ownerUId,  String? displayName, { String? email }) async {
     final topLevel = FirebaseFirestore.instance;
     final authName = FirebaseAuth.instance.currentUser?.displayName;
     final userDoc = topLevel.collection('users').doc(ownerUId);
@@ -69,23 +64,7 @@ class ChorezillaRepo {
       final userData = userSnap.data() ?? {};
       final currentFamId = (userData['defaultFamilyId'] as String?)?.trim();
 
-      // If no user exists, create one, or update last sign in time
-      if(!userSnap.exists){
-        tx.set(userDoc, {
-        'displayName': authName,
-        'email': email,
-        'defaultFamilyId': null,
-        'memberships': {},
-        'createdAt': FieldValue.serverTimestamp(),
-        'lastSignInAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      } else {
-        tx.update(userDoc, {'lastSignInAt' : FieldValue.serverTimestamp(),
-        });
-      }
-
-      if(currentFamId != null && currentFamId.isNotEmpty){
-        
+      if(currentFamId != null && currentFamId.isNotEmpty){        
         final ownerMemberDoc = topLevel.collection('families')
           .doc(currentFamId)
           .collection('members')
@@ -122,7 +101,6 @@ class ChorezillaRepo {
         'settings' : {
           'pointsPerDifficulty': {'1': 10, '2': 20, '3': 35, '4': 55, '5': 80},
         },
-        'createdAt' : FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       
       tx.set(memberDoc, {

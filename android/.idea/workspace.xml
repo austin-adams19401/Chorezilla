@@ -5,23 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b84a41e4-fb7a-43c9-b1ed-6ac5f59ec7f9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../assets/icons/mascot/mascot_no_bg.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/icons/mascot/mascot_no_bg.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/Auth/auth_gate.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/Auth/auth_gate.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/Auth/kid_join_page.dart" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/Auth/login_page.dart" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/Auth/parent_join_page.dart" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/Auth/register_page.dart" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/components/auth_scaffold.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/components/auth_scaffold.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/components/mascot_header.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/components/mascot_header.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/firebase_queries/family_repo.dart" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/main.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/family_setup/add_kids_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/family_setup/add_kids_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/family_setup/parent_setup_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/family_setup/parent_setup_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/settings/settings_tab.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/settings/settings_tab.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/state/app_state.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/state/app_state.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../macos/Flutter/GeneratedPluginRegistrant.swift" beforeDir="false" afterPath="$PROJECT_DIR$/../macos/Flutter/GeneratedPluginRegistrant.swift" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/../pubspec.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../pubspec.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

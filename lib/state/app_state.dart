@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Adjust these paths to your project layout if needed
 import 'package:chorezilla/firebase_queries/chorezilla_repo.dart' as repo_file;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:chorezilla/models/user_profile.dart';
 import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/member.dart';
@@ -30,7 +31,7 @@ class AppState extends ChangeNotifier {
     // Hot-reload / already signed-in case
     final u = auth.currentUser;
     if (u != null) {
-      _bootstrapForUser(u);
+      _getDataForUser(u);
     }
   }
 
@@ -137,142 +138,104 @@ class AppState extends ChangeNotifier {
       await _teardown();
       return;
     }
-    await _bootstrapForUser(u);
+    await _getDataForUser(u);
   }
 
   Future<void> signInWithGoogle() async {
     try {
-      //UserCredential uc;
+      await GoogleSignIn.instance.initialize();
 
-      // Android/iOS
-      final googleUser = await GoogleSignIn(scopes: const ['email']).signIn();
-      if (googleUser == null) return; // user canceled
-      final googleAuth = await googleUser.authentication;
+      if (kIsWeb || !GoogleSignIn.instance.supportsAuthenticate()) {
+        final provider = GoogleAuthProvider();
+        final uc = await FirebaseAuth.instance.signInWithPopup(provider);
+        await _getDataForUser(uc.user!);
+        return;
+      }
 
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-      await auth.signInWithCredential(credential);
+      final account = await GoogleSignIn.instance.authenticate();
+      final idToken = account.authentication.idToken; 
 
-      //await _postSignInBootstrap(uc.user);
-    } on FirebaseAuthException catch (e) {
-      debugPrint('Google sign-in failed: ${e.code} ${e.message}');
-      // surface a toast/snackbar in your UI if you’d like
-    } catch (e) {
-      debugPrint('Google sign-in error: $e');
-    }
+      if (idToken == null) {
+        throw StateError('Google returned no idToken. Check client IDs / platform setup.');
+      }
+
+      final credential = GoogleAuthProvider.credential(idToken: idToken);
+      final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+
+      await _getDataForUser(userCred.user!);
+
+      } on GoogleSignInException catch (e) {
+        debugPrint('Google Sign-In error: ${e.code} ${e.description}');
+      } on FirebaseAuthException catch (e) {
+        debugPrint('Firebase Auth error: ${e.code} ${e.message}');
+      } catch (e) {
+        debugPrint('Unexpected Google sign-in error: $e');
+      }
   }
 
-  Future<void> _postSignInBootstrap(User? user) async {
-  if (user == null) return;
-    final db = FirebaseFirestore.instance;
+//   Future<void> _postSignInBootstrap(User? user) async {
+//   // if (user == null) return;
+//   //   final db = FirebaseFirestore.instance;
 
-    final uid = user.uid;
-    final userRef = repo_file.userDoc(db, uid);
-    final now = FieldValue.serverTimestamp();
+//   //   final uid = user.uid;
+//   //   final userRef = repo_file.userDoc(db, uid);
+//   //   final now = FieldValue.serverTimestamp();
 
-    // 1) Upsert users/{uid} (UserProfile)
-    final snap = await userRef.get();
-    if (!snap.exists) {
-      await userRef.set({
-        'displayName': user.displayName,
-        'email': user.email,
-        'photoURL': user.photoURL,
-        'defaultFamilyId': null,
-        'memberships': {}, // familyId -> { memberId, role }
-        'createdAt': now,
-        'lastSignInAt': now,
-        'provider': 'google',
-      }, SetOptions(merge: true));
-    } else {
-      await userRef.set({'lastSignInAt': now, 'displayName': user.displayName, 'photoURL': user.photoURL}, SetOptions(merge: true));
-    }
+//   //   // 1) Upsert users/{uid} (UserProfile)
+//   //   final snap = await userRef.get();
+//   //   if (!snap.exists) {
+//   //     await userRef.set({
+//   //       'displayName': user.displayName,
+//   //       'email': user.email,
+//   //       'photoURL': user.photoURL,
+//   //       'defaultFamilyId': null,
+//   //       'memberships': {}, // familyId -> { memberId, role }
+//   //       'createdAt': now,
+//   //       'lastSignInAt': now,
+//   //       'provider': 'google',
+//   //     }, SetOptions(merge: true));
+//   //   } else {
+//   //     await userRef.set({'lastSignInAt': now, 'displayName': user.displayName, 'photoURL': user.photoURL}, SetOptions(merge: true));
+//   //   }
 
-  // 2) Decide where to go (needs setup vs ready)
-  // final data = (await userRef.get()).data() as Map<String, dynamic>? ?? {};
-  // final String? defaultFamilyId = data['defaultFamilyId'] as String?;
-  // final Map<String, dynamic> memberships = (data['memberships'] as Map<String, dynamic>? ?? {});
+//   // 2) Decide where to go (needs setup vs ready)
+//   // final data = (await userRef.get()).data() as Map<String, dynamic>? ?? {};
+//   // final String? defaultFamilyId = data['defaultFamilyId'] as String?;
+//   // final Map<String, dynamic> memberships = (data['memberships'] as Map<String, dynamic>? ?? {});
 
-  // if ((defaultFamilyId == null || defaultFamilyId.isEmpty) && memberships.isEmpty) {
-  //   // New account → Setup
-  //   pendingSetupPrefill = SetupPrefill(
-  //     displayName: user.displayName,
-  //     email: user.email,
-  //     photoUrl: user.photoURL,
-  //   );
-  //   authState = AuthState.needsFamilySetup;
-  //   notifyListeners();
-  //   // Your router should show the Parent/Family Setup screen when authState==needsFamilySetup
-  // } else {
-  //   // Returning user with a family → proceed to home bootstrap
-  //   authState = AuthState.ready;
-  //   notifyListeners();
-  //   // Load family, members, chores, etc. (your existing watchers)
-  // }
-}
+//   // if ((defaultFamilyId == null || defaultFamilyId.isEmpty) && memberships.isEmpty) {
+//   //   // New account → Setup
+//   //   pendingSetupPrefill = SetupPrefill(
+//   //     displayName: user.displayName,
+//   //     email: user.email,
+//   //     photoUrl: user.photoURL,
+//   //   );
+//   //   authState = AuthState.needsFamilySetup;
+//   //   notifyListeners();
+//   //   // Your router should show the Parent/Family Setup screen when authState==needsFamilySetup
+//   // } else {
+//   //   // Returning user with a family → proceed to home bootstrap
+//   //   authState = AuthState.ready;
+//   //   notifyListeners();
+//   //   // Load family, members, chores, etc. (your existing watchers)
+//   // }
+// }
 
-  Future<void> _bootstrapForUser(User u) async {
+  Future<void> _getDataForUser(User u) async {
     // 1) Ensure profile exists & fetch it
-    final profile = await repo.checkForUserProfile(
-      u.uid,
-      displayName: u.displayName,
-      email: u.email,
-    );
+    final profile = await repo.checkForUserProfile(u.uid, displayName: u.displayName, email: u.email);
+    
     _user = profile;
-
-    // 2) Decide current family; if none, create a new family + owner membership
     String? famId = profile.defaultFamilyId;
-    famId ??= await _createFamilyWithOwner(u);
 
     // 3) Bind streams if changed
     if (_familyId != famId) {
-      _familyId = famId;
-      _startFamilyStreams(famId);
+      _familyId = famId;      
     }
 
-    notifyListeners(); // structural change (user/family)
-  }
+    _startFamilyStreams(famId!);
 
-  // Create a family + owner member, and set defaultFamilyId on user
-  Future<String> _createFamilyWithOwner(User u) async {
-    final db = FirebaseFirestore.instance;
-    final famRef = db.collection('families').doc();
-    final ownerName = u.displayName?.trim().isNotEmpty == true ? u.displayName!.trim() : 'Parent';
-    final familyName = '${ownerName.split(' ').first} Family';
-
-    final memberRef = famRef.collection('members').doc(); // auto id for member
-
-    final userRef = db.collection('users').doc(u.uid);
-
-    final batch = db.batch();
-    batch.set(famRef, {
-      'name': familyName,
-      'ownerUid': u.uid,
-      'createdAt': FieldValue.serverTimestamp(),
-      'settings': {
-        'pointsPerDifficulty': {
-          '1': 10, '2': 20, '3': 35, '4': 55, '5': 80,
-        }
-      },
-      'active': true,
-    }, SetOptions(merge: true));
-
-    batch.set(memberRef, {
-      'userId': u.uid,
-      'displayName': ownerName,
-      'role': 'parent',
-      'active': true,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    // store defaultFamilyId on the user profile so next boot picks it
-    batch.set(userRef, {
-      'defaultFamilyId': famRef.id,
-    }, SetOptions(merge: true));
-
-    await batch.commit();
-    return famRef.id;
+    notifyListeners();
   }
 
   // ───────────────────────────────────────────────────────────────────────────
