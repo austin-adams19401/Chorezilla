@@ -1,3 +1,4 @@
+import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

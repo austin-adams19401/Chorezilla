@@ -5,9 +5,9 @@ class Member {
   final String id;
   final String displayName;
   final FamilyRole role;
-  final String? userUid; // null for kid without auth user
+  final String? userUid; 
   final String? avatarKey;
-  final String? pinHash; // optional for kid login on shared device
+  final String? pinHash;
   final int level;
   final int xp;
   final int coins;
@@ -74,17 +74,21 @@ class Member {
 
   factory Member.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
+    final rawRole = data['role'] as String?;
+
     return Member(
       id: doc.id,
       displayName: data['displayName'] as String? ?? 'Member',
-      role: roleFromString(data['role'] as String? ?? 'child'),
+      role: roleFromString(rawRole ?? 'parent'),
       userUid: data['userUid'] as String?,
       avatarKey: data['avatarKey'] as String?,
       pinHash: data['pinHash'] as String?,
       level: (data['level'] as num?)?.toInt() ?? 1,
       xp: (data['xp'] as num?)?.toInt() ?? 0,
       coins: (data['coins'] as num?)?.toInt() ?? 0,
-      badges: (data['badges'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      badges:
+          (data['badges'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
       createdAt: tsAsDate(data['createdAt']),
       active: (data['active'] as bool?) ?? true,
     );

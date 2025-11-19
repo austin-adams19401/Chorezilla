@@ -1,3 +1,4 @@
+import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -60,6 +61,10 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
     if (user == null || _familyId == null) return;
     setState(() { _busy = true; _error = null; });
     try {
+      debugPrint(
+        'JOIN AS PARENT: familyId=$_familyId user=$user displayName="${user.displayName}"',
+      );
+
       final app = context.read<AppState>();
       final repo = app.repo;
       await repo.joinFamilyAsParent(

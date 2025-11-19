@@ -1,16 +1,34 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 // Enums shared across models
 enum FamilyRole { parent, child }
 enum AssignmentStatus { assigned, completed, approved, rejected }
-enum AuthState { unknown, signedOut, needsFamilySetup, ready }
+enum AuthStatus { unknown, signedOut, needsFamilySetup, ready }
 
-// Enum <-> String helpers
-String roleToString(FamilyRole r) => r.name;
-FamilyRole roleFromString(String s) => FamilyRole.values.firstWhere(
-      (e) => e.name == s,
-      orElse: () => FamilyRole.child,
-    );
+String roleToString(FamilyRole role) {
+  switch (role) {
+    case FamilyRole.parent:
+      return 'parent';
+    case FamilyRole.child:
+      return 'child';
+  }
+}
+
+FamilyRole roleFromString(String value) {
+  switch (value) {
+    case 'parent':
+    case 'owner':
+      return FamilyRole.parent;
+    case 'child':
+    case 'kid':
+      return FamilyRole.child;
+    default:
+      debugPrint('roleFromString: Unknown role "$value", defaulting to PARENT');
+      return FamilyRole.parent;
+  }
+}
+
 
 String statusToString(AssignmentStatus s) => s.name;
 

@@ -17,14 +17,13 @@ import 'package:chorezilla/themes/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 //Firebase
-import 'package:chorezilla/firebase_queries/chorezilla_repo.dart';
+import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:chorezilla/firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 //App State
 import 'package:chorezilla/state/app_state.dart';
-import 'package:chorezilla/firebase_queries/chorezilla_repo.dart';
 
 
 Future<void> main() async {

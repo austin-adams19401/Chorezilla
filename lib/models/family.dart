@@ -55,20 +55,24 @@ class Family {
   final FamilySettings settings;
   final FamilyStats stats;
   final DateTime? createdAt;
+  final bool onboardingComplete;
 
   const Family({
     required this.id,
     required this.name,
     required this.ownerUid,
+    required this.onboardingComplete,
     this.joinCode,
     this.settings = const FamilySettings(),
     this.stats = const FamilyStats(),
     this.createdAt,
+    
   });
 
   Map<String, dynamic> toMap() => {
         'name': name,
         'ownerUid': ownerUid,
+        'onboardingComplete': onboardingComplete,
         'joinCode': joinCode,
         'settings': settings.toMap(),
         'stats': stats.toMap(),
@@ -81,6 +85,7 @@ class Family {
       id: doc.id,
       name: data['name'] as String? ?? 'Family',
       ownerUid: data['ownerUid'] as String? ?? '',
+      onboardingComplete: (data['onboardingComplete'] as bool?) ?? false,
       joinCode: data['joinCode'] as String?,
       settings: FamilySettings.fromMap(data['settings'] as Map<String, dynamic>?),
       stats: FamilyStats.fromMap(data['stats'] as Map<String, dynamic>?),

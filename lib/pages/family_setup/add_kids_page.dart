@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:chorezilla/firebase_queries/chorezilla_repo.dart';
+import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -129,25 +129,6 @@ class _AddKidsPageState extends State<AddKidsPage> {
       }
     }
   }
-
-  // Future<void> _deactivateKid(Member m) async {
-  //   final app = context.read<AppState>();
-  //   final familyId = app.family?.id;
-  //   if (familyId == null || familyId.isEmpty) return;
-
-  //   setState(() { _busy = true; _error = null; });
-  //   try {
-  //     await _repo.updateMember(familyId, m.id, {'active': false});
-  //     if (!mounted) return;
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(content: Text('Removed ${m.displayName}')),
-  //     );
-  //   } catch (e) {
-  //     setState(() => _error = e.toString());
-  //   } finally {
-  //     if (mounted) setState(() => _busy = false);
-  //   }
-  // }
 
   void _startEdit(Member m) {
     setState(() {

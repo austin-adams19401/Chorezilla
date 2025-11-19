@@ -1,18 +1,19 @@
+library;
+
 // lib/state/app_state.dart
 import 'dart:async';
+import 'package:chorezilla/models/common.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-// Adjust these paths to your project layout if needed
-import 'package:chorezilla/firebase_queries/chorezilla_repo.dart' as repo_file;
+import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:chorezilla/models/user_profile.dart';
 import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/assignment.dart';
-import 'package:chorezilla/models/common.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Central app state.
@@ -20,17 +21,22 @@ import 'package:google_sign_in/google_sign_in.dart';
 /// - Fast-changing lists are exposed via ValueNotifiers so only consumers of
 ///   those lists rebuild (reduces jank & GC).
 class AppState extends ChangeNotifier {
+  
   AppState({
     required this.auth,
     required this.repo,
     ThemeMode initialThemeMode = ThemeMode.system,
-  })  : _themeMode = initialThemeMode {
-    // Attach by default (main.dart may also call attachAuthListener(), which is idempotent)
+  }) : _themeMode = initialThemeMode {
+    // Attach auth listener once
     _authSub = auth.authStateChanges().listen(_onAuthChanged);
 
     // Hot-reload / already signed-in case
     final u = auth.currentUser;
+    _firebaseUser = u;
+
+    debugPrint('STATE CONSTRUCTOR: possible user: user=${u?.uid} - ${u?.displayName}');
     if (u != null) {
+      debugPrint('STATE CONSTRUCTOR: user exists =${u.uid} - ${u.displayName}');
       _getDataForUser(u);
     }
   }
@@ -39,8 +45,10 @@ class AppState extends ChangeNotifier {
   // Dependencies
   // ───────────────────────────────────────────────────────────────────────────
   final FirebaseAuth auth;
-  final repo_file.ChorezillaRepo repo;
-  AuthState authState = AuthState.unknown;
+  final ChorezillaRepo repo;
+  AuthStatus authState = AuthStatus.unknown;
+  User? _firebaseUser;
+  User? get firebaseUser => _firebaseUser;
 
   // ───────────────────────────────────────────────────────────────────────────
   // Theme
@@ -127,6 +135,7 @@ class AppState extends ChangeNotifier {
 
   // Allow main.dart to call this explicitly; safe to call more than once.
   void attachAuthListener() {
+    debugPrint('ATTACHING AUTH LISTENER');
     _authSub ??= auth.authStateChanges().listen(_onAuthChanged);
   }
 
@@ -134,11 +143,21 @@ class AppState extends ChangeNotifier {
   // Auth flow
   // ───────────────────────────────────────────────────────────────────────────
   Future<void> _onAuthChanged(User? u) async {
+    debugPrint('AUTH CHANGED!');
+
+    _firebaseUser = u;
+
     if (u == null) {
+      debugPrint('AUTH CHANGED: user is null, teardown');
       await _teardown();
       return;
     }
+
+    debugPrint('AUTH CHANGED: user=${u.uid} - ${u.displayName}');
     await _getDataForUser(u);
+
+    // Ensure anyone watching AppState rebuilds after auth change
+    notifyListeners();
   }
 
   Future<void> signInWithGoogle() async {
@@ -146,32 +165,41 @@ class AppState extends ChangeNotifier {
       await GoogleSignIn.instance.initialize();
 
       if (kIsWeb || !GoogleSignIn.instance.supportsAuthenticate()) {
+        // Web or fallback path
         final provider = GoogleAuthProvider();
-        final uc = await FirebaseAuth.instance.signInWithPopup(provider);
-        await _getDataForUser(uc.user!);
+        final uc = await auth.signInWithPopup(provider);
+        debugPrint(
+          'GOOGLE SIGN IN: WEB user=${uc.user?.uid} - ${uc.user?.displayName}',
+        );
+        // No need to call _getDataForUser here; _onAuthChanged will fire.
         return;
       }
 
       final account = await GoogleSignIn.instance.authenticate();
-      final idToken = account.authentication.idToken; 
+
+      final authData = account.authentication;
+      final idToken = authData.idToken;
 
       if (idToken == null) {
-        throw StateError('Google returned no idToken. Check client IDs / platform setup.');
+        debugPrint('Google returned no idToken. Check client IDs / platform setup.');
+        return;
       }
 
       final credential = GoogleAuthProvider.credential(idToken: idToken);
-      final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCred = await auth.signInWithCredential(credential);
 
-      await _getDataForUser(userCred.user!);
-
-      } on GoogleSignInException catch (e) {
-        debugPrint('Google Sign-In error: ${e.code} ${e.description}');
-      } on FirebaseAuthException catch (e) {
-        debugPrint('Firebase Auth error: ${e.code} ${e.message}');
-      } catch (e) {
-        debugPrint('Unexpected Google sign-in error: $e');
-      }
+      debugPrint(
+        'GOOGLE SIGN IN: user=${userCred.user?.uid} - ${userCred.user?.displayName}',
+      );
+    } on GoogleSignInException catch (e) {
+      debugPrint('Google Sign-In error: ${e.code} ${e.description}');
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth error: ${e.code} ${e.message}');
+    } catch (e) {
+      debugPrint('Unexpected Google sign-in error: $e');
+    }
   }
+
 
 //   Future<void> _postSignInBootstrap(User? user) async {
 //   // if (user == null) return;
@@ -223,17 +251,21 @@ class AppState extends ChangeNotifier {
 
   Future<void> _getDataForUser(User u) async {
     // 1) Ensure profile exists & fetch it
+    debugPrint('_getDataForUser: ${u.email} - ${u.displayName}');
     final profile = await repo.checkForUserProfile(u.uid, displayName: u.displayName, email: u.email);
     
     _user = profile;
     String? famId = profile.defaultFamilyId;
 
-    // 3) Bind streams if changed
+    debugPrint('_getDataForUser: email:${_user?.email} - name: ${_user?.displayName} - famId: $famId');
+
     if (_familyId != famId) {
-      _familyId = famId;      
+      _familyId = famId;
     }
 
-    _startFamilyStreams(famId!);
+    if (famId != null && famId.isNotEmpty) {
+      _startFamilyStreams(famId);
+    }
 
     notifyListeners();
   }
@@ -243,6 +275,7 @@ class AppState extends ChangeNotifier {
   // ───────────────────────────────────────────────────────────────────────────
   void _startFamilyStreams(String familyId) {
     // Reset boot flags whenever we bind to a (new) family
+    debugPrint('STARTING FAMILY STREAMS: famName: ${family?.name} - famId: $familyId');
     _familyLoaded = false;
     _membersLoaded = false;
 
@@ -266,18 +299,21 @@ class AppState extends ChangeNotifier {
         _membersLoaded = true;
         notifyListeners(); // let router know members are ready
       }
+      notifyListeners();
     });
 
     // Chores (hot list)
     _choresSub?.cancel();
     _choresSub = repo.watchChores(familyId).listen((list) {
       choresVN.value = list;
+      notifyListeners();
     });
 
     // Review queue (completed awaiting approval)
     _reviewSub?.cancel();
     _reviewSub = repo.watchReviewQueue(familyId).listen((list) {
       reviewQueueVN.value = list;
+      notifyListeners();
     });
   }
 
@@ -378,6 +414,7 @@ class AppState extends ChangeNotifier {
     String? pinHash,
   }) async {
     final famId = _familyId!;
+    debugPrint('ADDING CHILD');
     await repo.addChild(
       famId, 
       displayName: name,
@@ -506,6 +543,7 @@ class AppState extends ChangeNotifier {
   // Teardown / dispose
   // ───────────────────────────────────────────────────────────────────────────
   Future<void> _teardown() async {
+    _firebaseUser = null;
     _user = null;
     _family = null;
     _familyId = null;
