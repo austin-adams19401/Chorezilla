@@ -566,10 +566,8 @@ void setCurrentMember(String? memberId) {
   }
 
 
-  Future<void> deleteChore(
-    String choreId, {
-    bool cascadeAssignments = true,
-  }) async {
+    /// Delete a chore template and all its assignments (no orphan docs).
+  Future<void> deleteChore(String choreId) async {
     final famId = _familyId;
     if (famId == null) {
       throw StateError('No family selected when calling deleteChore');
@@ -578,44 +576,56 @@ void setCurrentMember(String? memberId) {
     final db = FirebaseFirestore.instance;
     final famRef = db.collection('families').doc(famId);
     final choreRef = famRef.collection('chores').doc(choreId);
+    final assignmentsRef = famRef.collection('assignments');
 
-    if (cascadeAssignments) {
-      final assignmentsRef = famRef.collection('assignments');
+    debugPrint('DELETE_CHORE: famId=$famId choreId=$choreId');
+
+    // Delete all assignments for this chore in batches to be safe
+    const batchSize = 200;
+    while (true) {
       final snap = await assignmentsRef
           .where('choreId', isEqualTo: choreId)
+          .limit(batchSize)
           .get();
 
-      if (snap.docs.isNotEmpty) {
-        final batch = db.batch();
-        for (final doc in snap.docs) {
-          batch.delete(doc.reference);
-        }
-        await batch.commit();
+      if (snap.docs.isEmpty) {
+        break;
       }
+
+      final batch = db.batch();
+      for (final doc in snap.docs) {
+        debugPrint('DELETE_CHORE: deleting assignment ${doc.id}');
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
     }
 
+    // Finally delete the chore doc itself
     await choreRef.delete();
+    debugPrint('DELETE_CHORE: chore $choreId deleted.');
   }
 
 
-  /// Return just the member ids that currently have this chore assigned.
+  /// This uses the `defaultAssignees` list stored on the Chore template,
+  /// not the per-day Assignment docs. That way avatars stay stable even
+  /// when today's instance moves from assigned → pending → approved.
   Set<String> assignedMemberIdsForChore(String choreId) {
-    final list = familyAssignedVN.value;
-    if (list.isEmpty) return <String>{};
-
-    return list
-        .where((a) => a.choreId == choreId)
-        .map((a) => a.memberId)
-        .toSet();
+    try {
+      final chore = chores.firstWhere((c) => c.id == choreId);
+      return chore.defaultAssignees.toSet();
+    } catch (_) {
+      return <String>{};
+    }
   }
 
-  /// Return the Member objects currently assigned to this chore.
+  /// Return the Member objects corresponding to this chore's default assignees.
   List<Member> assignedMembersForChore(String choreId) {
     final ids = assignedMemberIdsForChore(choreId);
     if (ids.isEmpty) return const <Member>[];
 
     return members.where((m) => ids.contains(m.id)).toList();
   }
+
 
   /// Remove assignment(s) for these member ids for a chore.
   ///
@@ -747,6 +757,27 @@ Future<void> assignChore({
 
     await batch.commit();
     debugPrint('ASSIGN_CHORE: batch committed ${mems.length} docs.');
+
+    try {
+      // Find the latest in-memory copy of this chore
+      final currentChore = chores.firstWhere((c) => c.id == choreId);
+
+      // Existing defaults + newly assigned kids
+      final existingDefaults = currentChore.defaultAssignees.toSet();
+      final updatedDefaults = {...existingDefaults, ...ids};
+
+      // If nothing actually changed, skip the write
+      if (updatedDefaults.length == existingDefaults.length) {
+        return;
+      }
+
+      await updateChoreDefaultAssignees(
+        choreId: choreId,
+        memberIds: updatedDefaults.toList(),
+      );
+    } catch (e) {
+      debugPrint('ASSIGN_CHORE: failed to update defaultAssignees: $e');
+    }
   }
 
 
@@ -758,11 +789,41 @@ Future<void> assignChore({
       // Optional: refresh caches if you keep a local chores list
     }
 
+Future<void> completeAssignment(String assignmentId) async {
+    final famId = _familyId;
+    if (famId == null) {
+      throw StateError('No family selected when calling completeAssignment');
+    }
 
-  // Future<void> completeAssignment(String assignmentId, {String? note}) async {
-  //   final famId = _familyId!;
-  //   await repo.completeAssignment(famId, assignmentId, note: note);
-  // }
+    final db = FirebaseFirestore.instance;
+    final famRef = db.collection('families').doc(famId);
+    final aRef = famRef.collection('assignments').doc(assignmentId);
+
+    // 1) Load the assignment so we can get choreId + memberId
+    final snap = await aRef.get();
+    if (!snap.exists) {
+      throw StateError('Assignment $assignmentId not found');
+    }
+
+    final assignment = Assignment.fromDoc(snap);
+
+    // 2) Log completion via the repo "events" function
+    const dayStartHour = 4; // TODO: wire to settings later if you want
+    await repo.completeAssignment(
+      familyId: famId,
+      choreId: assignment.choreId,
+      memberId: assignment.memberId,
+      dayStartHour: dayStartHour,
+    );
+
+    // 3) Update the assignment doc itself so streams/UI move it out of "To Do"
+    final statusWire = assignment.requiresApproval ? 'pending' : 'completed';
+
+    await aRef.update({
+      'status': statusWire,
+      'completedAt': FieldValue.serverTimestamp(),
+    });
+  }
 
   Future<void> approveAssignment(String assignmentId, {String? parentMemberId}) async {
     final famId = _familyId!;
@@ -773,6 +834,148 @@ Future<void> assignChore({
     final famId = _familyId!;
     await repo.rejectAssignment(famId, assignmentId, reason: reason);
   }
+  
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Recurring Assignment Creation Helpers
+  // ───────────────────────────────────────────────────────────────────────────
+
+    Member? _findMemberById(String id) {
+    for (final m in members) {
+      if (m.id == id) return m;
+    }
+    return null;
+  }
+
+  bool _choreOccursOnDate(Chore chore, DateTime date) {
+    final r = chore.recurrence;
+    if (r == null) {
+      // No recurrence → we won't auto-generate; assignments must be manual.
+      return false;
+    }
+
+    switch (r.type) {
+      case 'daily':
+        return true;
+
+      case 'weekly':
+      case 'custom':
+        final days = r.daysOfWeek;
+        if (days == null || days.isEmpty) return false;
+        // DateTime.weekday: 1=Mon .. 7=Sun (Mon=1)
+        return days.contains(date.weekday);
+
+      case 'once':
+      default:
+        // For now we don't auto-generate "once" chores;
+        // you can add date-based logic later.
+        return false;
+    }
+  }
+
+    /// Ensure that for today's date, each default assignee of each recurring chore
+  /// has an Assignment doc (status = 'assigned').
+  ///
+  /// Idempotent: safe to call multiple times. It checks existing assignments
+  /// with due == today and only creates missing ones.
+  Future<void> ensureAssignmentsForToday() async {
+    final famId = _familyId;
+    final fam = _family;
+    if (famId == null || fam == null) {
+      debugPrint('ensureAssignmentsForToday: no family loaded, skipping.');
+      return;
+    }
+
+    final db = FirebaseFirestore.instance;
+    final famRef = db.collection('families').doc(famId);
+    final assignmentsRef = famRef.collection('assignments');
+
+    // Normalize "today" to a date-only value (midnight).
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayTs = Timestamp.fromDate(today);
+
+    debugPrint('ensureAssignmentsForToday: famId=$famId date=$today');
+
+    // 1) Load all assignments that are already due today.
+    final existingSnap = await assignmentsRef
+        .where('due', isEqualTo: todayTs)
+        .get();
+
+    // Map: choreId -> set of memberIds that already have an assignment today.
+    final Map<String, Set<String>> existingByChore = {};
+    for (final doc in existingSnap.docs) {
+      final data = doc.data();
+      final choreId = data['choreId'] as String? ?? '';
+      final memberId = data['memberId'] as String? ?? '';
+      if (choreId.isEmpty || memberId.isEmpty) continue;
+      existingByChore.putIfAbsent(choreId, () => <String>{}).add(memberId);
+    }
+
+    int createdCount = 0;
+    final batch = db.batch();
+
+    for (final chore in chores) {
+      if (!chore.active) continue;
+      if (!_choreOccursOnDate(chore, today)) continue;
+      if (chore.defaultAssignees.isEmpty) continue;
+
+      final alreadyForChore = existingByChore[chore.id] ?? const <String>{};
+
+      for (final memberId in chore.defaultAssignees) {
+        if (alreadyForChore.contains(memberId)) {
+          // This kid already has today's assignment for this chore.
+          continue;
+        }
+
+        final member = _findMemberById(memberId);
+        if (member == null) {
+          debugPrint(
+            'ensureAssignmentsForToday: member $memberId not found, skipping.',
+          );
+          continue;
+        }
+
+        // Use your Award helper to compute XP + coins.
+        final award = calcAwards(
+          difficulty: chore.difficulty,
+          settings: fam.settings,
+        );
+
+        final aRef = assignmentsRef.doc();
+        batch.set(aRef, {
+          'familyId': famId,
+          'choreId': chore.id,
+          'choreTitle': chore.title,
+          'choreIcon': chore.icon,
+          'memberId': member.id,
+          'memberName': member.displayName,
+          'difficulty': chore.difficulty,
+          'xp': award.xp,
+          'coinAward': award.coins,
+          'requiresApproval': chore.requiresApproval,
+          'status': 'assigned',
+          'due': todayTs,
+          'assignedAt': FieldValue.serverTimestamp(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        createdCount++;
+      }
+    }
+
+    if (createdCount == 0) {
+      debugPrint('ensureAssignmentsForToday: no new assignments needed.');
+      return;
+    }
+
+    await batch.commit();
+    debugPrint(
+      'ensureAssignmentsForToday: created $createdCount new assignments for $today.',
+    );
+  }
+
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // Teardown / dispose

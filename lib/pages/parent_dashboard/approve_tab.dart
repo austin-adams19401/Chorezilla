@@ -6,14 +6,14 @@ import 'package:chorezilla/models/assignment.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/member.dart';
 
-class CheckoffTab extends StatefulWidget {
-  const CheckoffTab({super.key});
+class ApproveTab extends StatefulWidget {
+  const ApproveTab({super.key});
 
   @override
-  State<CheckoffTab> createState() => _CheckoffTabState();
+  State<ApproveTab> createState() => _ApproveTabState();
 }
 
-class _CheckoffTabState extends State<CheckoffTab> {
+class _ApproveTabState extends State<ApproveTab> {
   // Track which assignment IDs are in-flight (approve/reject)
   final Set<String> _busyIds = <String>{};
 
