@@ -5,7 +5,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:chorezilla/models/award.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/rendering.dart';
 import '../models/common.dart';
 import '../models/user_profile.dart';
@@ -40,7 +39,4 @@ class ChorezillaRepo {
   final FirebaseFirestore firebaseDB;
   ChorezillaRepo({required this.firebaseDB});
 
-  // Shared helpers available to all parts
-  Future<T> _tx<T>(Future<T> Function(Transaction) body) => firebaseDB.runTransaction(body);
-  WriteBatch _batch() => firebaseDB.batch();
 }

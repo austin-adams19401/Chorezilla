@@ -21,6 +21,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   bool _obscure = true;
   bool _busy = false;
+  // ignore: unused_field
   String? _error;
 
   @override

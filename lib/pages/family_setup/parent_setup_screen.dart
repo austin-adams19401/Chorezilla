@@ -1,5 +1,4 @@
 import 'package:chorezilla/data/chorezilla_repo.dart';
-import 'package:chorezilla/pages/parent_dashboard/parent_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -147,7 +146,7 @@ class ParentSetupPage extends StatelessWidget {
                         final app = context.read<AppState>();
                         final familyId = app.family?.id;
                         if (familyId == null) return;
-                        
+
                         await app.repo.updateFamily(familyId, {'onboardingComplete': true});
                       },
                       icon: const Icon(Icons.check),
