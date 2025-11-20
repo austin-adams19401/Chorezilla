@@ -46,7 +46,8 @@ extension ChoreRepo on ChorezillaRepo {
     int? difficulty,
     FamilySettings? settings,
     Recurrence? recurrence,
-    bool? active,
+    bool? active, 
+    required bool requiresApproval,
   }) async {
     final patch = <String, dynamic>{};
     if (title != null) patch['title'] = title;

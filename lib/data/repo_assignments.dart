@@ -151,8 +151,11 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
       final family = Family.fromDoc(famSnap);
       final asn = Assignment.fromDoc(asnSnap);
 
-      if (asn.status != AssignmentStatus.completed) {
-        throw Exception('Only completed assignments can be approved');
+      debugPrint('APPROVING: chore ${asn.choreTitle} - ${asn.status}');
+      debugPrint('APPROVING: requires approval? ${asn.requiresApproval}');
+
+      if (asn.requiresApproval == false || asn.status != AssignmentStatus.pending) {
+        throw Exception('Only pending assignments can be approved');
       }
 
       final memberRef = membersColl(firebaseDB, familyId).doc(asn.memberId);
@@ -162,7 +165,7 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
       final coins = (asn.xp * family.settings.coinPerPoint).round();
 
       tx.update(asnRef, {
-        'status': 'approved',
+        'status': 'completed',
         'approvedAt': FieldValue.serverTimestamp(),
       });
 
@@ -193,6 +196,9 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
       final asnSnap = await tx.get(asnRef);
       if (!asnSnap.exists) throw Exception('Assignment not found');
       final asn = Assignment.fromDoc(asnSnap);
+
+      debugPrint('');
+
       if (asn.status != AssignmentStatus.completed) {
         throw Exception('Only completed assignments can be rejected');
       }

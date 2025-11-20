@@ -8,16 +8,18 @@ class Recurrence {
   const Recurrence({required this.type, this.daysOfWeek, this.timeOfDay});
 
   Map<String, dynamic> toMap() => {
-        'type': type,
-        'daysOfWeek': daysOfWeek,
-        'timeOfDay': timeOfDay,
-      };
+    'type': type,
+    'daysOfWeek': daysOfWeek,
+    'timeOfDay': timeOfDay,
+  };
 
   factory Recurrence.fromMap(Map<String, dynamic>? data) {
     if (data == null) return const Recurrence(type: 'daily');
     return Recurrence(
       type: data['type'] as String? ?? 'daily',
-      daysOfWeek: (data['daysOfWeek'] as List?)?.map((e) => (e as num).toInt()).toList(),
+      daysOfWeek: (data['daysOfWeek'] as List?)
+          ?.map((e) => (e as num).toInt())
+          .toList(),
       timeOfDay: data['timeOfDay'] as String?,
     );
   }
@@ -34,10 +36,13 @@ class Chore {
   final bool active;
   final Recurrence? recurrence;
 
-  // NEW
+  // Existing
   final List<String> defaultAssignees;
 
-  Chore({
+  // NEW: does this chore type require parent approval?
+  final bool requiresApproval;
+
+  const Chore({
     required this.id,
     required this.title,
     this.description,
@@ -47,20 +52,26 @@ class Chore {
     required this.active,
     this.recurrence,
     this.defaultAssignees = const [],
+    this.requiresApproval = false, 
   });
 
   factory Chore.fromDoc(DocumentSnapshot d) {
-    final m = d.data() as Map<String, dynamic>;
+    final m = d.data() as Map<String, dynamic>? ?? {};
     return Chore(
       id: d.id,
-      title: m['title'] ?? '',
-      description: m['description'],
-      icon: m['icon'],
+      title: m['title'] as String? ?? '',
+      description: m['description'] as String?,
+      icon: m['icon'] as String?,
       difficulty: (m['difficulty'] as num?)?.toInt() ?? 1,
       points: (m['points'] as num?)?.toInt() ?? 0,
       active: (m['active'] as bool?) ?? true,
-      recurrence: m['recurrence'] == null ? null : Recurrence.fromMap(m['recurrence']),
-      defaultAssignees: (m['defaultAssignees'] as List?)?.cast<String>() ?? const [],
+      recurrence: m['recurrence'] == null
+          ? null
+          : Recurrence.fromMap(m['recurrence'] as Map<String, dynamic>?),
+      defaultAssignees:
+          (m['defaultAssignees'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
+      requiresApproval: (m['requiresApproval'] as bool?) ?? false,
     );
   }
 
@@ -72,8 +83,7 @@ class Chore {
     'points': points,
     'active': active,
     if (recurrence != null) 'recurrence': recurrence!.toMap(),
-    // NEW
     'defaultAssignees': defaultAssignees,
+    'requiresApproval': requiresApproval,
   };
 }
-

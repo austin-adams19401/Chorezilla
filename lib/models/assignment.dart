@@ -6,10 +6,7 @@ class Proof {
   final String? note;
   const Proof({this.photoUrl, this.note});
 
-  Map<String, dynamic> toMap() => {
-        'photoUrl': photoUrl,
-        'note': note,
-      };
+  Map<String, dynamic> toMap() => {'photoUrl': photoUrl, 'note': note};
 
   factory Proof.fromMap(Map<String, dynamic>? data) {
     if (data == null) return const Proof();
@@ -61,25 +58,32 @@ class Assignment {
     this.proof,
   });
 
+  /// Convenience: does this assignment *currently* need parent review?
+  /// (We treat "completed" + requiresApproval as "pending review".)
+  bool get pendingReview =>
+      requiresApproval && status == AssignmentStatus.completed;
+
   Map<String, dynamic> toMap() => {
-        'familyId' : familyId,
-        'memberId': memberId,
-        'memberName': memberName,
-        'choreId': choreId,
-        'choreTitle': choreTitle,
-        'difficulty': difficulty,
-        'choreIcon' : choreIcon,
-        'xp': xp,
-        'coinAward' : coinAward,
-        'requiresApproval' : requiresApproval,
-        'status': statusToString(status),
-        'assignedAt': assignedAt == null ? null : Timestamp.fromDate(assignedAt!),
-        'due': due == null ? null : Timestamp.fromDate(due!),
-        'startedAt': startedAt == null ? null : Timestamp.fromDate(startedAt!),
-        'completedAt': completedAt == null ? null : Timestamp.fromDate(completedAt!),
-        'approvedAt': approvedAt == null ? null : Timestamp.fromDate(approvedAt!),
-        'proof': proof?.toMap(),
-      };
+    'familyId': familyId,
+    'memberId': memberId,
+    'memberName': memberName,
+    'choreId': choreId,
+    'choreTitle': choreTitle,
+    'difficulty': difficulty,
+    'choreIcon': choreIcon,
+    'xp': xp,
+    'coinAward': coinAward,
+    'requiresApproval': requiresApproval,
+    'status': statusToString(status),
+    'assignedAt': assignedAt == null ? null : Timestamp.fromDate(assignedAt!),
+    'due': due == null ? null : Timestamp.fromDate(due!),
+    'startedAt': startedAt == null ? null : Timestamp.fromDate(startedAt!),
+    'completedAt': completedAt == null
+        ? null
+        : Timestamp.fromDate(completedAt!),
+    'approvedAt': approvedAt == null ? null : Timestamp.fromDate(approvedAt!),
+    'proof': proof?.toMap(),
+  };
 
   factory Assignment.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
@@ -101,7 +105,9 @@ class Assignment {
       startedAt: tsAsDate(data['startedAt']),
       completedAt: tsAsDate(data['completedAt']),
       approvedAt: tsAsDate(data['approvedAt']),
-      proof: data['proof'] == null ? null : Proof.fromMap(data['proof'] as Map<String, dynamic>),
+      proof: data['proof'] == null
+          ? null
+          : Proof.fromMap(data['proof'] as Map<String, dynamic>),
     );
   }
 }

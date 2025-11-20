@@ -2,6 +2,7 @@ library;
 
 // lib/state/app_state.dart
 import 'dart:async';
+import 'package:chorezilla/models/award.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -91,12 +92,12 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  void setCurrentMember(String? memberId) {
+void setCurrentMember(String? memberId) {
+    debugPrint('setCurrentMember: old=$_currentMemberId new=$memberId');
+
     if (_currentMemberId == memberId) return;
-    // Stop previous kid streams
     if (_currentMemberId != null) stopKidStreams(_currentMemberId!);
     _currentMemberId = memberId;
-    // Start new
     if (memberId != null) startKidStreams(memberId);
     notifyListeners();
   }
@@ -107,12 +108,19 @@ class AppState extends ChangeNotifier {
   final ValueNotifier<List<Member>> membersVN = ValueNotifier<List<Member>>(<Member>[]);
   final ValueNotifier<List<Chore>> choresVN = ValueNotifier<List<Chore>>(<Chore>[]);
   final ValueNotifier<List<Assignment>> reviewQueueVN = ValueNotifier<List<Assignment>>(<Assignment>[]);
+  
+    // All "assigned" assignments for the current family (used for avatars / assign sheet)
+  final ValueNotifier<List<Assignment>> familyAssignedVN =
+      ValueNotifier<List<Assignment>>(<Assignment>[]);
+
 
   // Legacy getters (keep older UI code compiling)
   List<Member> get members => membersVN.value;
   List<Member> get parents => members.where((m) => m.role == FamilyRole.parent && m.active).toList();
   List<Chore> get chores => choresVN.value;
   List<Assignment> get reviewQueue => reviewQueueVN.value;
+  List<Assignment> get familyAssigned => familyAssignedVN.value;
+
 
   // Kid-specific caches (child dashboard convenience)
   final Map<String, List<Assignment>> _kidAssigned = <String, List<Assignment>>{};
@@ -129,6 +137,8 @@ class AppState extends ChangeNotifier {
   StreamSubscription<List<Member>>? _membersSub;
   StreamSubscription<List<Chore>>? _choresSub;
   StreamSubscription<List<Assignment>>? _reviewSub;
+    StreamSubscription<List<Assignment>>? _familyAssignedSub; 
+
 
   final Map<String, StreamSubscription<List<Assignment>>> _kidAssignedSubs = {};
   final Map<String, StreamSubscription<List<Assignment>>> _kidCompletedSubs = {};
@@ -311,10 +321,20 @@ class AppState extends ChangeNotifier {
 
     // Review queue (completed awaiting approval)
     _reviewSub?.cancel();
-    _reviewSub = repo.watchReviewQueue(familyId).listen((list) {
+    _reviewSub = _watchReviewQueue(familyId).listen((list) {
       reviewQueueVN.value = list;
       notifyListeners();
     });
+
+        // Family-level "assigned" assignments (for avatars + assign sheet)
+    _familyAssignedSub?.cancel();
+    _familyAssignedSub =
+        _watchAssignmentsForFamily(familyId, AssignmentStatus.assigned).listen((
+          list,
+        ) {
+          familyAssignedVN.value = list;
+          // No notifyListeners needed; widgets will use ValueListenableBuilder.
+        });
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -328,24 +348,46 @@ class AppState extends ChangeNotifier {
   // ───────────────────────────────────────────────────────────────────────────
   void startKidStreams(String memberId) {
     final famId = _familyId;
-    if (famId == null) return;
+    if (famId == null) {
+      debugPrint('KID_STREAMS: cannot start, no familyId.');
+      return;
+    }
+
+    debugPrint('KID_STREAMS: starting for member=$memberId family=$famId');
 
     _kidAssignedSubs[memberId]?.cancel();
-    _kidAssignedSubs[memberId] = _watchAssignmentsForKid(famId, memberId, AssignmentStatus.assigned).listen((list) {
-      _kidAssigned[memberId] = list;
-    });
+    _kidAssignedSubs[memberId] =
+        _watchAssignmentsForKid(
+          famId,
+          memberId,
+          AssignmentStatus.assigned,
+        ).listen((list) {
+          debugPrint('KID_STREAM_ASSIGNED[$memberId]: count=${list.length}');
+          for (final a in list) {
+            debugPrint(
+              '  ASSIGNED[$memberId] aId=${a.id} status=${a.status} choreId=${a.choreId}',
+            );
+          }
+          _kidAssigned[memberId] = list;
+          notifyListeners(); // make sure this is here
+        });
 
     _kidCompletedSubs[memberId]?.cancel();
-    _kidCompletedSubs[memberId] = _watchAssignmentsForKid(famId, memberId, AssignmentStatus.completed).listen((list) {
-      _kidCompleted[memberId] = list;
-    });
-  }
-
-  void stopKidStreams(String memberId) {
-    _kidAssignedSubs.remove(memberId)?.cancel();
-    _kidCompletedSubs.remove(memberId)?.cancel();
-    _kidAssigned.remove(memberId);
-    _kidCompleted.remove(memberId);
+    _kidCompletedSubs[memberId] =
+        _watchAssignmentsForKid(
+          famId,
+          memberId,
+          AssignmentStatus.completed,
+        ).listen((list) {
+          debugPrint('KID_STREAM_COMPLETED[$memberId]: count=${list.length}');
+          for (final a in list) {
+            debugPrint(
+              '  COMPLETED[$memberId] aId=${a.id} status=${a.status} choreId=${a.choreId}',
+            );
+          }
+          _kidCompleted[memberId] = list;
+          notifyListeners(); // and here too
+        });
   }
 
   Stream<List<Assignment>> _watchAssignmentsForKid(
@@ -366,6 +408,21 @@ class AppState extends ChangeNotifier {
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
 
+  Stream<List<Assignment>> _watchReviewQueue(String familyId) {
+    final db = FirebaseFirestore.instance;
+
+    final q = db
+        .collection('families')
+        .doc(familyId)
+        .collection('assignments')
+        .where('requiresApproval', isEqualTo: true)
+        .where('status', isEqualTo: 'pending') 
+        .orderBy('due');
+
+    return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
+  }
+
+
   String _statusToWire(AssignmentStatus s) {
     switch (s) {
       case AssignmentStatus.assigned:
@@ -373,11 +430,29 @@ class AppState extends ChangeNotifier {
       case AssignmentStatus.completed:
         return 'completed';
       case AssignmentStatus.pending:
-        return 'approved';
+        return 'pending';
       case AssignmentStatus.rejected:
         return 'rejected';
     }
   }
+
+    // Watch all assignments in a family for a given status (no member filter)
+  Stream<List<Assignment>> _watchAssignmentsForFamily(
+    String familyId,
+    AssignmentStatus status,
+  ) {
+    final db = FirebaseFirestore.instance;
+    final statusWire = _statusToWire(status);
+    final q = db
+        .collection('families')
+        .doc(familyId)
+        .collection('assignments')
+        .where('status', isEqualTo: statusWire)
+        .orderBy('due');
+
+    return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
+  }
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // Profile & family helpers
@@ -433,19 +508,24 @@ class AppState extends ChangeNotifier {
     await repo.removeMember(famId, memberId);
   }
 
-  /// Create chore template directly in Firestore (repo variant seems missing in your file).
   Future<void> createChore({
     required String title,
     String? description,
     String? iconKey,
     required int difficulty,
     Recurrence? recurrence,
+    bool requiresApproval = true,
   }) async {
     final famId = _familyId!;
     final db = FirebaseFirestore.instance;
-    final choresRef = db.collection('families').doc(famId).collection('chores').doc();
+    final choresRef = db
+        .collection('families')
+        .doc(famId)
+        .collection('chores')
+        .doc();
 
-    final points = _family?.settings.difficultyToXP[difficulty] ??
+    final points =
+        _family?.settings.difficultyToXP[difficulty] ??
         (difficulty.clamp(1, 5) * 10);
 
     await choresRef.set({
@@ -456,6 +536,7 @@ class AppState extends ChangeNotifier {
       'points': points,
       'active': true,
       'recurrence': recurrence?.toMap(),
+      'requiresApproval': requiresApproval,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -468,6 +549,7 @@ class AppState extends ChangeNotifier {
     String? iconKey,
     required int difficulty,
     Recurrence? recurrence,
+    bool requiresApproval = true,
   }) async {
     final fam = family!;
     await repo.updateChoreTemplate(
@@ -479,41 +561,194 @@ class AppState extends ChangeNotifier {
       difficulty: difficulty,
       settings: fam.settings,
       recurrence: recurrence,
+      requiresApproval: requiresApproval,
     );
   }
 
 
-  Future<void> assignChore({
+  Future<void> deleteChore(
+    String choreId, {
+    bool cascadeAssignments = true,
+  }) async {
+    final famId = _familyId;
+    if (famId == null) {
+      throw StateError('No family selected when calling deleteChore');
+    }
+
+    final db = FirebaseFirestore.instance;
+    final famRef = db.collection('families').doc(famId);
+    final choreRef = famRef.collection('chores').doc(choreId);
+
+    if (cascadeAssignments) {
+      final assignmentsRef = famRef.collection('assignments');
+      final snap = await assignmentsRef
+          .where('choreId', isEqualTo: choreId)
+          .get();
+
+      if (snap.docs.isNotEmpty) {
+        final batch = db.batch();
+        for (final doc in snap.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+    }
+
+    await choreRef.delete();
+  }
+
+
+  /// Return just the member ids that currently have this chore assigned.
+  Set<String> assignedMemberIdsForChore(String choreId) {
+    final list = familyAssignedVN.value;
+    if (list.isEmpty) return <String>{};
+
+    return list
+        .where((a) => a.choreId == choreId)
+        .map((a) => a.memberId)
+        .toSet();
+  }
+
+  /// Return the Member objects currently assigned to this chore.
+  List<Member> assignedMembersForChore(String choreId) {
+    final ids = assignedMemberIdsForChore(choreId);
+    if (ids.isEmpty) return const <Member>[];
+
+    return members.where((m) => ids.contains(m.id)).toList();
+  }
+
+  /// Remove assignment(s) for these member ids for a chore.
+  ///
+  /// We look at the in-memory `familyAssignedVN` list (which only contains
+  /// status == 'assigned') and delete those docs by id.
+  Future<void> unassignChore({
+    required String choreId,
+    required Set<String> memberIds,
+  }) async {
+    if (memberIds.isEmpty) return;
+
+    final famId = _familyId;
+    if (famId == null) {
+      throw StateError('No family selected when calling unassignChore');
+    }
+    
+
+    // Find the currently-assigned docs we need to remove.
+    final toDelete = familyAssignedVN.value
+        .where((a) => a.choreId == choreId && memberIds.contains(a.memberId))
+        .toList();
+
+    if (toDelete.isEmpty) {
+      debugPrint(
+        'unassignChore: nothing to delete for chore=$choreId members=$memberIds',
+      );
+      return;
+    }
+
+    final db = FirebaseFirestore.instance;
+    final col = db.collection('families').doc(famId).collection('assignments');
+
+    final batch = db.batch();
+    for (final a in toDelete) {
+      // NOTE: if your Assignment model uses a different id field name,
+      // e.g. `assignmentId`, change `a.id` accordingly.
+      batch.delete(col.doc(a.id));
+    }
+    await batch.commit();
+  }
+
+Future<void> assignChore({
     required String choreId,
     required Iterable<String> memberIds,
     required DateTime due,
   }) async {
-    final famId = _familyId!;
+    final famId = _familyId;
+    if (famId == null) {
+      debugPrint('ASSIGN_CHORE: no familyId set!');
+      throw StateError('No family selected when calling assignChore');
+    }
+
+    debugPrint(
+      'ASSIGN_CHORE: famId=$famId choreId=$choreId memberIds=$memberIds',
+    );
+
+    final fam = family!;
     final db = FirebaseFirestore.instance;
     final famRef = db.collection('families').doc(famId);
     final assignmentsRef = famRef.collection('assignments');
 
-    final chore = chores.firstWhere((c) => c.id == choreId, orElse: () => throw Exception('Chore not found'));
+    // Find the chore template
+    final chore = chores.firstWhere(
+      (c) => c.id == choreId,
+      orElse: () {
+        debugPrint('ASSIGN_CHORE: chore $choreId not found in chores list!');
+        throw Exception('Chore not found');
+      },
+    );
+
+    // Avoid duplicate assignments for same chore/kid combo
     final ids = memberIds.toSet();
-    final mems = members.where((m) => ids.contains(m.id)).toList();
-    if (mems.isEmpty) throw Exception('No valid members selected');
+    debugPrint('ASSIGN_CHORE: unique memberIds=$ids');
+
+    final alreadyAssigned = assignedMemberIdsForChore(choreId);
+    debugPrint('ASSIGN_CHORE: alreadyAssignedIdsForChore=$alreadyAssigned');
+
+    final targetIds = ids.difference(alreadyAssigned);
+    debugPrint('ASSIGN_CHORE: targetIds(after diff)=$targetIds');
+
+    if (targetIds.isEmpty) {
+      debugPrint('ASSIGN_CHORE: nothing new to assign, returning early.');
+      return;
+    }
+
+    final mems = members.where((m) => targetIds.contains(m.id)).toList();
+    debugPrint(
+      'ASSIGN_CHORE: resolved mems=${mems.map((m) => '${m.id}:${m.displayName}').toList()}',
+    );
+
+    if (mems.isEmpty) {
+      debugPrint('ASSIGN_CHORE: no valid members found, throwing.');
+      throw Exception('No valid members selected');
+    }
+
+    // Use your award helper
+    final award = calcAwards(
+      difficulty: chore.difficulty,
+      settings: fam.settings,
+    );
+    debugPrint('ASSIGN_CHORE: award xp=${award.xp} coins=${award.coins}');
+
+    final normalizedDue = DateTime(due.year, due.month, due.day);
 
     final batch = db.batch();
     for (final m in mems) {
       final aRef = assignmentsRef.doc();
+      debugPrint(
+        'ASSIGN_CHORE: creating doc=${aRef.id} for member=${m.id} (${m.displayName})',
+      );
+
       batch.set(aRef, {
+        'familyId': famId,
         'choreId': chore.id,
         'choreTitle': chore.title,
         'choreIcon': chore.icon,
         'memberId': m.id,
         'memberName': m.displayName,
-        'status': 'assigned',
-        'due': Timestamp.fromDate(DateTime(due.year, due.month, due.day)),
+        'difficulty': chore.difficulty,
+        'xp': award.xp,
+        'coinAward': award.coins,
+        'requiresApproval': chore.requiresApproval,
+        'status': 'assigned', // key for kid streams & home tab
+        'due': Timestamp.fromDate(normalizedDue),
+        'assignedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
+
     await batch.commit();
+    debugPrint('ASSIGN_CHORE: batch committed ${mems.length} docs.');
   }
+
 
   Future<void> updateChoreDefaultAssignees({
     required String choreId,
@@ -556,7 +791,9 @@ class AppState extends ChangeNotifier {
     await _membersSub?.cancel();
     await _choresSub?.cancel();
     await _reviewSub?.cancel();
-    _familySub = _membersSub = _choresSub = _reviewSub = null;
+    await _familyAssignedSub?.cancel();
+
+    _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub = null;
 
     for (final s in _kidAssignedSubs.values) {
       await s.cancel();
@@ -573,6 +810,7 @@ class AppState extends ChangeNotifier {
     membersVN.value = const [];
     choresVN.value = const [];
     reviewQueueVN.value = const [];
+    familyAssignedVN.value = const [];
 
     notifyListeners(); // structural reset
   }
@@ -595,4 +833,6 @@ class AppState extends ChangeNotifier {
     reviewQueueVN.dispose();
     super.dispose();
   }
+  
+  void stopKidStreams(String s) {}
 }

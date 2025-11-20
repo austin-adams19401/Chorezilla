@@ -5,7 +5,7 @@ import 'package:chorezilla/state/app_state.dart';
 
 import 'parent_home_tab.dart';
 import 'assign_tab.dart';
-import 'checkoff_tab.dart';
+import 'approve_tab.dart';
 import 'settings/settings_tab.dart';
 
 class ParentDashboardPage extends StatefulWidget {
@@ -41,7 +41,7 @@ class _ParentDashboardPageState extends State<ParentDashboardPage> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.playlist_add_check_rounded), label: 'Assign'),
-          NavigationDestination(icon: Icon(Icons.fact_check_rounded), label: 'Checkoff'),
+          NavigationDestination(icon: Icon(Icons.fact_check_rounded), label: 'Approve'),
           NavigationDestination(icon: Icon(Icons.settings_rounded), label: 'Settings'),
         ],
       ),
