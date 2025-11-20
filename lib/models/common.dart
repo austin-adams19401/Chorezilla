@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 // Enums shared across models
 enum FamilyRole { parent, child }
-enum AssignmentStatus { assigned, completed, approved, rejected }
+enum AssignmentStatus { assigned, completed, pending, rejected }
 enum AuthStatus { unknown, signedOut, needsFamilySetup, ready }
 
 String roleToString(FamilyRole role) {
@@ -50,13 +50,13 @@ extension AssignmentStatusUi on AssignmentStatus {
     switch (this) {
       case AssignmentStatus.assigned:  return 'Assigned';
       case AssignmentStatus.completed: return 'Completed';
-      case AssignmentStatus.approved:  return 'Approved';
+      case AssignmentStatus.pending:  return 'Pending';
       case AssignmentStatus.rejected:  return 'Rejected';
     }
   }
 
   bool get isDone =>
-      this == AssignmentStatus.completed || this == AssignmentStatus.approved;
+      this == AssignmentStatus.completed;
 }
 
 

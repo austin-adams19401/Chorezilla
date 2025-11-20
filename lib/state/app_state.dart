@@ -372,7 +372,7 @@ class AppState extends ChangeNotifier {
         return 'assigned';
       case AssignmentStatus.completed:
         return 'completed';
-      case AssignmentStatus.approved:
+      case AssignmentStatus.pending:
         return 'approved';
       case AssignmentStatus.rejected:
         return 'rejected';

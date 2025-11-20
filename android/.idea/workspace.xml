@@ -5,21 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b84a41e4-fb7a-43c9-b1ed-6ac5f59ec7f9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/caches/deviceStreaming.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/wrapper/gradle-wrapper.properties" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/firebase_queries/chorezilla_repo.dart" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/main.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/models/common.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/models/common.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/family_setup/add_kids_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/family_setup/add_kids_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/family_setup/edit_family_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/family_setup/edit_family_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/assign_tab.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/assign_tab.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_home_tab.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_home_tab.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/startup/parent_join_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/startup/parent_join_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/state/app_state.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/state/app_state.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

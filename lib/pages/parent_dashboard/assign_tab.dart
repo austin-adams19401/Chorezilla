@@ -463,7 +463,7 @@ class _AssignSheet extends StatefulWidget {
 
 class _AssignSheetState extends State<_AssignSheet> {
   final Set<String> _kidIds = {};
-  DateTime _due = DateTime.now().add(const Duration(days: 1));
+  DateTime _due = DateTime.now();
   bool _busy = false;
 
   @override

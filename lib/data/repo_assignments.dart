@@ -33,17 +33,20 @@ extension AssignmentRepo on ChorezillaRepo {
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
 
-  // Assignments due today
-  Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
+Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
     final now = DateTime.now();
     final start = DateTime(now.year, now.month, now.day);
     final end = start.add(const Duration(days: 1));
+
     final q = assignmentsColl(firebaseDB, familyId)
         .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('due', isLessThanOrEqualTo: Timestamp.fromDate(end))
+        .where('due', isLessThan: Timestamp.fromDate(end))
         .orderBy('due');
+
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
+
+
 
   Stream<List<Assignment>> watchReviewQueue(String familyId) {
     return assignmentsColl(firebaseDB, familyId)

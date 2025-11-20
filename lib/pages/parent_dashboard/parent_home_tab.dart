@@ -27,7 +27,7 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
   @override
   void initState() {
     super.initState();
-    _loadGroupingPref(); 
+    _loadGroupingPref();
   }
 
   @override
@@ -42,7 +42,7 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
     if (_boundFamilyId != app.familyId) {
       _boundFamilyId = app.familyId;
       _todayStream = app.repo.watchAssignmentsDueToday(_boundFamilyId!);
-      setState(() { });
+      setState(() {});
     }
   }
 
@@ -72,6 +72,10 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
       builder: (context, snap) {
         final items = snap.data ?? const <Assignment>[];
 
+        debugPrint(
+          'TODAY ASSIGNMENTS: ${items.map((a) => '${a.choreTitle} @ ${a.due}').toList()}',
+        );
+
         if (snap.connectionState == ConnectionState.waiting && items.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -80,8 +84,14 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
         }
 
         final groups = _groupBy == HomeGroupBy.kid
-            ? _groupByKey(items, (a) => (a.memberName.isNotEmpty ? a.memberName : 'Kid'), key: (a) => a.memberId)
+            ? _groupByKey(
+                items,
+                (a) => (a.memberName.isNotEmpty ? a.memberName : 'Kid'),
+                key: (a) => a.memberId,
+              )
             : _groupByKey(items, (a) => a.choreTitle, key: (a) => a.choreId);
+
+        final isGroupedByKid = _groupBy == HomeGroupBy.kid;
 
         return Column(
           children: [
@@ -89,12 +99,21 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Row(
                 children: [
-                  Text('Due today', style: Theme.of(context).textTheme.titleLarge),
+                  Text(
+                    'Due today',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
                   const Spacer(),
                   SegmentedButton<HomeGroupBy>(
                     segments: const [
-                      ButtonSegment(value: HomeGroupBy.kid, label: Text('By Kid')),
-                      ButtonSegment(value: HomeGroupBy.chore, label: Text('By Chore')),
+                      ButtonSegment(
+                        value: HomeGroupBy.kid,
+                        label: Text('By Kid'),
+                      ),
+                      ButtonSegment(
+                        value: HomeGroupBy.chore,
+                        label: Text('By Chore'),
+                      ),
                     ],
                     selected: {_groupBy},
                     onSelectionChanged: (s) async {
@@ -112,51 +131,141 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
                 itemCount: groups.length,
                 itemBuilder: (_, i) {
                   final g = groups[i];
+                  final theme = Theme.of(context);
+                  final cs = theme.colorScheme;
+                  final ts = theme.textTheme;
+
+                  final allDone =
+                      isGroupedByKid &&
+                      g.items.isNotEmpty &&
+                      g.items.every(
+                        (a) => a.status == AssignmentStatus.completed,
+                      );
+
                   return Card(
                     elevation: 0,
                     margin: const EdgeInsets.only(bottom: 10),
+                    color: allDone
+                        ? cs.primaryContainer.withValues(alpha: .18)
+                        : null,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
-                      side:BorderSide(
-                        color: Theme.of(context).colorScheme.primary,
+                      side: BorderSide(
+                        color: allDone ? cs.primary : Colors.grey,
                         width: 2,
-                      )
                       ),
+                    ),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            g.title,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: .2,
-                            ),                              
+                          Row(
+                            children: [
+                              Text(
+                                g.title,
+                                style: ts.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: .2,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (allDone)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: cs.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.check_circle, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'All done',
+                                        style: ts.labelMedium?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(height: 6),                          
+                          const SizedBox(height: 6),
                           ...g.items.map((a) {
-                            final done = a.status.isDone; // uses the extension above
-                            return ListTile(
+                            final status = a.status;
+                            final theme = Theme.of(context);
+                            final cs = theme.colorScheme;
+
+                            Color? tileColor;
+                            BorderSide? side;
+                            TextStyle titleStyle = const TextStyle(
+                              fontSize: 20,
+                            );
+                            TextStyle subtitleStyle =
+                                theme.textTheme.bodySmall ?? const TextStyle();
+
+                            switch (status) {
+                              case AssignmentStatus.assigned:
+                                tileColor = null;
+                                side = null;
+                                break;
+                              case AssignmentStatus.pending:
+                                tileColor = cs.tertiaryContainer.withValues(alpha: 0.25);
+                                side = BorderSide(color: cs.tertiary, width: 2);
+                                break;
+                              case AssignmentStatus.rejected:
+                                tileColor = cs.error.withValues(alpha: 0.15);
+                                break;
+                              case AssignmentStatus.completed:
+                                tileColor = cs.surfaceContainerHighest
+                                    .withValues(alpha: 0.2);
+                                side = null;
+                                titleStyle = titleStyle.copyWith(
+                                  decoration: TextDecoration.lineThrough,
+                                );
+                                break;
+                            }
+
+                            final tile = ListTile(
                               dense: true,
                               contentPadding: EdgeInsets.zero,
                               leading: Text(
-                                (a.choreIcon?.isNotEmpty ?? false) ? a.choreIcon! : '🧩',
+                                (a.choreIcon?.isNotEmpty ?? false)
+                                    ? a.choreIcon!
+                                    : '🧩',
                                 style: const TextStyle(fontSize: 30),
                               ),
                               title: Text(
-                                a.choreTitle,
+                                isGroupedByKid
+                                    ? a.choreTitle
+                                    : (a.memberName.isNotEmpty
+                                          ? a.memberName
+                                          : 'Kid'),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  decoration: done ? TextDecoration.lineThrough : TextDecoration.none,
-                                  // optional: dim completed items a bit
-                                  color: done ? Theme.of(context).hintColor : null,
-                                ),
+                                style: titleStyle,
                               ),
-                              subtitle: Text(a.status.label), // ← no cast; display-friendly text
+                              subtitle: Text(
+                                status.label,
+                                style: subtitleStyle,
+                              ),
+                              tileColor: tileColor,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: side ?? BorderSide.none,
+                              ),
                             );
+
+                            if (status == AssignmentStatus.completed) {
+                              return Opacity(opacity: 0.45, child: tile);
+                            }
+                            return tile;
                           }),
                         ],
                       ),
@@ -172,7 +281,9 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
   }
 
   void _toggleGroup() {
-    final next = _groupBy == HomeGroupBy.kid ? HomeGroupBy.chore : HomeGroupBy.kid;
+    final next = _groupBy == HomeGroupBy.kid
+        ? HomeGroupBy.chore
+        : HomeGroupBy.kid;
     setState(() => _groupBy = next);
     _saveGroupingPref(next);
   }
@@ -191,7 +302,9 @@ class _ParentHomeTabState extends State<ParentHomeTab> {
     final out = map.values.toList();
     out.sort((a, b) => a.title.compareTo(b.title));
     for (final g in out) {
-      g.items.sort((a, b) => (a.due ?? DateTime(2100)).compareTo(b.due ?? DateTime(2100)));
+      g.items.sort(
+        (a, b) => (a.due ?? DateTime(2100)).compareTo(b.due ?? DateTime(2100)),
+      );
     }
     return out;
   }
@@ -232,135 +345,3 @@ class _EmptyToday extends StatelessWidget {
     );
   }
 }
-
-
-// import 'package:chorezilla/z_archive/app_state_old.dart';
-// import 'package:flutter/material.dart';
-// import 'package:provider/provider.dart';
-
-// /// Shows an overview for today/week. Read-only check indicators.
-// class ParentHomeTab extends StatefulWidget {
-//   const ParentHomeTab({super.key});
-
-//   @override
-//   State<ParentHomeTab> createState() => _HomeTabState();
-// }
-
-// class _HomeTabState extends State<ParentHomeTab> {
-//   @override
-//   Widget build(BuildContext context) {
-//     final app = context.watch<AppState>();
-//     final cs = Theme.of(context).colorScheme;
-//     //final chores = app.chores.choreListForToday; // example if you split state
-
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: const Text('Chore overview'),
-//         backgroundColor: cs.surface,
-//         foregroundColor: cs.onSurface,
-//         elevation: 0,
-//       ),
-//       body: Container(
-//         color: Colors.grey.shade100,
-//         padding: const EdgeInsets.all(16),
-//         child: Column(
-//           crossAxisAlignment: CrossAxisAlignment.stretch,
-//           children: [
-//             _Header(title: "Today's Chores"),
-//             const SizedBox(height: 12),
-//             _StatsRow(), // replace with your own small summary widget
-      
-//             const SizedBox(height: 12),
-      
-//             // TODO: Replace with your grid/list of chores/day cells.
-//             // NOTE: Home tab is view-only; completion happens in the Check Off tab.
-//             Expanded(
-//               child: ListView(
-//                 children: const [
-//                   _ReadOnlyChoreRow(
-//                     title: 'Example chore',
-//                     isScheduled: true,
-//                     isCompleted: false,
-//                   ),
-//                   _ReadOnlyChoreRow(
-//                     title: 'Example chore 2',
-//                     isScheduled: true,
-//                     isCompleted: true,
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-// /// Private helper widgets stay in the same file and start with underscore.
-// class _Header extends StatelessWidget {
-//   const _Header({required this.title});
-//   final String title;
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Container(
-//       padding: const EdgeInsets.all(12),
-//       decoration: BoxDecoration(
-//         color: Colors.green.shade50,
-//         borderRadius: BorderRadius.circular(12),
-//       ),
-//       child: Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-//     );
-//   }
-// }
-
-// class _StatsRow extends StatelessWidget {
-//   const _StatsRow();
-
-//   @override
-//   Widget build(BuildContext context) {
-//     // TODO: replace with your own stat chips (e.g., total, done, remaining)
-//     return Container(
-//       padding: const EdgeInsets.all(12),
-//       decoration: BoxDecoration(
-//         color: Colors.indigo.shade50,
-//         borderRadius: BorderRadius.circular(12),
-//       ),
-//       child: const Row(
-//         children: [
-//           Expanded(child: Text('Stats here')),
-//         ],
-//       ),
-//     );
-//   }
-// }
-
-// class _ReadOnlyChoreRow extends StatelessWidget {
-//   const _ReadOnlyChoreRow({
-//     required this.title,
-//     required this.isScheduled,
-//     required this.isCompleted,
-//   });
-
-//   final String title;
-//   final bool isScheduled;
-//   final bool isCompleted;
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final icon = isScheduled
-//         ? (isCompleted ? Icons.check_circle : Icons.radio_button_unchecked)
-//         : Icons.remove_circle_outline;
-
-//     final color = isCompleted
-//         ? Colors.green
-//         : (isScheduled ? Colors.grey : Colors.redAccent);
-
-//     return ListTile(
-//       title: Text(title),
-//       // NOTE: This is read-only. No onTap / onChanged handlers here.
-//       trailing: Icon(icon, size: 20, color: color),
-//     );
-//   }
-// }
