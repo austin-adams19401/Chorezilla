@@ -1,5 +1,6 @@
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/profile_header.dart';
+import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -24,9 +25,16 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   String? _watchingMemberId;
   int? _lastSeenLevel;
 
+  late final ConfettiController _confettiController;
+  bool _celebrationActive = false;
+  bool _showConfetti = false;
+
   @override
   void initState() {
     super.initState();
+      _confettiController = ConfettiController(
+      duration: const Duration(seconds: 5),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) => _startStreamsForCurrentKid());
   }
 
@@ -42,7 +50,10 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   @override
   void dispose() {
     final app = context.read<AppState>();
-    if (_watchingMemberId != null) app.stopKidStreams(_watchingMemberId!);
+    if (_watchingMemberId != null) {
+      app.stopKidStreams(_watchingMemberId!);
+    }
+    _confettiController.dispose();
     super.dispose();
   }
 
@@ -123,42 +134,66 @@ void _startStreamsForCurrentKid() {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Chorezilla')),
-      body: Column(
+      body: Stack(
         children: [
-          // Profile header (kid)
-          ProfileHeader(member: member, showInviteButton: false, showSwitchButton: false),
-          const SizedBox(height: 8),
-
-          // Tabs: To Do / Submitted
-          Expanded(
-            child: DefaultTabController(
-              length: 2,
-              child: Column(
-                children: [
-                  const TabBar(
-                    tabs: [
-                      Tab(text: 'To Do'),
-                      Tab(text: 'Submitted'),
+          // Main content
+          Column(
+            children: [
+              ProfileHeader(
+                member: member,
+                showInviteButton: false,
+                showSwitchButton: false,
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: DefaultTabController(
+                  length: 2,
+                  child: Column(
+                    children: [
+                      const TabBar(
+                        tabs: [
+                          Tab(text: 'To Do'),
+                          Tab(text: 'Submitted'),
+                        ],
+                      ),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _TodoList(
+                              memberId: member.id,
+                              items: todos,
+                              busyIds: _busyIds,
+                              onComplete: _completeAssignment, 
+                              completedToday: completedToday,
+                            ),
+                            _SubmittedList(items: submitted),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-_TodoList(
-                          memberId: member.id,
-                          items: todos,
-                          completedToday: completedToday, // 👈 NEW
-                          busyIds: _busyIds,
-                          onComplete: _completeAssignment,
-                        ),
-                        _SubmittedList(items: submitted),
-                      ],
-                    ),
+                ),
+              ),
+            ],
+          ),
+
+          // Confetti overlay on top of everything
+          if (_showConfetti)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConfettiWidget(
+                    confettiController: _confettiController,
+                    blastDirectionality: BlastDirectionality.explosive,
+                    shouldLoop: false,
+                    emissionFrequency: 0.05,
+                    numberOfParticles: 30,
+                    gravity: 0.35,
                   ),
-                ],
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -184,41 +219,56 @@ Future<void> _completeAssignment(Assignment a) async {
   }
 
   void _handleLevelChange(Member member) {
-    // Use your helper to compute level from total XP
     final info = levelInfoForXp(member.xp);
-    final newLevel = info.level;
+    final currentLevel = info.level;
 
-    final prev = _lastSeenLevel;
+    // Use lastSeen if we have it, otherwise fall back to the stored level.
+    // If that is also null (shouldn’t really happen), fall back to current.
+    final storedLevel = member.level; // from your Member model
+    final baseline = _lastSeenLevel ?? storedLevel;
 
-    if (prev == null) {
-      // First time seeing this kid on this screen → just record level
-      _lastSeenLevel = newLevel;
-      return;
-    }
-
-    if (newLevel > prev) {
+    if (currentLevel > baseline) {
       // LEVEL UP! 🎉
-      _lastSeenLevel = newLevel;
-      final levelInfo = info;
+      _lastSeenLevel = currentLevel;
 
+      // Defer celebration until after the current frame, so we can safely
+      // call setState + showDialog.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _showLevelUpDialog(member, levelInfo);
+        _triggerLevelUpCelebration(member, info);
       });
-    } else if (newLevel != prev) {
-      // XP went down or we jumped around (e.g., profile reset) → resync
-      _lastSeenLevel = newLevel;
+    } else {
+      // keep them in sync so we don’t backslide
+      _lastSeenLevel = baseline;
     }
   }
 
-  Future<void> _showLevelUpDialog(Member member, LevelInfo info) async {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
 
+  Future<void> _triggerLevelUpCelebration(Member member, LevelInfo info) async {
+    if (!mounted) return;
+
+    // If a celebration is already showing, don’t stack another.
+    if (_celebrationActive) return;
+    _celebrationActive = true;
+
+    // Turn on confetti
+    setState(() {
+      _showConfetti = true;
+    });
+    _confettiController.play();
+
+    // Persist the new level so we don’t re-celebrate this same level
+    final app = context.read<AppState>();
+    app.updateMember(member.id, {'level': info.level});
+
+    // Show the level-up dialog and wait for it to close
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final cs = theme.colorScheme;
+
         return Center(
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.8, end: 1.0),
@@ -284,8 +334,15 @@ Future<void> _completeAssignment(Assignment a) async {
         );
       },
     );
-  }
 
+    // After dialog closes, stop confetti + clear flag
+    if (!mounted) return;
+    setState(() {
+      _showConfetti = false;
+    });
+    _confettiController.stop();
+    _celebrationActive = false;
+  }
 
 
   // ---- Helpers --------------------------------------------------------------
