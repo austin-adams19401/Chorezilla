@@ -10,11 +10,11 @@ class Award {
   });
 }
 
-Award calcAwards({
-  required int difficulty,
-  required FamilySettings settings,
-}) {
-  final xp = settings.difficultyToXP[difficulty] ?? 0;
+Award calcAwards({required int difficulty, required FamilySettings settings}) {
+  final safeDifficulty = difficulty.clamp(1, 5);
+  final xp =
+      settings.difficultyToXP[safeDifficulty] ??
+      (safeDifficulty * 10);
   final coins = (xp * settings.coinPerPoint).round();
 
   return Award(xp: xp, coins: coins);

@@ -1,4 +1,5 @@
 
+import 'package:chorezilla/pages/kid_pages/kids_home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
@@ -63,8 +64,32 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
       SettingsTab(),
     ];
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Chorezilla')),
+return Scaffold(
+appBar: AppBar(
+        title: const Text('Chorezilla'),
+        actions: [
+          Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              final fg =
+                  theme.appBarTheme.foregroundColor ??
+                  theme.colorScheme.onSurface; // fallback for light/dark
+
+              return TextButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const KidsHomePage()),
+                  );
+                },
+                icon: Icon(Icons.family_restroom_rounded, color: fg),
+                label: Text('Kid view', style: TextStyle(color: fg)),
+                style: TextButton.styleFrom(foregroundColor: fg),
+              );
+            },
+          ),
+        ],
+      ),
+
       body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

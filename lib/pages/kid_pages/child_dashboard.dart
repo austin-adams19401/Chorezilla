@@ -92,8 +92,24 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
       );
     }
 
-    final todos = [...app.assignedForKid(member.id)]..sort(_byDueThenTitle);
+final todos = [...app.assignedForKid(member.id)]..sort(_byDueThenTitle);
+
+    // All completed for this kid
+    final completedAll = app.completedForKid(member.id);
+
+    // Filter to only "today"
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
+
+    final completedToday = completedAll.where((a) {
+      final t = a.completedAt;
+      if (t == null) return false;
+      return !t.isBefore(todayStart) && t.isBefore(tomorrowStart);
+    }).toList()..sort(_byCompletedAtDescThenTitle);
+
     final submitted = [...app.pendingForKid(member.id)]..sort(_byDueThenTitle);
+
 
 
     return Scaffold(
@@ -119,9 +135,10 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
                   Expanded(
                     child: TabBarView(
                       children: [
-                        _TodoList(
+_TodoList(
                           memberId: member.id,
                           items: todos,
+                          completedToday: completedToday, // 👈 NEW
                           busyIds: _busyIds,
                           onComplete: _completeAssignment,
                         ),
@@ -147,9 +164,6 @@ Future<void> _completeAssignment(Assignment a) async {
       await app.completeAssignment(a.id);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Marked complete!')));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -193,28 +207,6 @@ Future<void> _completeAssignment(Assignment a) async {
     }
   }
 
-  // Future<String?> _promptNote(BuildContext context) async {
-  //   final controller = TextEditingController();
-  //   final result = await showDialog<String?>(
-  //     context: context,
-  //     builder: (ctx) => AlertDialog(
-  //       title: const Text('Add a note?'),
-  //       content: TextField(
-  //         controller: controller,
-  //         maxLines: 3,
-  //         decoration: const InputDecoration(
-  //           hintText: 'Optional — anything you want to tell your parent',
-  //         ),
-  //       ),
-  //       actions: [
-  //         TextButton(onPressed: () => Navigator.of(ctx).pop(null), child: const Text('Skip')),
-  //         FilledButton(onPressed: () => Navigator.of(ctx).pop(controller.text.trim()), child: const Text('Submit')),
-  //       ],
-  //     ),
-  //   );
-  //   return result?.isEmpty == true ? null : result;
-  // }
-
   @override
   bool get wantKeepAlive => true;
 }
@@ -227,6 +219,7 @@ class _TodoList extends StatelessWidget {
   const _TodoList({
     required this.memberId,
     required this.items,
+    required this.completedToday,
     required this.busyIds,
     required this.onComplete,
   });
@@ -234,11 +227,15 @@ class _TodoList extends StatelessWidget {
   final String memberId;
   final List<Assignment> items;
   final Set<String> busyIds;
-  final Future<void> Function(Assignment) onComplete;
+  final Future<void> Function(Assignment) onComplete;  
+  final List<Assignment> completedToday;
 
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
+    final hasTodos = items.isNotEmpty;
+    final hasCompleted = completedToday.isNotEmpty;
+
+    if (!hasTodos && !hasCompleted) {
       return const _EmptyState(
         emoji: '🎉',
         title: 'All caught up!',
@@ -246,24 +243,73 @@ class _TodoList extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
+    final ts = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final a = items[i];
-        return _AssignmentTile(
-          assignment: a,
-          trailing: FilledButton(
-            onPressed: busyIds.contains(a.id) ? null : () => onComplete(a),
-            child: busyIds.contains(a.id)
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Mark done'),
+      children: [
+        if (hasTodos) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+            child: Text(
+              'To do',
+              style: ts.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+            ),
           ),
-        );
-      },
+          ...items.map((a) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AssignmentTile(
+                assignment: a,
+                completed: false,
+                trailing: FilledButton(
+                  onPressed: busyIds.contains(a.id)
+                      ? null
+                      : () => onComplete(a),
+                  child: busyIds.contains(a.id)
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Mark done'),
+                ),
+              ),
+            );
+          }),
+          if (hasCompleted) const SizedBox(height: 16),
+        ],
+
+        if (hasCompleted) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+            child: Text(
+              'Done today',
+              style: ts.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+          ),
+          ...completedToday.map((a) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _AssignmentTile(
+                assignment: a,
+                completed: true,
+                trailing: Icon(Icons.check_circle_rounded, color: cs.primary),
+              ),
+            );
+          }),
+        ],
+      ],
     );
   }
+
 }
 
 class _SubmittedList extends StatelessWidget {
@@ -299,10 +345,12 @@ class _AssignmentTile extends StatelessWidget {
   const _AssignmentTile({
     required this.assignment,
     required this.trailing,
+    this.completed = false,
   });
 
   final Assignment assignment;
   final Widget trailing;
+  final bool completed;
 
   @override
   Widget build(BuildContext context) {
@@ -314,8 +362,29 @@ class _AssignmentTile extends StatelessWidget {
     final dueText = _formatDue(due);
     final overdue = due != null && due.isBefore(DateTime.now());
 
+
+    const double iconBoxSize = 50; // size of the colored square
+    final double emojiSize = iconBoxSize * 0.65; // scale text with box
+
+    // Style variants when completed
+    final baseTitleStyle = ts.titleMedium?.copyWith(
+      fontWeight: FontWeight.w600,
+    );
+
+    final titleStyle = completed
+        ? baseTitleStyle?.copyWith(
+            decoration: TextDecoration.lineThrough,
+            color: cs.onSurfaceVariant,
+          )
+        : baseTitleStyle;
+
+    final xpStyle = completed
+        ? ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant)
+        : ts.bodyMedium;
+
     return Card(
       elevation: 0,
+      color: completed ? cs.surfaceContainerHighest : null, 
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -323,37 +392,45 @@ class _AssignmentTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
+              width: iconBoxSize,
+              height: iconBoxSize,
               decoration: BoxDecoration(
                 color: cs.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              child: Text(icon == null || icon.isEmpty ? '🧩' : icon, style: const TextStyle(fontSize: 18)),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(2.0),
+                  child: Text(
+                    icon == null || icon.isEmpty ? '🧩' : icon,
+                    style: TextStyle(
+                      fontSize: emojiSize, 
+                    ),
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(assignment.choreTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                  Text(
+                    assignment.choreTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
+                  ),
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.monetization_on_rounded, size: 16, color: cs.secondary),
-                      const SizedBox(width: 4),
-                      Text('${assignment.xp} pts', style: ts.bodySmall),
-                      if (dueText != null) ...[
-                        const SizedBox(width: 10),
-                        Icon(Icons.schedule_rounded, size: 16, color: overdue ? cs.error : cs.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(
-                          dueText,
-                          style: ts.bodySmall?.copyWith(color: overdue ? cs.error : cs.onSurfaceVariant),
-                        ),
-                      ],
+                      Icon(
+                        Icons.add,
+                        size: 16,
+                        color: cs.secondary,
+                      ),
+                      const SizedBox(width: 1),
+                      Text('${assignment.xp} pts', style: xpStyle),
                     ],
                   ),
                 ],

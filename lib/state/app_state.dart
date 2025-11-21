@@ -750,6 +750,10 @@ Future<void> assignChore({
       throw Exception('No valid members selected');
     }
 
+    debugPrint(
+      'FAM_SETTINGS: difficultyToXP=${fam.settings.difficultyToXP} coinPerPoint=${fam.settings.coinPerPoint}',
+    );
+
     // Use your award helper
     final award = calcAwards(
       difficulty: chore.difficulty,

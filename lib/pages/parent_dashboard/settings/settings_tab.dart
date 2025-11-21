@@ -1,3 +1,4 @@
+import 'package:chorezilla/pages/kid_pages/kids_home_page.dart';
 import 'package:chorezilla/pages/startup/parent_join_page.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +9,7 @@ import 'package:chorezilla/state/app_state.dart';
 
 import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
-import 'package:chorezilla/pages/child_dashboard/child_dashboard.dart';
+import 'package:chorezilla/pages/kid_pages/child_dashboard.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
 
 class SettingsTab extends StatelessWidget {
@@ -85,29 +86,7 @@ class SettingsTab extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 3),
 
-        // 5) Enter Kid Mode
-        Card(
-          child: ListTile(
-            leading: const Icon(Icons.smart_toy_rounded),
-            title: const Text('Enter Kid Mode'),
-            subtitle: const Text('Switch to child dashboard on this device'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () async {
-              // Persist a flag (optional; useful if you want to respect it on app start)
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('kid_mode', true);
-
-              if (!context.mounted) return;
-              // Navigate and clear back stack so the device is "locked" in kid experience
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const ChildDashboardPage()),
-                (_) => false,
-              );
-            },
-          ),
-        ),
         const SizedBox(height: 24),
 
         // 6) Sign out

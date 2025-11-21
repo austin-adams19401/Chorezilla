@@ -7,7 +7,7 @@ import 'package:chorezilla/pages/startup/kid_join_page.dart';
 import 'package:chorezilla/pages/startup/parent_join_page.dart';
 import 'package:chorezilla/pages/startup/register_page.dart';
 
-import 'package:chorezilla/pages/child_dashboard/child_dashboard.dart';
+import 'package:chorezilla/pages/kid_pages/child_dashboard.dart';
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
 import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_dashboard.dart';

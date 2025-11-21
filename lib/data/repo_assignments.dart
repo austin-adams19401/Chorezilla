@@ -82,7 +82,7 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
         'choreIcon': chore.icon,
         'difficulty': chore.difficulty,
         'xp': awards.xp,
-        'coins': awards.coins,
+        'coinAward': awards.coins,
         'requiresApproval': false,
         'status': 'assigned',
         'assignedAt': FieldValue.serverTimestamp(),

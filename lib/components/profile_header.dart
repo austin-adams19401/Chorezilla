@@ -1,23 +1,12 @@
+import 'package:chorezilla/components/leveling.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/member.dart';
-import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/common.dart';
 
-/// ProfileHeader
-///  - Reads AppState by default (current member + family)
-///  - Or pass a [member] explicitly to render a specific person
-///  - Optional actions: invite (parents only) and switch-member callback
-///
-/// Usage:
-///   // simplest, uses AppState.currentMember
-///   const ProfileHeader();
-///
-///   // or explicit
-///   ProfileHeader(member: someMember, onSwitchMember: () { ... });
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
     super.key,
@@ -35,17 +24,18 @@ class ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final Family? family = app.family;
 
     // Prefer explicit member, otherwise AppState's current or first
-    Member? m = member ?? app.currentMember;
-    m ??= app.members.isNotEmpty ? app.members.first : null;
+    Member? maybe = member ?? app.currentMember;
+    maybe ??= app.members.isNotEmpty ? app.members.first : null;
 
-    if (m == null) {
+    if (maybe == null) {
       return const SizedBox.shrink();
     }
 
-    final cs = Theme.of(context).colorScheme;
+    final Member m = maybe;
+
+    // final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
 
     return Material(
@@ -60,7 +50,7 @@ class ProfileHeader extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Name + Role
+                  // Name row
                   Row(
                     children: [
                       Flexible(
@@ -73,52 +63,46 @@ class ProfileHeader extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      _RoleChip(role: m.role),
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  // Family name (if available)
-                  if (family != null)
-                    Text(
-                      family.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  const SizedBox(height: 6),
+
+                  // Level + XP progress
+                  _LevelProgressBar(member: m),
+
+                  const SizedBox(height: 4),
+
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '🪙 Coins ${m.coins}',
+                          style: ts.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            side: BorderSide(color: Colors.green, width: 1),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          onPressed: () => _showSpendCoinsDialog(context, m),
+                          child: const Text('Spend'),
+                        ),
+                      ],
                     ),
-                  const SizedBox(height: 8),
-                  // Stats row
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _StatChip(
-                        icon: Icons.military_tech_rounded,
-                        label: 'Level',
-                        value: '${m.level}',
-                        background: cs.secondaryContainer,
-                        foreground: cs.onSecondaryContainer,
-                      ),
-                      _StatChip(
-                        icon: Icons.bolt_rounded,
-                        label: 'XP',
-                        value: '${m.xp}',
-                        background: cs.tertiaryContainer,
-                        foreground: cs.onTertiaryContainer,
-                      ),
-                      _StatChip(
-                        icon: Icons.monetization_on_rounded,
-                        label: 'Coins',
-                        value: '${m.coins}',
-                        background: cs.primaryContainer,
-                        foreground: cs.onPrimaryContainer,
-                      ),
-                    ],
                   ),
                 ],
               ),
             ),
-
             // Actions
             if (showSwitchButton)
               IconButton(
@@ -150,12 +134,34 @@ class ProfileHeader extends StatelessWidget {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not create invite: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not create invite: $e')));
     }
   }
+
+  Future<void> _showSpendCoinsDialog(BuildContext context, Member m) async {
+    final app = context.read<AppState>();
+    final messenger = ScaffoldMessenger.of(context);
+
+    final amount = await showDialog<int?>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _SpendCoinsDialog(member: m),
+    );
+
+    if (amount == null) return;
+
+    await app.updateMember(m.id, {'coins': m.coins - amount});
+
+    messenger.showSnackBar(SnackBar(content: Text('Spent $amount coins')));
+  }
+
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Avatar
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _AvatarCircle extends StatelessWidget {
   const _AvatarCircle({required this.member});
@@ -166,26 +172,32 @@ class _AvatarCircle extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     final avatar = (member.avatarKey ?? '').trim();
+    final String display = avatar.isNotEmpty
+        ? avatar
+        : _initials(member.displayName);
 
-    // If you later store full image URLs in avatarKey, you can branch here and use NetworkImage
-    final String display = avatar.isNotEmpty ? avatar : _initials(member.displayName);
+    const double radius = 28;
+    final double emojiSize = radius * 0.9;
 
     return CircleAvatar(
-      radius: 28,
-      backgroundColor: member.role == FamilyRole.child ? cs.tertiaryContainer : cs.secondaryContainer,
+      radius: radius,
+      backgroundColor: member.role == FamilyRole.child
+          ? cs.tertiaryContainer
+          : cs.secondaryContainer,
       child: Text(
         display,
         textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(fontSize: emojiSize, fontWeight: FontWeight.w700),
       ),
     );
   }
 
   String _initials(String name) {
-    final parts = name.trim().split(RegExp(r'\\s+')).where((p) => p.isNotEmpty).toList();
+    final parts = name
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts.first.characters.first.toUpperCase();
     final a = parts.first.characters.first.toUpperCase();
@@ -194,6 +206,262 @@ class _AvatarCircle extends StatelessWidget {
   }
 }
 
+class _SpendCoinsDialog extends StatefulWidget {
+  const _SpendCoinsDialog({required this.member});
+
+  final Member member;
+
+  @override
+  State<_SpendCoinsDialog> createState() => _SpendCoinsDialogState();
+}
+
+class _SpendCoinsDialogState extends State<_SpendCoinsDialog>
+    with SingleTickerProviderStateMixin {
+  late final TextEditingController _controller;
+  late final AnimationController _shakeController;
+  late final Animation<Offset> _shakeAnimation;
+
+  String? _error;
+  bool _highlightError = false; // 👈 controls the red flash
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _shakeAnimation = TweenSequence<Offset>(
+      [
+        TweenSequenceItem(
+          tween: Tween(begin: Offset.zero, end: const Offset(0.03, 0)),
+          weight: 1,
+        ),
+        TweenSequenceItem(
+          tween: Tween(
+            begin: const Offset(0.03, 0),
+            end: const Offset(-0.03, 0),
+          ),
+          weight: 2,
+        ),
+        TweenSequenceItem(
+          tween: Tween(begin: const Offset(-0.03, 0), end: Offset.zero),
+          weight: 1,
+        ),
+      ],
+    ).animate(CurvedAnimation(parent: _shakeController, curve: Curves.easeOut));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  void _triggerError(String message) {
+    setState(() {
+      _error = message;
+      _highlightError = true;
+    });
+
+    _shakeController
+      ..reset()
+      ..forward();
+
+    // After a short delay, fade the background back to normal
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      setState(() => _highlightError = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final m = widget.member;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final hasError = _error != null;
+    final baseColor = cs.surface;
+    final errorColor = cs.errorContainer;
+
+    return SlideTransition(
+      position: _shakeAnimation,
+      child: TweenAnimationBuilder<Color?>(
+        // Animate between normal and error colors
+        tween: ColorTween(
+          begin: baseColor,
+          end: _highlightError ? errorColor : baseColor,
+        ),
+        duration: const Duration(milliseconds: 250),
+        builder: (ctx, color, child) {
+          return AlertDialog(
+            backgroundColor: color,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text('Spend coins'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'You have ${m.coins} coins.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: hasError ? cs.onErrorContainer : cs.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _controller,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Coins to spend',
+                    prefixIcon: const Icon(Icons.monetization_on_rounded),
+                    errorText: _error,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(null),
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: hasError ? cs.onErrorContainer : cs.primary,
+                  ),
+                ),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: hasError ? cs.error : cs.primary,
+                ),
+                onPressed: () {
+                  final raw = _controller.text.trim();
+                  final value = int.tryParse(raw);
+
+                  if (value == null || value <= 0) {
+                    _triggerError('Enter a positive number');
+                    return;
+                  }
+                  if (value > m.coins) {
+                    _triggerError('Not enough coins');
+                    return;
+                  }
+
+                  Navigator.of(context).pop(value);
+                },
+                child: const Text('Spend'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Level + XP progress
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LevelProgressBar extends StatelessWidget {
+  const _LevelProgressBar({required this.member});
+  final Member member;
+
+  @override
+  Widget build(BuildContext context) {
+    final ts = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    // Use total XP to compute level & progress
+    final info = levelInfoForXp(member.xp);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'Level ${info.level}',
+              style: ts.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${info.xpIntoLevel} / ${info.xpNeededThisLevel} XP',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 8,
+            value: info.progress,
+            backgroundColor: cs.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coins chip
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CoinsChip extends StatelessWidget {
+  const _CoinsChip({
+    required this.coins,
+    required this.background,
+    required this.foreground,
+  });
+
+  final int coins;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.monetization_on_rounded, size: 18, color: foreground),
+          const SizedBox(width: 6),
+          Text(
+            'Coins ',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: foreground,
+            ),
+          ),
+          Text('$coins', style: TextStyle(fontSize: 12, color: foreground)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Old role/stat chips (kept for potential reuse, unused for kid header now)
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _RoleChip extends StatelessWidget {
   const _RoleChip({required this.role});
   final FamilyRole role;
@@ -201,8 +469,12 @@ class _RoleChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = role == FamilyRole.parent ? cs.secondaryContainer : cs.tertiaryContainer;
-    final fg = role == FamilyRole.parent ? cs.onSecondaryContainer : cs.onTertiaryContainer;
+    final bg = role == FamilyRole.parent
+        ? cs.secondaryContainer
+        : cs.tertiaryContainer;
+    final fg = role == FamilyRole.parent
+        ? cs.onSecondaryContainer
+        : cs.onTertiaryContainer;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -253,17 +525,22 @@ class _StatChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             '$label ',
-            style: TextStyle(fontSize: 12, color: foreground, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              fontSize: 12,
+              color: foreground,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          Text(
-            value,
-            style: TextStyle(fontSize: 12, color: foreground),
-          ),
+          Text(value, style: TextStyle(fontSize: 12, color: foreground)),
         ],
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Invite dialog
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _InviteDialog extends StatelessWidget {
   const _InviteDialog({required this.code});
@@ -303,75 +580,3 @@ class _InviteDialog extends StatelessWidget {
     );
   }
 }
-
-
-// import 'package:chorezilla/state/app_state.dart';
-// import 'package:flutter/material.dart';
-// import 'package:provider/provider.dart';
-// import '../z_archive/app_state_old.dart';
-// import '../models/family_models.dart';
-
-// class ProfileHeader extends StatelessWidget {
-//   const ProfileHeader({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final app = context.watch<AppState>();
-//     final cs = Theme.of(context).colorScheme;
-
-//     if (app.members.isEmpty) {
-//       return const SizedBox.shrink();
-//     }
-
-//     return SingleChildScrollView(
-//       scrollDirection: Axis.horizontal,
-//       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-//       child: Row(
-//         children: app.members.map((m) {
-//           final selected = app.currentProfileId == m.id;
-//           final isKid = m.role == MemberRole.child;
-
-//           return Padding(
-//             padding: const EdgeInsets.symmetric(horizontal: 4),
-//             child: InkWell(
-//               borderRadius: BorderRadius.circular(28),
-//               onTap: () => app.setCurrentProfile(m.id),
-//               child: Container(
-//                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-//                 decoration: BoxDecoration(
-//                   color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
-//                   borderRadius: BorderRadius.circular(28),
-//                   border: Border.all(
-//                     color: selected ? cs.primary : Colors.transparent,
-//                     width: selected ? 2 : 1,
-//                   ),
-//                 ),
-//                 child: Row(
-//                   children: [
-//                     CircleAvatar(
-//                       radius: 16,
-//                       backgroundColor: isKid ? cs.tertiaryContainer : cs.secondaryContainer,
-//                       child: Text(m.avatar, style: const TextStyle(fontSize: 18)),
-//                     ),
-//                     const SizedBox(width: 8),
-//                     Text(
-//                       m.name,
-//                       style: TextStyle(
-//                         color: selected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-//                         fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-//                       ),
-//                     ),
-//                     if (!m.usesThisDevice) ...[
-//                       const SizedBox(width: 6),
-//                       Icon(Icons.phone_iphone, size: 16, color: cs.outlineVariant),
-//                     ]
-//                   ],
-//                 ),
-//               ),
-//             ),
-//           );
-//         }).toList(),
-//       ),
-//     );
-//   }
-// }
