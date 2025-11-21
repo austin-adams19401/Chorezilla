@@ -1,3 +1,4 @@
+import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/profile_header.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -21,6 +22,7 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     with AutomaticKeepAliveClientMixin {
   final Set<String> _busyIds = {}; // assignmentIds being completed
   String? _watchingMemberId;
+  int? _lastSeenLevel;
 
   @override
   void initState() {
@@ -53,13 +55,18 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     _startStreamsForCurrentKid();
   }
 
-  void _startStreamsForCurrentKid() {
+void _startStreamsForCurrentKid() {
     final app = context.read<AppState>();
     final member = _resolveMember(app);
     if (member == null) return;
+
     _watchingMemberId = member.id;
+
+    _lastSeenLevel = null;
+
     app.startKidStreams(member.id);
   }
+
 
   Member? _resolveMember(AppState app) {
     if (!app.isReady) return null;
@@ -92,7 +99,9 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
       );
     }
 
-final todos = [...app.assignedForKid(member.id)]..sort(_byDueThenTitle);
+    _handleLevelChange(member);
+
+    final todos = [...app.assignedForKid(member.id)]..sort(_byDueThenTitle);
 
     // All completed for this kid
     final completedAll = app.completedForKid(member.id);
@@ -173,6 +182,110 @@ Future<void> _completeAssignment(Assignment a) async {
       if (mounted) setState(() => _busyIds.remove(a.id));
     }
   }
+
+  void _handleLevelChange(Member member) {
+    // Use your helper to compute level from total XP
+    final info = levelInfoForXp(member.xp);
+    final newLevel = info.level;
+
+    final prev = _lastSeenLevel;
+
+    if (prev == null) {
+      // First time seeing this kid on this screen → just record level
+      _lastSeenLevel = newLevel;
+      return;
+    }
+
+    if (newLevel > prev) {
+      // LEVEL UP! 🎉
+      _lastSeenLevel = newLevel;
+      final levelInfo = info;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showLevelUpDialog(member, levelInfo);
+      });
+    } else if (newLevel != prev) {
+      // XP went down or we jumped around (e.g., profile reset) → resync
+      _lastSeenLevel = newLevel;
+    }
+  }
+
+  Future<void> _showLevelUpDialog(Member member, LevelInfo info) async {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.8, end: 1.0),
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) {
+              return Transform.scale(
+                scale: scale,
+                child: AlertDialog(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  backgroundColor: cs.surface,
+                  titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                  contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                  title: Row(
+                    children: [
+                      const Text('🎉', style: TextStyle(fontSize: 32)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Level up!',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${member.displayName} reached Level ${info.level}!',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${info.xpIntoLevel} / ${info.xpNeededThisLevel} XP for this level',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Keep going to earn more coins and unlock rewards!',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('Awesome!'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
 
 
   // ---- Helpers --------------------------------------------------------------

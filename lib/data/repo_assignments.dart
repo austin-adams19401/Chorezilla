@@ -114,24 +114,64 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
     }, SetOptions(merge: true));
   }
 
-  Future<void> completeAssignment({
-    required String familyId,
-    required String choreId,
-    required String memberId,
-    required int dayStartHour,
-  }) {
-    final start = _startOfLocalDayWithHour(dayStartHour);
-    final dayKey = _yyyymmdd(start);
-    final id = '${choreId}_${memberId}_$dayKey';
-    final ref = eventsColl(firebaseDB, familyId).doc(id);
-    return ref.set({
-      'familyId': familyId,
-      'choreId': choreId,
-      'memberId': memberId,
-      'dayKey': dayKey,
-      'status': 'done',
-      'completedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+Future<void> completeAssignment(
+    String familyId,
+    String assignmentId, {
+    String? note,
+  }) async {
+    final db = firebaseDB;
+    final assignRef = assignmentsColl(db, familyId).doc(assignmentId);
+
+    await db.runTransaction((tx) async {
+      final snap = await tx.get(assignRef);
+      if (!snap.exists) {
+        throw Exception('Assignment not found');
+      }
+
+      final data = snap.data() as Map<String, dynamic>;
+
+      final String status = (data['status'] as String?) ?? 'assigned';
+      final bool requiresApproval =
+          (data['requiresApproval'] as bool?) ?? false;
+      final String? memberId = data['memberId'] as String?;
+      final int xp = (data['xp'] as num?)?.toInt() ?? 0;
+      final int coins = (data['coinAward'] as num?)?.toInt() ?? 0;
+
+      if (memberId == null || memberId.isEmpty) {
+        throw Exception('Assignment missing memberId');
+      }
+
+      // If it's already pending or completed, do nothing.
+      if (status == 'pending' || status == 'completed') {
+        return;
+      }
+
+      final now = FieldValue.serverTimestamp();
+      final updates = <String, dynamic>{'completedAt': now};
+
+      // Optional: attach / merge note into proof
+      if (note != null && note.isNotEmpty) {
+        final existingProof =
+            (data['proof'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+        updates['proof'] = {...existingProof, 'note': note};
+      }
+
+      if (requiresApproval) {
+        // No XP/coins yet — parent approval will handle rewards.
+        updates['status'] = 'pending';
+        tx.update(assignRef, updates);
+        return;
+      }
+
+      updates['status'] = 'completed';
+      tx.update(assignRef, updates);
+
+      final memberRef = membersColl(db, familyId).doc(memberId);
+      tx.update(memberRef, {
+        'xp': FieldValue.increment(xp),
+        'coins': FieldValue.increment(coins),
+      });
+    });
   }
 
   // Parent approves: update assignment + increment kid xp/coins + add event

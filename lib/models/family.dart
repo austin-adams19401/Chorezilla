@@ -7,9 +7,9 @@ class FamilySettings {
   final double coinPerPoint; // e.g., 0.2 means 5 points -> 1 coin
 
   const FamilySettings({
-    this.difficultyToXP = const {1: 10, 2: 20, 3: 35, 4: 55, 5: 80},
+    this.difficultyToXP = const {1: 10, 2: 20, 3: 30, 4: 50, 5: 80},
     this.dayStartHour = 0,
-    this.coinPerPoint = 0.2,
+    this.coinPerPoint = 0.1,
   });
 
   Map<String, dynamic> toMap() => {
@@ -23,7 +23,7 @@ class FamilySettings {
     return FamilySettings(
       difficultyToXP: mapStringIntToIntInt(data['xpPerDifficulty'] as Map<String, dynamic>?),
       dayStartHour: (data['dayStartHour'] as num?)?.toInt() ?? 0,
-      coinPerPoint: (data['coinPerPoint'] as num?)?.toDouble() ?? 0.2,
+      coinPerPoint: (data['coinPerPoint'] as num?)?.toDouble() ?? 0.1,
     );
   }
 }

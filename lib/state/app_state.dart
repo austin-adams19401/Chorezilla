@@ -750,9 +750,7 @@ Future<void> assignChore({
       throw Exception('No valid members selected');
     }
 
-    debugPrint(
-      'FAM_SETTINGS: difficultyToXP=${fam.settings.difficultyToXP} coinPerPoint=${fam.settings.coinPerPoint}',
-    );
+    debugPrint('FAM_SETTINGS: difficultyToXP=${fam.settings.difficultyToXP} coinPerPoint=${fam.settings.coinPerPoint}');
 
     // Use your award helper
     final award = calcAwards(
@@ -832,7 +830,7 @@ Future<void> completeAssignment(String assignmentId) async {
     final famRef = db.collection('families').doc(famId);
     final aRef = famRef.collection('assignments').doc(assignmentId);
 
-    // 1) Load the assignment so we can get choreId + memberId
+    // 1) Load the assignment so we can get choreId + memberId, requiresApproval, etc.
     final snap = await aRef.get();
     if (!snap.exists) {
       throw StateError('Assignment $assignmentId not found');
@@ -840,22 +838,17 @@ Future<void> completeAssignment(String assignmentId) async {
 
     final assignment = Assignment.fromDoc(snap);
 
-    // 2) Log completion via the repo "events" function
-    const dayStartHour = 4; // TODO: wire to family settings later
-    await repo.completeAssignment(
-      familyId: famId,
-      choreId: assignment.choreId,
-      memberId: assignment.memberId,
-      dayStartHour: dayStartHour,
-    );
+    // 2) Let the repo handle status + XP/coins (uses the new signature)
+    await repo.completeAssignment(famId, assignmentId);
 
-    // 3) Update the assignment doc itself so streams/UI move it out of "To Do"
-    final statusWire = assignment.requiresApproval ? 'pending' : 'completed';
-
-    await aRef.update({
-      'status': statusWire,
-      'completedAt': FieldValue.serverTimestamp(),
-    });
+    // 3) (Optional) also log a daily completion event like before
+    const dayStartHour = 4; // TODO: wire to family.settings.dayStartHour
+    // await repo.logCompletionEvent(
+    //   familyId: famId,
+    //   choreId: assignment.choreId,
+    //   memberId: assignment.memberId,
+    //   dayStartHour: dayStartHour,
+    // );
 
     // 4) Optimistically update local kid cache so the To Do list updates immediately
     final memberId = assignment.memberId;
@@ -869,6 +862,7 @@ Future<void> completeAssignment(String assignmentId) async {
 
     notifyListeners();
   }
+
 
 
   Future<void> approveAssignment(String assignmentId, {String? parentMemberId}) async {
