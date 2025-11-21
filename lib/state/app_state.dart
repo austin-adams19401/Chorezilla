@@ -16,6 +16,7 @@ import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/assignment.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Central app state.
 /// - Slow/structural state stays on this ChangeNotifier (user/family/theme).
@@ -61,6 +62,46 @@ class AppState extends ChangeNotifier {
     _themeMode = mode;
     notifyListeners();
   }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // View mode (Parent vs Kid) – persisted on device
+  // ───────────────────────────────────────────────────────────────────────────
+  static const _viewModeKey = 'viewMode';
+
+  AppViewMode _viewMode = AppViewMode.parent; // default
+  bool _viewModeLoaded = false;
+
+  AppViewMode get viewMode => _viewMode;
+  bool get viewModeLoaded => _viewModeLoaded;
+
+  /// Load last view mode from local storage.
+  Future<void> loadViewMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final v = prefs.getString(_viewModeKey);
+
+    if (v == 'kid') {
+      _viewMode = AppViewMode.kid;
+    } else {
+      _viewMode = AppViewMode.parent;
+    }
+
+    _viewModeLoaded = true;
+    notifyListeners();
+  }
+
+  /// Persist view mode to local storage and notify listeners.
+  Future<void> setViewMode(AppViewMode mode) async {
+    if (_viewMode == mode) return;
+
+    _viewMode = mode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _viewModeKey,
+      mode == AppViewMode.kid ? 'kid' : 'parent',
+    );
+    notifyListeners();
+  }
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // User & Family (rare changes)
@@ -1059,6 +1100,8 @@ Future<void> completeAssignment(String assignmentId) async {
     choresVN.value = const [];
     reviewQueueVN.value = const [];
     familyAssignedVN.value = const [];
+
+    await setViewMode(AppViewMode.parent);
 
     notifyListeners(); // structural reset
   }

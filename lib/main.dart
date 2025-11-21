@@ -37,10 +37,14 @@ Future<void> main() async {
 
   runApp(
     ChangeNotifierProvider(
-      create: (_) => AppState(repo: repo, auth: auth)..attachAuthListener(),
+      create: (_) => AppState(repo: repo, auth: auth)
+        ..attachAuthListener()
+        ..loadViewMode(), 
       child: const Chorezilla(),
     ),
   );
+
+
 }
 
 class Chorezilla extends StatelessWidget {

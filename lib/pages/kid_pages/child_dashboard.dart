@@ -25,6 +25,8 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   String? _watchingMemberId;
   int? _lastSeenLevel;
 
+  late final AppState _app;
+
   late final ConfettiController _confettiController;
   bool _celebrationActive = false;
   bool _showConfetti = false;
@@ -32,7 +34,10 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   @override
   void initState() {
     super.initState();
-      _confettiController = ConfettiController(
+
+    _app = context.read<AppState>();
+
+    _confettiController = ConfettiController(
       duration: const Duration(seconds: 5),
     );
     WidgetsBinding.instance.addPostFrameCallback((_) => _startStreamsForCurrentKid());
@@ -49,33 +54,30 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
 
   @override
   void dispose() {
-    final app = context.read<AppState>();
     if (_watchingMemberId != null) {
-      app.stopKidStreams(_watchingMemberId!);
+      _app.stopKidStreams(_watchingMemberId!);
     }
     _confettiController.dispose();
     super.dispose();
   }
 
   void _restartStreams() {
-    final app = context.read<AppState>();
     if (_watchingMemberId != null) {
-      app.stopKidStreams(_watchingMemberId!);
+      _app.stopKidStreams(_watchingMemberId!);
       _watchingMemberId = null;
     }
     _startStreamsForCurrentKid();
   }
 
 void _startStreamsForCurrentKid() {
-    final app = context.read<AppState>();
-    final member = _resolveMember(app);
+    final member = _resolveMember(_app);
     if (member == null) return;
 
     _watchingMemberId = member.id;
 
     _lastSeenLevel = null;
 
-    app.startKidStreams(member.id);
+    _app.startKidStreams(member.id);
   }
 
 

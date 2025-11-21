@@ -78,6 +78,8 @@ Future<void> _showAdultExitDialog(BuildContext context) async {
 
     const correctAnswer = '144'; // 12 x 12
 
+    final app = context.read<AppState>();
+
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -180,9 +182,11 @@ Future<void> _showAdultExitDialog(BuildContext context) async {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () {
+              onPressed: () async {
                 if (controller.text.trim() == correctAnswer) {
                   // Correct → close this dialog, result = true
+                  await app.setViewMode(AppViewMode.parent);
+                  if(!ctx.mounted) return;
                   Navigator.of(ctx).pop(true);
                 } else {
                   // Incorrect → show styled "Nice try" dialog, keep main dialog open

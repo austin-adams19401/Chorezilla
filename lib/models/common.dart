@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 enum FamilyRole { parent, child }
 enum AssignmentStatus { assigned, completed, pending, rejected }
 enum AuthStatus { unknown, signedOut, needsFamilySetup, ready }
+enum AppViewMode { parent, kid }
 
 String roleToString(FamilyRole role) {
   switch (role) {
