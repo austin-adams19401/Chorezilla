@@ -141,7 +141,16 @@ void setCurrentMember(String? memberId) {
 
 
   final Map<String, StreamSubscription<List<Assignment>>> _kidAssignedSubs = {};
+  final Map<String, StreamSubscription<List<Assignment>>> _kidPendingSubs = {};
   final Map<String, StreamSubscription<List<Assignment>>> _kidCompletedSubs = {};
+
+    final Map<String, List<Assignment>> _kidPending =
+      <String, List<Assignment>>{};
+  List<Assignment> pendingForKid(String memberId) =>
+      _kidPending[memberId] ?? const [];
+
+
+
 
   // Allow main.dart to call this explicitly; safe to call more than once.
   void attachAuthListener() {
@@ -355,6 +364,7 @@ void setCurrentMember(String? memberId) {
 
     debugPrint('KID_STREAMS: starting for member=$memberId family=$famId');
 
+    // ASSIGNED
     _kidAssignedSubs[memberId]?.cancel();
     _kidAssignedSubs[memberId] =
         _watchAssignmentsForKid(
@@ -369,9 +379,28 @@ void setCurrentMember(String? memberId) {
             );
           }
           _kidAssigned[memberId] = list;
-          notifyListeners(); // make sure this is here
+          notifyListeners();
         });
 
+    // PENDING (NEW)
+    _kidPendingSubs[memberId]?.cancel();
+    _kidPendingSubs[memberId] =
+        _watchAssignmentsForKid(
+          famId,
+          memberId,
+          AssignmentStatus.pending,
+        ).listen((list) {
+          debugPrint('KID_STREAM_PENDING[$memberId]: count=${list.length}');
+          for (final a in list) {
+            debugPrint(
+              '  PENDING[$memberId] aId=${a.id} status=${a.status} choreId=${a.choreId}',
+            );
+          }
+          _kidPending[memberId] = list;
+          notifyListeners();
+        });
+
+    // COMPLETED
     _kidCompletedSubs[memberId]?.cancel();
     _kidCompletedSubs[memberId] =
         _watchAssignmentsForKid(
@@ -386,7 +415,7 @@ void setCurrentMember(String? memberId) {
             );
           }
           _kidCompleted[memberId] = list;
-          notifyListeners(); // and here too
+          notifyListeners();
         });
   }
 
@@ -808,7 +837,7 @@ Future<void> completeAssignment(String assignmentId) async {
     final assignment = Assignment.fromDoc(snap);
 
     // 2) Log completion via the repo "events" function
-    const dayStartHour = 4; // TODO: wire to settings later if you want
+    const dayStartHour = 4; // TODO: wire to family settings later
     await repo.completeAssignment(
       familyId: famId,
       choreId: assignment.choreId,
@@ -823,7 +852,20 @@ Future<void> completeAssignment(String assignmentId) async {
       'status': statusWire,
       'completedAt': FieldValue.serverTimestamp(),
     });
+
+    // 4) Optimistically update local kid cache so the To Do list updates immediately
+    final memberId = assignment.memberId;
+    final existingAssigned = _kidAssigned[memberId];
+
+    if (existingAssigned != null && existingAssigned.isNotEmpty) {
+      _kidAssigned[memberId] = existingAssigned
+          .where((a) => a.id != assignmentId)
+          .toList();
+    }
+
+    notifyListeners();
   }
+
 
   Future<void> approveAssignment(String assignmentId, {String? parentMemberId}) async {
     final famId = _familyId!;
@@ -1001,12 +1043,17 @@ Future<void> completeAssignment(String assignmentId) async {
     for (final s in _kidAssignedSubs.values) {
       await s.cancel();
     }
+    for (final s in _kidPendingSubs.values) {
+      await s.cancel();
+    }
     for (final s in _kidCompletedSubs.values) {
       await s.cancel();
     }
     _kidAssignedSubs.clear();
+    _kidPendingSubs.clear();
     _kidCompletedSubs.clear();
     _kidAssigned.clear();
+    _kidPending.clear();
     _kidCompleted.clear();
 
     // Clear slices (doesn't notify by itself)
@@ -1031,11 +1078,22 @@ Future<void> completeAssignment(String assignmentId) async {
     for (final s in _kidCompletedSubs.values) {
       s.cancel();
     }
+    for (final s in _kidPendingSubs.values) {   // NEW
+      s.cancel();
+    }
     membersVN.dispose();
     choresVN.dispose();
     reviewQueueVN.dispose();
     super.dispose();
   }
   
-  void stopKidStreams(String s) {}
+  void stopKidStreams(String memberId) {
+    _kidAssignedSubs.remove(memberId)?.cancel();
+    _kidPendingSubs.remove(memberId)?.cancel(); // NEW
+    _kidCompletedSubs.remove(memberId)?.cancel();
+
+    _kidAssigned.remove(memberId);
+    _kidPending.remove(memberId); // NEW
+    _kidCompleted.remove(memberId);
+  }
 }

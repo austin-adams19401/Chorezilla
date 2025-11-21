@@ -93,7 +93,8 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     }
 
     final todos = [...app.assignedForKid(member.id)]..sort(_byDueThenTitle);
-    final submitted = [...app.completedForKid(member.id)]..sort(_byCompletedAtDescThenTitle);
+    final submitted = [...app.pendingForKid(member.id)]..sort(_byDueThenTitle);
+
 
     return Scaffold(
       appBar: AppBar(title: const Text('Chorezilla')),
@@ -275,7 +276,7 @@ class _SubmittedList extends StatelessWidget {
       return const _EmptyState(
         emoji: '⌛',
         title: 'Nothing submitted yet',
-        subtitle: 'Completed chores will show up here until a parent reviews them.',
+        subtitle: 'Pending chores will show up here until a parent reviews them.',
       );
     }
 
