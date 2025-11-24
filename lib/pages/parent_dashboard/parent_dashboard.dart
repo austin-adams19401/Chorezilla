@@ -65,29 +65,22 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
       SettingsTab(),
     ];
 
-return Scaffold(
-appBar: AppBar(
+    return Scaffold(
+      appBar: AppBar(
         title: const Text('Chorezilla'),
         actions: [
           TextButton.icon(
             onPressed: () async {
               final app = context.read<AppState>();
 
-              // 1) Persist that we’re in kid mode now
+              // 1) Persist kid mode
               await app.setViewMode(AppViewMode.kid);
-
-              // 2) Navigate to kid home
-              if (!context.mounted) return;
-              Navigator.of(
-                context,
-              ).push(MaterialPageRoute(builder: (_) => const KidsHomePage()));
             },
             icon: const Icon(Icons.family_restroom_rounded),
             label: const Text('Kid view'),
           ),
         ],
       ),
-
       body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

@@ -42,76 +42,95 @@ class KidsHomePage extends StatelessWidget {
               ),
             ],
           ),
-          body: GridView.builder(
-            padding: const EdgeInsets.all(16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 16,
-              crossAxisSpacing: 16,
-              childAspectRatio: 3 / 4,
-            ),
-            itemCount: kids.length,
-            itemBuilder: (context, index) {
-              final kid = kids[index];
-              return _KidCard(member: kid);
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+
+              // Responsive column count based on available width
+              int crossAxisCount;
+              if (width < 500) {
+                crossAxisCount = 2; // small phones
+              } else if (width < 900) {
+                crossAxisCount = 3; // large phones / small tablets
+              } else {
+                crossAxisCount = 4; // big tablets / desktop
+              }
+
+              // Slightly different aspect ratio on bigger screens
+              final childAspectRatio = width < 600 ? 3 / 4 : 4 / 5;
+
+              return GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 16,
+                  crossAxisSpacing: 16,
+                  childAspectRatio: childAspectRatio,
+                ),
+                itemCount: kids.length,
+                itemBuilder: (context, index) {
+                  final kid = kids[index];
+                  return _KidCard(member: kid);
+                },
+              );
             },
           ),
         );
       }
     }
 
-    return PopScope(
-      canPop: false, 
-      // onPopInvokedWithResult: (didPop) {
-      //   debugPrint('Tried to pop kid mode: didPop=$didPop');
-      // },
-      child: content,
-    );
+    return PopScope(canPop: false, child: content);
   }
-
+}
 
 Future<void> _showAdultExitDialog(BuildContext context) async {
-    final controller = TextEditingController();
-    final navigator = Navigator.of(context);
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+  final controller = TextEditingController();
+  final theme = Theme.of(context);
+  final cs = theme.colorScheme;
 
-    const correctAnswer = '144'; // 12 x 12
+  const correctAnswer = '144'; // 12 x 12
 
-    final app = context.read<AppState>();
+  final app = context.read<AppState>();
 
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return AlertDialog(
-          backgroundColor: cs.surface,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-          titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          title: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: cs.primaryContainer,
-                child: Icon(Icons.lock_outline_rounded, color: cs.onPrimaryContainer),
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) {
+      return AlertDialog(
+        scrollable: true, // <-- allow scrolling when space is tight
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: cs.primaryContainer,
+              child: Icon(
+                Icons.lock_outline_rounded,
+                color: cs.onPrimaryContainer,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Parents only',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Parents only',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
+            ),
+          ],
+        ),
+        content: Padding(
+          // Push content up when the keyboard opens (fixes landscape overflow)
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
           ),
-          content: Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -176,87 +195,79 @@ Future<void> _showAdultExitDialog(BuildContext context) async {
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (controller.text.trim() == correctAnswer) {
-                  // Correct → close this dialog, result = true
-                  await app.setViewMode(AppViewMode.parent);
-                  if(!ctx.mounted) return;
-                  Navigator.of(ctx).pop(true);
-                } else {
-                  // Incorrect → show styled "Nice try" dialog, keep main dialog open
-                  showDialog<void>(
-                    context: ctx,
-                    builder: (errCtx) {
-                      final errTheme = Theme.of(errCtx);
-                      final errCs = errTheme.colorScheme;
-                      return AlertDialog(
-                        backgroundColor: errCs.surface,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                        contentPadding: const EdgeInsets.fromLTRB(
-                          24,
-                          12,
-                          24,
-                          16,
-                        ),
-                        actionsPadding: const EdgeInsets.fromLTRB(
-                          16,
-                          0,
-                          16,
-                          12,
-                        ),
-                        title: Row(
-                          children: [                            
-                            Text(
-                              'Nice try… 😏',
-                              style: errTheme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              if (controller.text.trim() == correctAnswer) {
+                // Correct → switch to parent mode and close THIS dialog
+                await app.setViewMode(AppViewMode.parent);
+                if (!ctx.mounted) return;
+                Navigator.of(ctx).pop(true);
+              } else {
+                // Incorrect → show styled "Nice try" dialog, keep main dialog open
+                showDialog<void>(
+                  context: ctx,
+                  builder: (errCtx) {
+                    final errTheme = Theme.of(errCtx);
+                    final errCs = errTheme.colorScheme;
+                    return AlertDialog(
+                      backgroundColor: errCs.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      titlePadding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                      contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+                      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      title: Row(
+                        children: [
+                          Text(
+                            'Nice try… 😏',
+                            style: errTheme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
-                          ],
-                        ),
-                        content: Text(
-                          "Are you sure you're a parent??",
-                          style: errTheme.textTheme.bodyMedium?.copyWith(
-                            color: errCs.onSurfaceVariant,
-                          ),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(errCtx).pop(),
-                            child: const Text('Yes, let me try again'),
-                          ),
-                          FilledButton.tonal(
-                            onPressed: () {
-                              Navigator.of(errCtx).pop();
-                              Navigator.of(ctx).pop(false);
-                            },
-                            child: const Text("I'm just a kid"),
                           ),
                         ],
-                      );
-                    },
-                  );
-                }
-              },
-              child: const Text('Unlock'),
-            ),
-          ],
-        );
-      },
-    );
+                      ),
+                      content: Text(
+                        "Are you sure you're a parent??",
+                        style: errTheme.textTheme.bodyMedium?.copyWith(
+                          color: errCs.onSurfaceVariant,
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(errCtx).pop(),
+                          child: const Text('Yes, let me try again'),
+                        ),
+                        FilledButton.tonal(
+                          onPressed: () {
+                            Navigator.of(errCtx).pop();
+                            Navigator.of(ctx).pop(false);
+                          },
+                          child: const Text("I'm just a kid"),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              }
+            },
+            child: const Text('Unlock'),
+          ),
+        ],
+      );
+    },
+  );
 
-    if (result == true) {
-      navigator.pop();
-    }
+  if (result == true) {
+    // Do NOT pop the KidsHomePage route here.
+    // AuthGate / root routing should react to AppViewMode.parent and
+    // show the parent dashboard.
   }
 }
 
@@ -272,8 +283,6 @@ class _KidCard extends StatelessWidget {
     final ts = Theme.of(context).textTheme;
 
     final avatarKey = member.avatarKey;
-    const double avatarRadius = 64;
-    final double emojiSize = avatarRadius * 0.9;
 
     return InkWell(
       borderRadius: BorderRadius.circular(40),
@@ -287,50 +296,59 @@ class _KidCard extends StatelessWidget {
       },
       child: Padding(
         padding: const EdgeInsets.all(8.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircleAvatar(
-              radius: avatarRadius,
-              backgroundColor: cs.primaryContainer,
-              child: avatarKey != null && avatarKey.isNotEmpty
-                ? Text(
-                    avatarKey,
-                    style: TextStyle(
-                      fontSize: emojiSize, // 👈 bigger emoji
-                      color: cs.onPrimaryContainer,
-                    ),
-                  )
-                : Text(
-                    _initialsFor(member.displayName),
-                    style: TextStyle(
-                      fontSize: emojiSize * 0.7, // initials a bit smaller
-                      color: cs.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // Make avatar size respond to card width
+            final avatarRadius =
+                (constraints.maxWidth * 0.25).clamp(48.0, 72.0);
+            final emojiSize = avatarRadius * 0.9;
+
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: avatarRadius,
+                  backgroundColor: cs.primaryContainer,
+                  child: avatarKey != null && avatarKey.isNotEmpty
+                      ? Text(
+                          avatarKey,
+                          style: TextStyle(
+                            fontSize: emojiSize,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        )
+                      : Text(
+                          _initialsFor(member.displayName),
+                          style: TextStyle(
+                            fontSize: emojiSize * 0.7,
+                            color: cs.onPrimaryContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  member.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ts.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              member.displayName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: ts.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-
-  String _initialsFor(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty) return '?';
-    if (parts.length == 1) {
-      return parts.first.substring(0, 1).toUpperCase();
-    }
-    return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+String _initialsFor(String name) {
+  final parts = name.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty) return '?';
+  if (parts.length == 1) {
+    return parts.first.substring(0, 1).toUpperCase();
   }
-
+  return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+}

@@ -121,6 +121,8 @@ class AppState extends ChangeNotifier {
   bool _membersLoaded = false;
   bool get bootLoaded => _familyLoaded && _membersLoaded;
 
+  bool _todayAssignmentsEnsured = false;
+
 
   // Active member selection for child dashboard/profile header
   String? _currentMemberId;
@@ -149,6 +151,7 @@ void setCurrentMember(String? memberId) {
   final ValueNotifier<List<Member>> membersVN = ValueNotifier<List<Member>>(<Member>[]);
   final ValueNotifier<List<Chore>> choresVN = ValueNotifier<List<Chore>>(<Chore>[]);
   final ValueNotifier<List<Assignment>> reviewQueueVN = ValueNotifier<List<Assignment>>(<Assignment>[]);
+  final ValueNotifier<List<Assignment>> missedAssignmentsVN = ValueNotifier<List<Assignment>>(<Assignment>[]);
   
     // All "assigned" assignments for the current family (used for avatars / assign sheet)
   final ValueNotifier<List<Assignment>> familyAssignedVN =
@@ -161,6 +164,8 @@ void setCurrentMember(String? memberId) {
   List<Chore> get chores => choresVN.value;
   List<Assignment> get reviewQueue => reviewQueueVN.value;
   List<Assignment> get familyAssigned => familyAssignedVN.value;
+  List<Assignment> get missedAssignments => missedAssignmentsVN.value;
+
 
 
   // Kid-specific caches (child dashboard convenience)
@@ -178,7 +183,8 @@ void setCurrentMember(String? memberId) {
   StreamSubscription<List<Member>>? _membersSub;
   StreamSubscription<List<Chore>>? _choresSub;
   StreamSubscription<List<Assignment>>? _reviewSub;
-    StreamSubscription<List<Assignment>>? _familyAssignedSub; 
+  StreamSubscription<List<Assignment>>? _familyAssignedSub; 
+  StreamSubscription<List<Assignment>>? _missedSub;
 
 
   final Map<String, StreamSubscription<List<Assignment>>> _kidAssignedSubs = {};
@@ -260,55 +266,6 @@ void setCurrentMember(String? memberId) {
     }
   }
 
-
-//   Future<void> _postSignInBootstrap(User? user) async {
-//   // if (user == null) return;
-//   //   final db = FirebaseFirestore.instance;
-
-//   //   final uid = user.uid;
-//   //   final userRef = repo_file.userDoc(db, uid);
-//   //   final now = FieldValue.serverTimestamp();
-
-//   //   // 1) Upsert users/{uid} (UserProfile)
-//   //   final snap = await userRef.get();
-//   //   if (!snap.exists) {
-//   //     await userRef.set({
-//   //       'displayName': user.displayName,
-//   //       'email': user.email,
-//   //       'photoURL': user.photoURL,
-//   //       'defaultFamilyId': null,
-//   //       'memberships': {}, // familyId -> { memberId, role }
-//   //       'createdAt': now,
-//   //       'lastSignInAt': now,
-//   //       'provider': 'google',
-//   //     }, SetOptions(merge: true));
-//   //   } else {
-//   //     await userRef.set({'lastSignInAt': now, 'displayName': user.displayName, 'photoURL': user.photoURL}, SetOptions(merge: true));
-//   //   }
-
-//   // 2) Decide where to go (needs setup vs ready)
-//   // final data = (await userRef.get()).data() as Map<String, dynamic>? ?? {};
-//   // final String? defaultFamilyId = data['defaultFamilyId'] as String?;
-//   // final Map<String, dynamic> memberships = (data['memberships'] as Map<String, dynamic>? ?? {});
-
-//   // if ((defaultFamilyId == null || defaultFamilyId.isEmpty) && memberships.isEmpty) {
-//   //   // New account → Setup
-//   //   pendingSetupPrefill = SetupPrefill(
-//   //     displayName: user.displayName,
-//   //     email: user.email,
-//   //     photoUrl: user.photoURL,
-//   //   );
-//   //   authState = AuthState.needsFamilySetup;
-//   //   notifyListeners();
-//   //   // Your router should show the Parent/Family Setup screen when authState==needsFamilySetup
-//   // } else {
-//   //   // Returning user with a family → proceed to home bootstrap
-//   //   authState = AuthState.ready;
-//   //   notifyListeners();
-//   //   // Load family, members, chores, etc. (your existing watchers)
-//   // }
-// }
-
   Future<void> _getDataForUser(User u) async {
     // 1) Ensure profile exists & fetch it
     debugPrint('_getDataForUser: ${u.email} - ${u.displayName}');
@@ -335,9 +292,12 @@ void setCurrentMember(String? memberId) {
   // ───────────────────────────────────────────────────────────────────────────
   void _startFamilyStreams(String familyId) {
     // Reset boot flags whenever we bind to a (new) family
-    debugPrint('STARTING FAMILY STREAMS: famName: ${family?.name} - famId: $familyId');
+    debugPrint(
+      'STARTING FAMILY STREAMS: famName: ${family?.name} - famId: $familyId',
+    );
     _familyLoaded = false;
     _membersLoaded = false;
+    _todayAssignmentsEnsured = false; // NEW
 
     // Family doc (rare changes — name/settings)
     _familySub?.cancel();
@@ -367,6 +327,13 @@ void setCurrentMember(String? memberId) {
     _choresSub = repo.watchChores(familyId).listen((list) {
       choresVN.value = list;
       notifyListeners();
+
+      // NEW: once per family bind / app boot, after chores are known,
+      // ensure today's assignments exist (works for parent or kid mode).
+      if (!_todayAssignmentsEnsured) {
+        _todayAssignmentsEnsured = true;
+        ensureAssignmentsForToday();
+      }
     });
 
     // Review queue (completed awaiting approval)
@@ -376,21 +343,46 @@ void setCurrentMember(String? memberId) {
       notifyListeners();
     });
 
-        // Family-level "assigned" assignments (for avatars + assign sheet)
+    // Family-level "assigned" assignments (for avatars + assign sheet)
     _familyAssignedSub?.cancel();
     _familyAssignedSub =
         _watchAssignmentsForFamily(familyId, AssignmentStatus.assigned).listen((
           list,
         ) {
           familyAssignedVN.value = list;
-          // No notifyListeners needed; widgets will use ValueListenableBuilder.
         });
+
+    _missedSub?.cancel();
+    _missedSub = _watchMissedAssignmentsForFamily(familyId).listen((list) {
+      missedAssignmentsVN.value = list;
+    });
   }
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // Assignment streams
   // ───────────────────────────────────────────────────────────────────────────
 
+Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
+    final db = FirebaseFirestore.instance;
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayTs = Timestamp.fromDate(today);
+
+    // Missed = status == 'assigned' AND due < today (i.e., old assignments)
+    Query q = db
+        .collection('families')
+        .doc(familyId)
+        .collection('assignments')
+        .where('status', isEqualTo: 'assigned')
+        .where('due', isLessThan: todayTs)
+        .orderBy('due', descending: true);
+
+    // NOTE: Firestore will likely ask you to create a composite index
+    // for (status == 'assigned', due < today) the first time this runs.
+    return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
+  }
 
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -466,17 +458,29 @@ void setCurrentMember(String? memberId) {
     AssignmentStatus status,
   ) {
     final db = FirebaseFirestore.instance;
-    final statusWire = _statusToWire(status); // stored as string
-    final q = db
+    final statusWire = _statusToWire(status);
+
+    // Define "today" as [todayMidnight, tomorrowMidnight)
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final startTs = Timestamp.fromDate(today);
+    final endTs = Timestamp.fromDate(tomorrow);
+
+    Query q = db
         .collection('families')
         .doc(familyId)
         .collection('assignments')
         .where('memberId', isEqualTo: memberId)
         .where('status', isEqualTo: statusWire)
+        .where('due', isGreaterThanOrEqualTo: startTs)
+        .where('due', isLessThan: endTs)
         .orderBy('due');
 
+    // NOTE: Firestore may ask you to create a composite index the first time.
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
+
 
   Stream<List<Assignment>> _watchReviewQueue(String familyId) {
     final db = FirebaseFirestore.instance;
@@ -513,15 +517,25 @@ void setCurrentMember(String? memberId) {
   ) {
     final db = FirebaseFirestore.instance;
     final statusWire = _statusToWire(status);
-    final q = db
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
+    final startTs = Timestamp.fromDate(today);
+    final endTs = Timestamp.fromDate(tomorrow);
+
+    Query q = db
         .collection('families')
         .doc(familyId)
         .collection('assignments')
         .where('status', isEqualTo: statusWire)
+        .where('due', isGreaterThanOrEqualTo: startTs)
+        .where('due', isLessThan: endTs)
         .orderBy('due');
 
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
+
 
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -971,14 +985,14 @@ Future<void> completeAssignment(String assignmentId) async {
     final famRef = db.collection('families').doc(famId);
     final assignmentsRef = famRef.collection('assignments');
 
-    // Normalize "today" to a date-only value (midnight).
+    // Normalize "today" to calendar day (midnight local time)
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final todayTs = Timestamp.fromDate(today);
 
     debugPrint('ensureAssignmentsForToday: famId=$famId date=$today');
 
-    // 1) Load all assignments that are already due today.
+    // 1) Load all assignments that are already due today (any status).
     final existingSnap = await assignmentsRef
         .where('due', isEqualTo: todayTs)
         .get();
@@ -1017,7 +1031,6 @@ Future<void> completeAssignment(String assignmentId) async {
           continue;
         }
 
-        // Use your Award helper to compute XP + coins.
         final award = calcAwards(
           difficulty: chore.difficulty,
           settings: fam.settings,
@@ -1036,7 +1049,7 @@ Future<void> completeAssignment(String assignmentId) async {
           'coinAward': award.coins,
           'requiresApproval': chore.requiresApproval,
           'status': 'assigned',
-          'due': todayTs,
+          'due': todayTs, // 👈 this anchors assignments to today's date
           'assignedAt': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
         });
@@ -1057,7 +1070,6 @@ Future<void> completeAssignment(String assignmentId) async {
   }
 
 
-
   // ───────────────────────────────────────────────────────────────────────────
   // Teardown / dispose
   // ───────────────────────────────────────────────────────────────────────────
@@ -1076,8 +1088,9 @@ Future<void> completeAssignment(String assignmentId) async {
     await _choresSub?.cancel();
     await _reviewSub?.cancel();
     await _familyAssignedSub?.cancel();
+    await _missedSub?.cancel();
 
-    _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub = null;
+    _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub = _missedSub = null;
 
     for (final s in _kidAssignedSubs.values) {
       await s.cancel();
@@ -1113,6 +1126,8 @@ Future<void> completeAssignment(String assignmentId) async {
     _membersSub?.cancel();
     _choresSub?.cancel();
     _reviewSub?.cancel();
+    _missedSub?.cancel();
+
     for (final s in _kidAssignedSubs.values) {
       s.cancel();
     }
