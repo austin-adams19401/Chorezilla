@@ -1,15 +1,12 @@
-import 'package:chorezilla/pages/kid_pages/kids_home_page.dart';
 import 'package:chorezilla/pages/startup/parent_join_page.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:chorezilla/state/app_state.dart';
 
 import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
-import 'package:chorezilla/pages/kid_pages/child_dashboard.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
 
 class SettingsTab extends StatelessWidget {

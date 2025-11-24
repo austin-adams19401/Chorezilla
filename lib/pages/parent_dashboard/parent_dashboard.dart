@@ -1,6 +1,5 @@
 
 import 'package:chorezilla/models/common.dart';
-import 'package:chorezilla/pages/kid_pages/kids_home_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';

@@ -897,7 +897,7 @@ Future<void> completeAssignment(String assignmentId) async {
     await repo.completeAssignment(famId, assignmentId);
 
     // 3) (Optional) also log a daily completion event like before
-    const dayStartHour = 4; // TODO: wire to family.settings.dayStartHour
+    // const dayStartHour = 4; // TODO: wire to family.settings.dayStartHour
     // await repo.logCompletionEvent(
     //   familyId: famId,
     //   choreId: assignment.choreId,

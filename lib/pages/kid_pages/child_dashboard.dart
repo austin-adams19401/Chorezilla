@@ -530,9 +530,9 @@ class _AssignmentTile extends StatelessWidget {
     final ts = Theme.of(context).textTheme;
 
     final icon = assignment.choreIcon?.trim();
-    final due = assignment.due;
-    final dueText = _formatDue(due);
-    final overdue = due != null && due.isBefore(DateTime.now());
+    // final due = assignment.due;
+    // final dueText = _formatDue(due);
+    // final overdue = due != null && due.isBefore(DateTime.now());
 
 
     const double iconBoxSize = 50; // size of the colored square
@@ -616,21 +616,21 @@ class _AssignmentTile extends StatelessWidget {
     );
   }
 
-  String? _formatDue(DateTime? due) {
-    if (due == null) return null;
-    final now = DateTime.now();
-    final dDate = DateTime(due.year, due.month, due.day);
-    final nDate = DateTime(now.year, now.month, now.day);
-    final diff = dDate.difference(nDate).inDays;
+//   String? _formatDue(DateTime? due) {
+//     if (due == null) return null;
+//     final now = DateTime.now();
+//     final dDate = DateTime(due.year, due.month, due.day);
+//     final nDate = DateTime(now.year, now.month, now.day);
+//     final diff = dDate.difference(nDate).inDays;
 
-    if (diff == 0) return 'Due today';
-    if (diff == 1) return 'Due tomorrow';
-    if (diff == -1) return 'Due yesterday';
-    if (diff > 1 && diff <= 7) return 'Due in $diff days';
-    if (diff < -1 && diff >= -7) return '${diff.abs()} days overdue';
-    // Fallback date
-    return '${due.month}/${due.day}';
-  }
+//     if (diff == 0) return 'Due today';
+//     if (diff == 1) return 'Due tomorrow';
+//     if (diff == -1) return 'Due yesterday';
+//     if (diff > 1 && diff <= 7) return 'Due in $diff days';
+//     if (diff < -1 && diff >= -7) return '${diff.abs()} days overdue';
+//     // Fallback date
+//     return '${due.month}/${due.day}';
+//   }
 }
 
 class _StatusPill extends StatelessWidget {
