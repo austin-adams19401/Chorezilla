@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 import 'package:chorezilla/models/award.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/models/reward.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -193,6 +194,8 @@ void setCurrentMember(String? memberId) {
 
     final Map<String, List<Assignment>> _kidPending =
       <String, List<Assignment>>{};
+
+  get rewards => null;
   List<Assignment> pendingForKid(String memberId) =>
       _kidPending[memberId] ?? const [];
 
@@ -1152,4 +1155,14 @@ Future<void> completeAssignment(String assignmentId) async {
     _kidPending.remove(memberId); // NEW
     _kidCompleted.remove(memberId);
   }
+
+  // void redeemReward(RewardDefinition r, String id) {}
+
+  // void markRewardFulfilled(id) {}
+
+  // pendingRewardsForMember(String id) {}
+
+  // allowanceForMember(String id) {}
+
+  // coinBalanceForMember(String id) {}
 }

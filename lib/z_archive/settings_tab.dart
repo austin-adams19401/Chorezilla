@@ -9,8 +9,8 @@ import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
 
-class SettingsTab extends StatelessWidget {
-  const SettingsTab({super.key});
+class HistoryTab extends StatelessWidget {
+  const HistoryTab({super.key});
 
   @override
   Widget build(BuildContext context) {
