@@ -33,6 +33,7 @@ CollectionReference assignmentsColl(FirebaseFirestore db, String familyId) => db
 CollectionReference rewardsColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/rewards');
 CollectionReference devicesColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/devices');
 CollectionReference eventsColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/events');
+CollectionReference<Map<String, dynamic>> rewardRedemptionsColl(FirebaseFirestore db, String familyId) => db.collection('families').doc(familyId).collection('rewardRedemptions');
 
 
 class ChorezillaRepo {

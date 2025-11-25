@@ -1,7 +1,9 @@
 import 'package:chorezilla/components/chores_nav_icon.dart';
 import 'package:chorezilla/components/parent_menu_drawer.dart';
+import 'package:chorezilla/components/rewards_nav_icon.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/pages/parent_dashboard/manage_chores_tab.dart';
+import 'package:chorezilla/pages/parent_dashboard/parent_rewards_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
@@ -65,8 +67,8 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
     final pages = const [
       ParentTodayTab(),
       ParentChoresTab(),
-      RewardsTab(), 
-      //HistoryTab(),
+      ParentRewardsPage(),
+      ParentRewardsPage(), 
     ];
 
     return Scaffold(
@@ -106,7 +108,8 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
             label: 'Chores',
           ),
           NavigationDestination(
-            icon: Icon(Icons.card_giftcard_rounded),
+            icon: RewardsNavIcon(selected: false),
+            selectedIcon: RewardsNavIcon(selected: true),
             label: 'Rewards',
           ),
           NavigationDestination(
@@ -115,48 +118,7 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
           ),
         ],
       ),
-    );
-  }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Rewards tab – simple placeholder for now
-// You can flesh this out later with your XP store, coin spending, etc.
-// ─────────────────────────────────────────────────────────────────────────────
-
-class RewardsTab extends StatelessWidget {
-  const RewardsTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.card_giftcard_rounded, size: 48, color: cs.primary),
-            const SizedBox(height: 12),
-            Text(
-              'Rewards coming soon',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Here you’ll be able to see rewards, prices, and how many coins each kid has to spend.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

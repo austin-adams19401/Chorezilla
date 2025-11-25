@@ -4,7 +4,6 @@ library;
 import 'dart:async';
 import 'package:chorezilla/models/award.dart';
 import 'package:chorezilla/models/common.dart';
-import 'package:chorezilla/models/reward.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';

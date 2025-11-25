@@ -1,318 +1,781 @@
-// import 'package:chorezilla/models/common.dart';
-// import 'package:flutter/material.dart';
-// import 'package:provider/provider.dart';
+// lib/pages/parent_dashboard/parent_rewards_page.dart
+import 'package:chorezilla/models/common.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
 
-// import 'package:chorezilla/state/app_state.dart';
-// import 'package:chorezilla/models/member.dart';
-// import 'package:chorezilla/models/reward.dart';
-// import 'package:chorezilla/models/reward_redemption.dart';
 
-// class ParentRewardsTab extends StatefulWidget {
-//   const ParentRewardsTab({super.key});
 
-//   @override
-//   State<ParentRewardsTab> createState() => _ParentRewardsTabState();
-// }
+import 'package:chorezilla/state/app_state.dart';
+import 'package:chorezilla/models/reward.dart';
+import 'package:chorezilla/data/chorezilla_repo.dart';
 
-// class _ParentRewardsTabState extends State<ParentRewardsTab> {
-//   String? _selectedKidId;
+class ParentRewardsPage extends StatefulWidget {
+  const ParentRewardsPage({super.key});
 
-//   @override
-//   Widget build(BuildContext context) {
-//     final app = context.watch<AppState>();
-//     final theme = Theme.of(context);
-//     final cs = theme.colorScheme;
+  @override
+  State<ParentRewardsPage> createState() => _ParentRewardsPageState();
+}
 
-//     // You already have members in AppState
-//     final kids = app.members.where((m) => m.role == FamilyRole.child && m.active).toList();
-//     if (kids.isEmpty) {
-//       return const Center(child: Text('Add kids to start using rewards.'));
-//     }
+class _ParentRewardsPageState extends State<ParentRewardsPage> {
+  RewardCategory? _categoryFilter; // null = All
+  bool _showDisabled = false;
 
-//     final selectedKid = kids.firstWhere(
-//       (m) => m.id == _selectedKidId,
-//       orElse: () => kids.first,
-//     );
-//     _selectedKidId ??= selectedKid.id;
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final familyId = app.familyId;
 
-//     // TODO: wire these up to your actual notifiers/streams
-//     final coinBalance = app.coinBalanceForMember(selectedKid.id); // int
-//     final allowance = app.allowanceForMember(
-//       selectedKid.id,
-//     ); // AllowanceSettings?
-//     final pending = app.pendingRewardsForMember(
-//       selectedKid.id,
-//     ); // List<RewardRedemption>
-//     final allRewards = app.rewards; // List<RewardDefinition>
+    if (familyId == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
-//     final activeRewards = allRewards.where((r) => r.active).toList()
-//       ..sort((a, b) => a.coinCost.compareTo(b.coinCost));
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
 
-//     final rewardsByCost = <int, List<RewardDefinition>>{};
-//     for (final r in activeRewards) {
-//       rewardsByCost.putIfAbsent(r.coinCost, () => []).add(r);
-//     }
+    return Scaffold(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header & filters ────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Rewards & Store',
+                  style: ts.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Choose what your kids can spend coins on.',
+                  style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 12),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: const Text('All'),
+                          selected: _categoryFilter == null,
+                          onSelected: (_) =>
+                              setState(() => _categoryFilter = null),
+                        ),
+                      ),
+                      for (final cat in RewardCategory.values)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: ChoiceChip(
+                            label: Text(_categoryLabel(cat)),
+                            selected: _categoryFilter == cat,
+                            onSelected: (_) =>
+                                setState(() => _categoryFilter = cat),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    FilterChip(
+                      label: const Text('Show disabled'),
+                      selected: _showDisabled,
+                      onSelected: (val) => setState(() => _showDisabled = val),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
 
-//     return SafeArea(
-//       child: CustomScrollView(
-//         slivers: [
-//           // Kid selector
-//           SliverToBoxAdapter(
-//             child: Padding(
-//               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-//               child: Row(
-//                 children: [
-//                   Text(
-//                     'Rewards',
-//                     style: theme.textTheme.titleLarge?.copyWith(
-//                       fontWeight: FontWeight.w700,
-//                     ),
-//                   ),
-//                   const Spacer(),
-//                   Wrap(
-//                     spacing: 8,
-//                     children: kids.map((k) {
-//                       final selected = k.id == _selectedKidId;
-//                       return ChoiceChip(
-//                         label: Text(k.displayName),
-//                         selected: selected,
-//                         onSelected: (_) =>
-//                             setState(() => _selectedKidId = k.id),
-//                       );
-//                     }).toList(),
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           ),
+          const SizedBox(height: 4),
 
-//           // Balance + allowance card
-//           SliverToBoxAdapter(
-//             child: Padding(
-//               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-//               child: Card(
-//                 elevation: 0,
-//                 shape: RoundedRectangleBorder(
-//                   borderRadius: BorderRadius.circular(16),
-//                   side: BorderSide(color: cs.outlineVariant),
-//                 ),
-//                 child: Padding(
-//                   padding: const EdgeInsets.all(16),
-//                   child: Column(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         selectedKid.displayName,
-//                         style: theme.textTheme.titleMedium?.copyWith(
-//                           fontWeight: FontWeight.w700,
-//                         ),
-//                       ),
-//                       const SizedBox(height: 8),
-//                       Row(
-//                         children: [
-//                           Icon(Icons.savings_rounded, color: cs.primary),
-//                           const SizedBox(width: 8),
-//                           Text(
-//                             '$coinBalance coins',
-//                             style: theme.textTheme.titleLarge?.copyWith(
-//                               fontWeight: FontWeight.bold,
-//                             ),
-//                           ),
-//                         ],
-//                       ),
-//                       if (allowance != null && allowance.enabled) ...[
-//                         const SizedBox(height: 12),
-//                         Row(
-//                           children: [
-//                             Icon(Icons.payments_rounded, color: cs.secondary),
-//                             const SizedBox(width: 8),
-//                             Text(
-//                               'Weekly allowance: \$${(allowance.amountCents / 100).toStringAsFixed(0)}',
-//                               style: theme.textTheme.bodyMedium,
-//                             ),
-//                           ],
-//                         ),
-//                         // Later we can show real progress based on streaks/history
-//                         const SizedBox(height: 4),
-//                         Text(
-//                           'Earned by keeping a perfect week of chores.',
-//                           style: theme.textTheme.bodySmall?.copyWith(
-//                             color: cs.onSurfaceVariant,
-//                           ),
-//                         ),
-//                       ],
-//                     ],
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           ),
+          // ── NEW: Pending rewards strip ───────────────────────────────────
+          StreamBuilder<List<RewardRedemption>>(
+            stream: app.repo.watchPendingRewardRedemptions(familyId),
+            builder: (context, pendingSnap) {
+              // While loading, don't flash anything
+              if (pendingSnap.connectionState == ConnectionState.waiting &&
+                  !pendingSnap.hasData) {
+                return const SizedBox.shrink();
+              }
 
-//           // Pending redemptions
-//           if (pending.isNotEmpty)
-//             SliverToBoxAdapter(
-//               child: Padding(
-//                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-//                 child: Text(
-//                   'Pending rewards to give',
-//                   style: theme.textTheme.labelLarge?.copyWith(
-//                     color: cs.onSurfaceVariant,
-//                     fontWeight: FontWeight.w600,
-//                   ),
-//                 ),
-//               ),
-//             ),
-//           if (pending.isNotEmpty)
-//             SliverList(
-//               delegate: SliverChildBuilderDelegate((ctx, index) {
-//                 final red = pending[index];
-//                 final reward = activeRewards.firstWhere(
-//                   (r) => r.id == red.rewardId,
-//                   orElse: () => activeRewards.first,
-//                 );
+              final pending = pendingSnap.data ?? const <RewardRedemption>[];
 
-//                 return Padding(
-//                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-//                   child: Card(
-//                     elevation: 0,
-//                     shape: RoundedRectangleBorder(
-//                       borderRadius: BorderRadius.circular(14),
-//                       side: BorderSide(color: cs.primary),
-//                     ),
-//                     child: ListTile(
-//                       leading: Text(
-//                         reward.icon ?? '🎁',
-//                         style: const TextStyle(fontSize: 28),
-//                       ),
-//                       title: Text(reward.title),
-//                       subtitle: Text(
-//                         'Requested on ${red.requestedAt.month}/${red.requestedAt.day}',
-//                       ),
-//                       trailing: FilledButton(
-//                         onPressed: () {
-//                           app.markRewardFulfilled(red.id);
-//                         },
-//                         child: const Text('Mark given'),
-//                       ),
-//                     ),
-//                   ),
-//                 );
-//               }, childCount: pending.length),
-//             ),
+              // In release: only show card if there are items.
+              // In debug: always show it (so you can use the dev button).
+              if (pending.isEmpty && !kDebugMode) {
+                return const SizedBox.shrink();
+              }
 
-//           // Shop header
-//           SliverToBoxAdapter(
-//             child: Padding(
-//               padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-//               child: Row(
-//                 children: [
-//                   Text(
-//                     'Reward shop',
-//                     style: theme.textTheme.titleMedium?.copyWith(
-//                       fontWeight: FontWeight.w600,
-//                     ),
-//                   ),
-//                   const Spacer(),
-//                   TextButton.icon(
-//                     onPressed: () {
-//                       // TODO: open "Manage rewards" screen (enable/disable, custom rewards)
-//                     },
-//                     icon: const Icon(Icons.settings_outlined, size: 18),
-//                     label: const Text('Manage'),
-//                   ),
-//                 ],
-//               ),
-//             ),
-//           ),
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: _PendingRewardsCard(redemptions: pending),
+              );
+            },
+          ),
 
-//           // Shop grouped by coin cost
-//           SliverList(
-//             delegate: SliverChildBuilderDelegate((ctx, index) {
-//               final cost = rewardsByCost.keys.toList()..sort();
-//               final coinCost = cost[index];
-//               final rewards = rewardsByCost[coinCost]!;
 
-//               return Padding(
-//                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-//                 child: Column(
-//                   crossAxisAlignment: CrossAxisAlignment.start,
-//                   children: [
-//                     Text(
-//                       '$coinCost coins',
-//                       style: theme.textTheme.labelLarge?.copyWith(
-//                         color: cs.onSurfaceVariant,
-//                         fontWeight: FontWeight.w600,
-//                       ),
-//                     ),
-//                     const SizedBox(height: 4),
-//                     Wrap(
-//                       spacing: 8,
-//                       runSpacing: 8,
-//                       children: rewards.map((r) {
-//                         final canAfford = coinBalance >= r.coinCost;
-//                         return _RewardChip(
-//                           reward: r,
-//                           enabled: canAfford,
-//                           onTap: () {
-//                             if (!canAfford) return;
-//                             app.redeemReward(r, selectedKid.id);
-//                           },
-//                         );
-//                       }).toList(),
-//                     ),
-//                   ],
-//                 ),
-//               );
-//             }, childCount: rewardsByCost.length),
-//           ),
-//           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-//         ],
-//       ),
-//     );
-//   }
-// }
+                    const SizedBox(height: 4),
 
-// class _RewardChip extends StatelessWidget {
-//   const _RewardChip({
-//     required this.reward,
-//     required this.enabled,
-//     required this.onTap,
-//   });
+          // ── Rewards list ────────────────────────────────────────────────
+          Expanded(
+            child: StreamBuilder<List<Reward>>(
+              stream: app.repo.watchRewards(familyId, activeOnly: false),
+              builder: (context, snap) {
+                final rewards = snap.data ?? const <Reward>[];
+                final pending = snap.data ?? const <RewardRedemption>[];
+                if (pending.isEmpty) return const SizedBox.shrink();
 
-//   final RewardDefinition reward;
-//   final bool enabled;
-//   final VoidCallback onTap;
+                if (rewards.isEmpty) {
+                  return _EmptyRewards(
+                    onSeedStarter: () async {
+                      await app.repo.seedStarterRewards(familyId);
+                    },
+                    onCreateNew: () => _openNewRewardSheet(context),
+                  );
+                }
 
-//   @override
-//   Widget build(BuildContext context) {
-//     final cs = Theme.of(context).colorScheme;
-//     return InkWell(
-//       onTap: enabled ? onTap : null,
-//       borderRadius: BorderRadius.circular(14),
-//       child: Container(
-//         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-//         decoration: BoxDecoration(
-//           color: enabled
-//               ? cs.primaryContainer.withValues(alpha: 0.7)
-//               : cs.surfaceContainerHighest,
-//           borderRadius: BorderRadius.circular(14),
-//           border: Border.all(color: enabled ? cs.primary : cs.outlineVariant),
-//         ),
-//         child: Row(
-//           mainAxisSize: MainAxisSize.min,
-//           children: [
-//             Text(reward.icon ?? '🎁', style: const TextStyle(fontSize: 20)),
-//             const SizedBox(width: 6),
-//             Text(
-//               reward.title,
-//               style: TextStyle(
-//                 fontWeight: FontWeight.w600,
-//                 color: enabled ? cs.onPrimaryContainer : cs.onSurfaceVariant,
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
+                var visible = rewards;
+
+                if (!_showDisabled) {
+                  visible = visible.where((r) => r.active).toList();
+                }
+
+                if (_categoryFilter != null) {
+                  visible = visible
+                      .where((r) => r.category == _categoryFilter)
+                      .toList();
+                }
+
+                // Sort by category, then coin cost, then title
+                visible.sort((a, b) {
+                  final catCmp = a.category.index.compareTo(b.category.index);
+                  if (catCmp != 0) return catCmp;
+                  final costCmp = a.coinCost.compareTo(b.coinCost);
+                  if (costCmp != 0) return costCmp;
+                  return a.title.compareTo(b.title);
+                });
+
+                if (visible.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'No rewards match your filters.\n'
+                        'Try changing category or showing disabled.',
+                        textAlign: TextAlign.center,
+                        style: ts.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
+                  itemCount: visible.length,
+                  itemBuilder: (context, i) {
+                    final r = visible[i];
+                    return _RewardCard(
+                      reward: r,
+                      onToggleActive: (active) async {
+                        try {
+                          await app.repo.setRewardActive(
+                            familyId,
+                            rewardId: r.id,
+                            active: active,
+                          );
+                        } catch (e) {
+                          if (!mounted) return;
+                        }
+                      },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openNewRewardSheet(context),
+        icon: const Icon(Icons.add),
+        label: const Text('New reward'),
+      ),
+    );
+  }
+
+  Future<void> _openNewRewardSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => const _RewardEditorSheet(),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Empty state
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EmptyRewards extends StatelessWidget {
+  const _EmptyRewards({required this.onSeedStarter, required this.onCreateNew});
+
+  final VoidCallback onSeedStarter;
+  final VoidCallback onCreateNew;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('🎁', style: ts.displaySmall),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No rewards yet',
+                    style: ts.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Load a starter set of family-friendly rewards,\n'
+                    'or create your own custom reward.',
+                    textAlign: TextAlign.center,
+                    style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: onSeedStarter,
+                    icon: const Icon(Icons.auto_awesome_rounded),
+                    label: const Text('Load starter rewards'),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: onCreateNew,
+                    icon: const Icon(Icons.add_rounded),
+                    label: const Text('Create custom reward'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reward card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RewardCard extends StatelessWidget {
+  const _RewardCard({required this.reward, required this.onToggleActive});
+
+  final Reward reward;
+  final ValueChanged<bool> onToggleActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
+
+    final iconText = reward.icon?.isNotEmpty == true ? reward.icon! : '🎁';
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: reward.active ? cs.primary : cs.outlineVariant,
+          width: 1.5,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top row: icon, title, coins, switch
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(iconText, style: const TextStyle(fontSize: 28)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        reward.title,
+                        style: ts.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${reward.coinCost} coins',
+                        style: ts.bodySmall?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(value: reward.active, onChanged: onToggleActive),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (reward.description != null &&
+                reward.description!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  reward.description!,
+                  style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                Chip(
+                  label: Text(_categoryLabel(reward.category)),
+                  avatar: Icon(_categoryIcon(reward.category), size: 16),
+                  backgroundColor: cs.secondaryContainer.withValues(alpha: 0.7),
+                  labelStyle: ts.labelSmall?.copyWith(
+                    color: cs.onSecondaryContainer,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                if (reward.isCustom)
+                  Chip(
+                    label: const Text('Custom'),
+                    backgroundColor: cs.tertiaryContainer.withValues(
+                      alpha: 0.7,
+                    ),
+                    labelStyle: ts.labelSmall?.copyWith(
+                      color: cs.onTertiaryContainer,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                if (!reward.active)
+                  Chip(
+                    label: const Text('Disabled'),
+                    backgroundColor: cs.errorContainer.withValues(alpha: .7),
+                    labelStyle: ts.labelSmall?.copyWith(
+                      color: cs.onErrorContainer,
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reward editor bottom sheet (create new)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _RewardEditorSheet extends StatefulWidget {
+  const _RewardEditorSheet();
+
+  @override
+  State<_RewardEditorSheet> createState() => _RewardEditorSheetState();
+}
+
+class _RewardEditorSheetState extends State<_RewardEditorSheet> {
+  final _titleCtrl = TextEditingController();
+  final _descCtrl = TextEditingController();
+  final _coinCtrl = TextEditingController(text: '5');
+  final _iconCtrl = TextEditingController(text: '🎁');
+
+  RewardCategory _category = RewardCategory.experience;
+  bool _busy = false;
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descCtrl.dispose();
+    _coinCtrl.dispose();
+    _iconCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ts = theme.textTheme;
+    final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: viewInsets),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.card_giftcard_rounded),
+                    const SizedBox(width: 8),
+                    Text(
+                      'New reward',
+                      style: ts.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _titleCtrl,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Reward name',
+                    hintText: 'e.g. Pick dessert tonight',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _descCtrl,
+                  maxLines: 2,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(
+                    labelText: 'Description (optional)',
+                    hintText: 'What does this reward actually give?',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _iconCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Icon (emoji)',
+                          hintText: '🎁',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: _coinCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Cost (coins)',
+                          hintText: '5',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<RewardCategory>(
+                  initialValue: _category,
+                  items: RewardCategory.values
+                      .map(
+                        (cat) => DropdownMenuItem<RewardCategory>(
+                          value: cat,
+                          child: Text(_categoryLabel(cat)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) {
+                    if (v == null) return;
+                    setState(() => _category = v);
+                  },
+                  decoration: const InputDecoration(labelText: 'Category'),
+                ),
+                const SizedBox(height: 16),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    onPressed: _busy ? null : _save,
+                    child: _busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Create reward'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    final title = _titleCtrl.text.trim();
+    final desc = _descCtrl.text.trim();
+    final icon = _iconCtrl.text.trim().isEmpty ? null : _iconCtrl.text.trim();
+    final cost = int.tryParse(_coinCtrl.text.trim());
+
+    if (title.isEmpty) {
+      _showSnack('Please enter a reward name.');
+      return;
+    }
+    if (cost == null || cost <= 0) {
+      _showSnack('Enter a valid positive coin cost.');
+      return;
+    }
+
+    setState(() => _busy = true);
+
+    try {
+      final app = context.read<AppState>();
+      final familyId = app.familyId;
+      if (familyId == null) {
+        _showSnack('No family loaded.');
+        return;
+      }
+
+      await app.repo.createReward(
+        familyId,
+        title: title,
+        description: desc.isEmpty ? null : desc,
+        icon: icon,
+        coinCost: cost,
+        category: _category,
+        isCustom: true,
+        stock: null,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Failed to save reward: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showSnack(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+String _categoryLabel(RewardCategory cat) {
+  switch (cat) {
+    case RewardCategory.snack:
+      return 'Snacks & treats';
+    case RewardCategory.time:
+      return 'Time & screen';
+    case RewardCategory.experience:
+      return 'Experiences';
+    case RewardCategory.digital:
+      return 'In-app / digital';
+    case RewardCategory.money:
+      return 'Money / allowance';
+    case RewardCategory.other:
+      return 'Other';
+  }
+}
+
+IconData _categoryIcon(RewardCategory cat) {
+  switch (cat) {
+    case RewardCategory.snack:
+      return Icons.fastfood_rounded;
+    case RewardCategory.time:
+      return Icons.access_time_rounded;
+    case RewardCategory.experience:
+      return Icons.celebration_rounded;
+    case RewardCategory.digital:
+      return Icons.videogame_asset_rounded;
+    case RewardCategory.money:
+      return Icons.attach_money_rounded;
+    case RewardCategory.other:
+      return Icons.star_border_rounded;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pending rewards card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PendingRewardsCard extends StatelessWidget {
+  const _PendingRewardsCard({required this.redemptions});
+
+  final List<RewardRedemption> redemptions;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.read<AppState>();
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final members = app.members;
+    final namesById = {for (final m in members) m.id: m.displayName};
+
+    return Card(
+      elevation: 0,
+      color: cs.secondaryContainer.withValues(alpha: 0.35),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.pending_actions_rounded,
+                  color: cs.onSecondaryContainer,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Rewards to give',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (kDebugMode)
+                  TextButton(
+                    onPressed: () => _createDevPendingReward(context),
+                    child: const Text('Add fake'),
+                  ),
+                const SizedBox(width: 4),
+                Text(
+                  '${redemptions.length}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: cs.onSecondaryContainer.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...redemptions.map((r) {
+              final kidName = namesById[r.memberId] ?? 'Kid';
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '$kidName — ${r.rewardName} (${r.coinCost} coins)',
+                        style: theme.textTheme.bodyMedium,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () async {
+                        final familyId = app.familyId;
+                        if (familyId == null) return;
+
+                        try {
+                          await app.repo.markRewardGiven(
+                            familyId,
+                            redemptionId: r.id,
+                            parentMemberId: app.currentMember?.id,
+                          );
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Marked "${r.rewardName}" as given to $kidName.',
+                              ),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error marking reward given: $e'),
+                            ),
+                          );
+                        }
+                      },
+                      child: const Text('Mark given'),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _createDevPendingReward(BuildContext context) async {
+    final app = context.read<AppState>();
+    final familyId = app.familyId;
+    if (familyId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('No family loaded.')));
+      return;
+    }
+
+    final kids = app.members.where((m) => m.role == FamilyRole.child).toList();
+    if (kids.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No kids to assign dev reward to.')),
+      );
+      return;
+    }
+
+    final kid = kids.first;
+
+    try {
+      final id = await app.repo.createRewardRedemption(
+        familyId,
+        memberId: kid.id,
+        rewardId: null,
+        rewardName: 'Dev test reward',
+        coinCost: 5,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error creating dev reward: $e')));
+    }
+  }
+}
