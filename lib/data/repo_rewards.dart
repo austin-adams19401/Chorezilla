@@ -46,6 +46,12 @@ extension RewardRepo on ChorezillaRepo {
     return ref.id;
   }
 
+  Future<void> deleteReward(String familyId, {required String rewardId}) async {
+    final ref = rewardsColl(firebaseDB, familyId).doc(rewardId);
+    await ref.delete();
+  }
+
+
   // ─────────────────────────────────────────────────────────────────────────
   // Enable / disable reward
   // ─────────────────────────────────────────────────────────────────────────
@@ -63,16 +69,14 @@ extension RewardRepo on ChorezillaRepo {
   // ─────────────────────────────────────────────────────────────────────────
 
     /// Watch all pending reward redemptions for this family.
-  Stream<List<RewardRedemption>> watchPendingRewardRedemptions(
-    String familyId,
-  ) {
-    return eventsColl(firebaseDB, familyId)
-        .where('type', isEqualTo: 'reward_purchased')
+  Stream<List<RewardRedemption>> watchPendingRewardRedemptions(String familyId) {
+    return rewardRedemptionsColl(firebaseDB, familyId)
         .where('status', isEqualTo: 'pending')
         .orderBy('createdAt', descending: false)
         .snapshots()
         .map((s) => s.docs.map(RewardRedemption.fromDoc).toList());
   }
+
 
   /// Mark a pending reward as given by a parent.
   Future<void> markRewardGiven(
@@ -80,13 +84,15 @@ extension RewardRepo on ChorezillaRepo {
     required String redemptionId,
     String? parentMemberId,
   }) async {
-    final ref = eventsColl(firebaseDB, familyId).doc(redemptionId);
+    final ref = rewardRedemptionsColl(firebaseDB, familyId).doc(redemptionId);
     await ref.update({
-      'status': 'granted',
-      'grantedAt': FieldValue.serverTimestamp(),
-      if (parentMemberId != null) 'grantedByMemberId': parentMemberId,
+      'status': 'given',
+      'givenAt': FieldValue.serverTimestamp(),
+      if (parentMemberId != null) 'parentMemberId': parentMemberId,
     });
   }
+
+
 
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -254,41 +260,13 @@ extension RewardRepo on ChorezillaRepo {
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
-  }
-}
 
-class RewardRedemption {
-  final String id; // event doc id
-  final String rewardId;
-  final String rewardName;
-  final int coinCost;
-  final String memberId; // kid who earned it
-  final String status; // pending / granted
-  final DateTime? createdAt;
-
-  RewardRedemption({
-    required this.id,
-    required this.rewardId,
-    required this.rewardName,
-    required this.coinCost,
-    required this.memberId,
-    required this.status,
-    required this.createdAt,
-  });
-
-  factory RewardRedemption.fromDoc(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
-    final payload = data['payload'] as Map<String, dynamic>? ?? {};
-
-    return RewardRedemption(
-      id: doc.id,
-      rewardId: payload['rewardId'] as String? ?? '',
-      rewardName: payload['name'] as String? ?? 'Reward',
-      coinCost: (payload['priceCoins'] as num?)?.toInt() ?? 0,
-      memberId: data['targetMemberId'] as String? ?? '',
-      status: data['status'] as String? ?? 'pending',
-      createdAt: tsAsDate(data['createdAt']),
+    await createRewardRedemption(
+      familyId,
+      memberId: memberId,
+      rewardId: reward.id,
+      rewardName: reward.title,
+      coinCost: reward.coinCost,
     );
   }
 }
-

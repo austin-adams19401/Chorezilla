@@ -1,6 +1,7 @@
 
 library;
 
+import 'package:chorezilla/models/reward_redemption.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:chorezilla/models/award.dart';

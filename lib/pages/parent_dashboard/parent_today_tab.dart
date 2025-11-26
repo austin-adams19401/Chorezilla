@@ -425,7 +425,7 @@ class _KidTodayCard extends StatelessWidget {
                 child: ListView.separated(
                   shrinkWrap: true,
                   itemCount: assignments.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 4),
+                  separatorBuilder: (_, _) => const SizedBox(height: 4),
                   itemBuilder: (ctx, i) {
                     final a = assignments[i];
                     final status = a.status;
