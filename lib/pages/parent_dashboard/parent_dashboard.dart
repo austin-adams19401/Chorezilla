@@ -3,6 +3,7 @@ import 'package:chorezilla/components/parent_menu_drawer.dart';
 import 'package:chorezilla/components/rewards_nav_icon.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/pages/parent_dashboard/manage_chores_tab.dart';
+import 'package:chorezilla/pages/parent_dashboard/parent_history_tab.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_rewards_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -68,7 +69,7 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
       ParentTodayTab(),
       ParentChoresTab(),
       ParentRewardsPage(),
-      ParentRewardsPage(), 
+      ParentHistoryTab(), 
     ];
 
     return Scaffold(

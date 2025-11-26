@@ -4,6 +4,7 @@ library;
 import 'dart:async';
 import 'package:chorezilla/models/award.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/models/history.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -1155,13 +1156,137 @@ Future<void> completeAssignment(String assignmentId) async {
     _kidCompleted.remove(memberId);
   }
 
-  // void redeemReward(RewardDefinition r, String id) {}
+  // ───────────────────────────────────────────────────────────────────────────
+  // Allowance & history state
+  // ───────────────────────────────────────────────────────────────────────────
+  /// Allowance settings per kid (by memberId).
+  final Map<String, AllowanceConfig> _allowanceByMemberId = {};
+  final Map<String, Map<String, DayStatus>> _dayStatusByMemberId = {};
 
-  // void markRewardFulfilled(id) {}
+  Map<String, AllowanceConfig> get allowanceByMemberId =>
+      Map.unmodifiable(_allowanceByMemberId);
 
-  // pendingRewardsForMember(String id) {}
+  AllowanceConfig allowanceForMember(String memberId) {
+    return _allowanceByMemberId[memberId] ?? AllowanceConfig.disabled();
+  }
 
-  // allowanceForMember(String id) {}
+  Future<void> updateAllowanceForMember(
+    String memberId,
+    AllowanceConfig config,
+  ) async {
+    _allowanceByMemberId[memberId] = config;
+    notifyListeners();
 
-  // coinBalanceForMember(String id) {}
+    // TODO: persist to backend (e.g., Firestore document for this member)
+  }
+
+  /// Get the status for a specific kid + date.
+  DayStatus dayStatusFor(String memberId, DateTime date) {
+    final key = _dateKey(date);
+    return _dayStatusByMemberId[memberId]?[key] ?? DayStatus.noChores;
+  }
+
+  /// Set / override status for a specific kid + date.
+  Future<void> setDayStatus({
+    required String memberId,
+    required DateTime date,
+    required DayStatus status,
+  }) async {
+    final key = _dateKey(date);
+    final map = _dayStatusByMemberId.putIfAbsent(memberId, () => {});
+    map[key] = status;
+    notifyListeners();
+
+    // TODO: persist to backend
+  }
+
+  String _dateKey(DateTime date) {
+    final d = normalizeDate(date);
+    return '${d.year.toString().padLeft(4, '0')}-'
+        '${d.month.toString().padLeft(2, '0')}-'
+        '${d.day.toString().padLeft(2, '0')}';
+  }
+
+  /// View model for a single kid for one week.
+  List<WeeklyKidHistory> buildWeeklyHistory(DateTime weekStart) {
+    final List<Member> kids = members.where((m) => m.role == FamilyRole.child).toList(); 
+
+    final result = <WeeklyKidHistory>[];
+
+    for (final kid in kids) {
+      final allowance = allowanceForMember(kid.id);
+
+      final dayStatuses = <DayStatus>[];
+      int completed = 0;
+      int excused = 0;
+      int missed = 0;
+
+      for (var i = 0; i < 7; i++) {
+        final date = weekStart.add(Duration(days: i));
+        final status = dayStatusFor(kid.id, date);
+        dayStatuses.add(status);
+
+        switch (status) {
+          case DayStatus.completed:
+            completed++;
+            break;
+          case DayStatus.excused:
+            excused++;
+            break;
+          case DayStatus.missed:
+            missed++;
+            break;
+          case DayStatus.noChores:
+            break;
+        }
+      }
+
+      final allowanceResult = allowance.enabled
+          ? computeAllowance(
+              config: allowance,
+              completedDays: completed,
+              excusedDays: excused,
+              missedDays: missed,
+            )
+          : null;
+
+      result.add(
+        WeeklyKidHistory(
+          member: kid,
+          weekStart: weekStart,
+          dayStatuses: dayStatuses,
+          allowanceConfig: allowance,
+          allowanceResult: allowanceResult,
+        ),
+      );
+    }
+
+    return result;
+  }
+}
+
+/// A ready-to-render view model for the parent history tab.
+class WeeklyKidHistory {
+  final Member member;
+  final DateTime weekStart;
+  final List<DayStatus> dayStatuses; // length 7, Mon–Sun
+  final AllowanceConfig allowanceConfig;
+  final AllowanceResult? allowanceResult;
+
+  WeeklyKidHistory({
+    required this.member,
+    required this.weekStart,
+    required this.dayStatuses,
+    required this.allowanceConfig,
+    required this.allowanceResult,
+  });
+
+  int get completedDays =>
+      dayStatuses.where((s) => s == DayStatus.completed).length;
+
+  int get excusedDays =>
+      dayStatuses.where((s) => s == DayStatus.excused).length;
+
+  int get missedDays =>
+      dayStatuses.where((s) => s == DayStatus.missed).length;
 }
