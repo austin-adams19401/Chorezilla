@@ -16,8 +16,12 @@ import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/assignment.dart';
+import 'package:chorezilla/models/reward.dart';
+import 'package:chorezilla/models/reward_redemption.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+
 
 /// Central app state.
 /// - Slow/structural state stays on this ChangeNotifier (user/family/theme).
@@ -149,23 +153,36 @@ void setCurrentMember(String? memberId) {
   // ───────────────────────────────────────────────────────────────────────────
   // Hot lists (ValueNotifiers)
   // ───────────────────────────────────────────────────────────────────────────
-  final ValueNotifier<List<Member>> membersVN = ValueNotifier<List<Member>>(<Member>[]);
-  final ValueNotifier<List<Chore>> choresVN = ValueNotifier<List<Chore>>(<Chore>[]);
-  final ValueNotifier<List<Assignment>> reviewQueueVN = ValueNotifier<List<Assignment>>(<Assignment>[]);
-  final ValueNotifier<List<Assignment>> missedAssignmentsVN = ValueNotifier<List<Assignment>>(<Assignment>[]);
-  
-    // All "assigned" assignments for the current family (used for avatars / assign sheet)
+  final ValueNotifier<List<Member>> membersVN = ValueNotifier<List<Member>>(
+    <Member>[],
+  );
+  final ValueNotifier<List<Chore>> choresVN = ValueNotifier<List<Chore>>(
+    <Chore>[],
+  );
+  final ValueNotifier<List<Assignment>> reviewQueueVN =
+      ValueNotifier<List<Assignment>>(<Assignment>[]);
+  final ValueNotifier<List<Assignment>> missedAssignmentsVN =
+      ValueNotifier<List<Assignment>>(<Assignment>[]);
+
+  // All "assigned" assignments for the current family (used for avatars / assign sheet)
   final ValueNotifier<List<Assignment>> familyAssignedVN =
       ValueNotifier<List<Assignment>>(<Assignment>[]);
 
+  // All rewards available in the family store
+  final ValueNotifier<List<Reward>> rewardsVN = ValueNotifier<List<Reward>>(
+    <Reward>[],
+  );
 
   // Legacy getters (keep older UI code compiling)
   List<Member> get members => membersVN.value;
-  List<Member> get parents => members.where((m) => m.role == FamilyRole.parent && m.active).toList();
+  List<Member> get parents =>
+      members.where((m) => m.role == FamilyRole.parent && m.active).toList();
   List<Chore> get chores => choresVN.value;
   List<Assignment> get reviewQueue => reviewQueueVN.value;
   List<Assignment> get familyAssigned => familyAssignedVN.value;
   List<Assignment> get missedAssignments => missedAssignmentsVN.value;
+  List<Reward> get rewards => rewardsVN.value;
+
 
 
 
@@ -187,21 +204,42 @@ void setCurrentMember(String? memberId) {
   StreamSubscription<List<Assignment>>? _familyAssignedSub; 
   StreamSubscription<List<Assignment>>? _missedSub;
   StreamSubscription<List<Assignment>>? _historyAssignmentsSub;
+  StreamSubscription<List<Reward>>? _rewardsSub;
+  StreamSubscription<List<RewardRedemption>>? _pendingRewardsSub;
 
 
   final Map<String, StreamSubscription<List<Assignment>>> _kidAssignedSubs = {};
   final Map<String, StreamSubscription<List<Assignment>>> _kidPendingSubs = {};
   final Map<String, StreamSubscription<List<Assignment>>> _kidCompletedSubs = {};
+  final Map<String, StreamSubscription<List<RewardRedemption>>> _kidRewardRedemptionsSubs = {};
 
-    final Map<String, List<Assignment>> _kidPending =
+  // Today view caches for a kid
+  final Map<String, List<Assignment>> _kidPending =
       <String, List<Assignment>>{};
 
-  get rewards => null;
   List<Assignment> pendingForKid(String memberId) =>
       _kidPending[memberId] ?? const [];
 
+      
+final Map<String, List<RewardRedemption>> _pendingRewardsByMemberId =
+      <String, List<RewardRedemption>>{};
 
+  // Reward redemptions ("My Rewards") per kid
+  final Map<String, List<RewardRedemption>> _kidRewardRedemptions =
+      <String, List<RewardRedemption>>{};
 
+  List<RewardRedemption> rewardRedemptionsForKid(String memberId) =>
+      _kidRewardRedemptions[memberId] ?? const [];
+
+  List<RewardRedemption> pendingRewardsForKid(String memberId) =>
+    _pendingRewardsByMemberId[memberId] ?? const <RewardRedemption>[];
+
+  /// Convenience: current kid's reward redemptions
+  List<RewardRedemption> get currentKidRewardRedemptions {
+    final m = currentMember;
+    if (m == null) return const [];
+    return rewardRedemptionsForKid(m.id);
+  }
 
   // Allow main.dart to call this explicitly; safe to call more than once.
   void attachAuthListener() {
@@ -336,19 +374,23 @@ void setCurrentMember(String? memberId) {
       notifyListeners();
     });
 
-
     // Chores (hot list)
     _choresSub?.cancel();
     _choresSub = repo.watchChores(familyId).listen((list) {
       choresVN.value = list;
       notifyListeners();
 
-      // NEW: once per family bind / app boot, after chores are known,
-      // ensure today's assignments exist (works for parent or kid mode).
       if (!_todayAssignmentsEnsured) {
         _todayAssignmentsEnsured = true;
         ensureAssignmentsForToday();
       }
+    });
+
+    // Rewards (store catalog)
+    _rewardsSub?.cancel();
+    _rewardsSub = repo.watchRewards(familyId).listen((list) {
+      rewardsVN.value = list;
+      notifyListeners();
     });
 
     // Review queue (completed awaiting approval)
@@ -370,6 +412,21 @@ void setCurrentMember(String? memberId) {
     _missedSub?.cancel();
     _missedSub = _watchMissedAssignmentsForFamily(familyId).listen((list) {
       missedAssignmentsVN.value = list;
+    });
+
+        // Pending reward redemptions → grouped by memberId
+    _pendingRewardsSub?.cancel();
+    _pendingRewardsSub = repo.watchPendingRewardRedemptions(familyId).listen((
+      list,
+    ) {
+      final map = <String, List<RewardRedemption>>{};
+      for (final r in list) {
+        map.putIfAbsent(r.memberId, () => <RewardRedemption>[]).add(r);
+      }
+      _pendingRewardsByMemberId
+        ..clear()
+        ..addAll(map);
+      notifyListeners();
     });
   }
 
@@ -463,6 +520,15 @@ Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
             );
           }
           _kidCompleted[memberId] = list;
+          notifyListeners();
+        });
+    // Reward redemptions ("My Rewards")
+    _kidRewardRedemptionsSubs[memberId]?.cancel();
+    _kidRewardRedemptionsSubs[memberId] = repo
+        .watchRewardRedemptionsForMember(famId, memberId: memberId)
+        .listen((list) {
+          debugPrint('KID_STREAM_REWARDS[$memberId]: count=${list.length}');
+          _kidRewardRedemptions[memberId] = list;
           notifyListeners();
         });
   }
@@ -945,6 +1011,35 @@ Future<void> completeAssignment(String assignmentId) async {
     await repo.rejectAssignment(famId, assignmentId, reason: reason);
   }
   
+    Future<void> purchaseReward(String memberId, Reward reward) async {
+    final famId = _familyId;
+    if (famId == null) {
+      throw StateError('No family selected when calling purchaseReward');
+    }
+
+    await repo.purchaseReward(famId, memberId: memberId, reward: reward);
+  }
+
+  Future<void> createLevelUpRewardRedemptionForKid({
+    required String memberId,
+    required int level,
+    required String rewardTitle,
+  }) async {
+    final fam = family;
+    if (fam == null) {
+      return;
+    }
+
+    await repo.createLevelUpRewardRedemption(
+      fam.id,
+      memberId: memberId,
+      level: level,
+      rewardTitle: rewardTitle,
+    );
+  }
+
+
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // Recurring Assignment Creation Helpers
@@ -1105,8 +1200,10 @@ Future<void> completeAssignment(String assignmentId) async {
     await _familyAssignedSub?.cancel();
     await _missedSub?.cancel();
     await _historyAssignmentsSub?.cancel();
+    await _rewardsSub?.cancel();
+    await _pendingRewardsSub?.cancel();
 
-    _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub = _missedSub = _historyAssignmentsSub = null;
+    _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub = _missedSub = _historyAssignmentsSub = _pendingRewardsSub = null;
 
     for (final s in _kidAssignedSubs.values) {
       await s.cancel();
@@ -1117,12 +1214,20 @@ Future<void> completeAssignment(String assignmentId) async {
     for (final s in _kidCompletedSubs.values) {
       await s.cancel();
     }
+    for (final s in _kidRewardRedemptionsSubs.values) {
+      await s.cancel();
+    }
+
     _kidAssignedSubs.clear();
     _kidPendingSubs.clear();
     _kidCompletedSubs.clear();
+    _kidRewardRedemptionsSubs.clear();
+
     _kidAssigned.clear();
     _kidPending.clear();
     _kidCompleted.clear();
+    _kidRewardRedemptions.clear();
+    _pendingRewardsByMemberId.clear();
 
     _historyAssignments = const [];
     _historyWeekStart = null;
@@ -1132,6 +1237,7 @@ Future<void> completeAssignment(String assignmentId) async {
     choresVN.value = const [];
     reviewQueueVN.value = const [];
     familyAssignedVN.value = const [];
+    rewardsVN.value = const [];
 
     await setViewMode(AppViewMode.parent);
 
@@ -1147,6 +1253,9 @@ Future<void> completeAssignment(String assignmentId) async {
     _reviewSub?.cancel();
     _missedSub?.cancel();
     _historyAssignmentsSub?.cancel();
+    _familyAssignedSub?.cancel();
+    _rewardsSub?.cancel();
+    _pendingRewardsSub?.cancel();
 
     for (final s in _kidAssignedSubs.values) {
       s.cancel();
@@ -1154,24 +1263,36 @@ Future<void> completeAssignment(String assignmentId) async {
     for (final s in _kidCompletedSubs.values) {
       s.cancel();
     }
-    for (final s in _kidPendingSubs.values) { 
+    for (final s in _kidPendingSubs.values) {
       s.cancel();
     }
+    for (final s in _kidRewardRedemptionsSubs.values) {
+      s.cancel();
+    }
+
     membersVN.dispose();
     choresVN.dispose();
     reviewQueueVN.dispose();
+    familyAssignedVN.dispose();
+    rewardsVN.dispose();
+
     super.dispose();
   }
+
+
   
   void stopKidStreams(String memberId) {
     _kidAssignedSubs.remove(memberId)?.cancel();
-    _kidPendingSubs.remove(memberId)?.cancel(); // NEW
+    _kidPendingSubs.remove(memberId)?.cancel();
     _kidCompletedSubs.remove(memberId)?.cancel();
+    _kidRewardRedemptionsSubs.remove(memberId)?.cancel();
 
     _kidAssigned.remove(memberId);
-    _kidPending.remove(memberId); // NEW
+    _kidPending.remove(memberId);
     _kidCompleted.remove(memberId);
+    _kidRewardRedemptions.remove(memberId);
   }
+
 
   DateTime? _historyWeekStart;
   List<Assignment> _historyAssignments = const [];

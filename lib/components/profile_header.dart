@@ -1,4 +1,5 @@
 import 'package:chorezilla/components/leveling.dart';
+import 'package:chorezilla/pages/kid_pages/kid_rewards_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -77,25 +78,23 @@ class ProfileHeader extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          '🪙 Coins ${m.coins}',
-                          style: ts.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Text('🪙', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
+                        const SizedBox(width: 4),
+                        Text('Coins ${m.coins}',style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600,),
                         ),
                         const SizedBox(width: 8),
-                        FilledButton(
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            side: BorderSide(color: Colors.green, width: 1),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          onPressed: () => _showSpendCoinsDialog(context, m),
-                          child: const Text('Spend'),
+                        TextButton.icon(
+                          icon: const Text('🎁', style: TextStyle(fontSize: 28)),
+                          label: const Text('Spend', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),),
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => KidRewardsPage(
+                                  memberId: m.id
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -139,24 +138,6 @@ class ProfileHeader extends StatelessWidget {
       ).showSnackBar(SnackBar(content: Text('Could not create invite: $e')));
     }
   }
-
-  Future<void> _showSpendCoinsDialog(BuildContext context, Member m) async {
-    final app = context.read<AppState>();
-    final messenger = ScaffoldMessenger.of(context);
-
-    final amount = await showDialog<int?>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => _SpendCoinsDialog(member: m),
-    );
-
-    if (amount == null) return;
-
-    await app.updateMember(m.id, {'coins': m.coins - amount});
-
-    messenger.showSnackBar(SnackBar(content: Text('Spent $amount coins')));
-  }
-
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -206,166 +187,6 @@ class _AvatarCircle extends StatelessWidget {
   }
 }
 
-class _SpendCoinsDialog extends StatefulWidget {
-  const _SpendCoinsDialog({required this.member});
-
-  final Member member;
-
-  @override
-  State<_SpendCoinsDialog> createState() => _SpendCoinsDialogState();
-}
-
-class _SpendCoinsDialogState extends State<_SpendCoinsDialog>
-    with SingleTickerProviderStateMixin {
-  late final TextEditingController _controller;
-  late final AnimationController _shakeController;
-  late final Animation<Offset> _shakeAnimation;
-
-  String? _error;
-  bool _highlightError = false; // 👈 controls the red flash
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController();
-    _shakeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _shakeAnimation = TweenSequence<Offset>(
-      [
-        TweenSequenceItem(
-          tween: Tween(begin: Offset.zero, end: const Offset(0.03, 0)),
-          weight: 1,
-        ),
-        TweenSequenceItem(
-          tween: Tween(
-            begin: const Offset(0.03, 0),
-            end: const Offset(-0.03, 0),
-          ),
-          weight: 2,
-        ),
-        TweenSequenceItem(
-          tween: Tween(begin: const Offset(-0.03, 0), end: Offset.zero),
-          weight: 1,
-        ),
-      ],
-    ).animate(CurvedAnimation(parent: _shakeController, curve: Curves.easeOut));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    _shakeController.dispose();
-    super.dispose();
-  }
-
-  void _triggerError(String message) {
-    setState(() {
-      _error = message;
-      _highlightError = true;
-    });
-
-    _shakeController
-      ..reset()
-      ..forward();
-
-    // After a short delay, fade the background back to normal
-    Future.delayed(const Duration(milliseconds: 450), () {
-      if (!mounted) return;
-      setState(() => _highlightError = false);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final m = widget.member;
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    final hasError = _error != null;
-    final baseColor = cs.surface;
-    final errorColor = cs.errorContainer;
-
-    return SlideTransition(
-      position: _shakeAnimation,
-      child: TweenAnimationBuilder<Color?>(
-        // Animate between normal and error colors
-        tween: ColorTween(
-          begin: baseColor,
-          end: _highlightError ? errorColor : baseColor,
-        ),
-        duration: const Duration(milliseconds: 250),
-        builder: (ctx, color, child) {
-          return AlertDialog(
-            backgroundColor: color,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            title: const Text('Spend coins'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'You have ${m.coins} coins.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: hasError ? cs.onErrorContainer : cs.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _controller,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: 'Coins to spend',
-                    prefixIcon: const Icon(Icons.monetization_on_rounded),
-                    errorText: _error,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(null),
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: hasError ? cs.onErrorContainer : cs.primary,
-                  ),
-                ),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: hasError ? cs.error : cs.primary,
-                ),
-                onPressed: () {
-                  final raw = _controller.text.trim();
-                  final value = int.tryParse(raw);
-
-                  if (value == null || value <= 0) {
-                    _triggerError('Enter a positive number');
-                    return;
-                  }
-                  if (value > m.coins) {
-                    _triggerError('Not enough coins');
-                    return;
-                  }
-
-                  Navigator.of(context).pop(value);
-                },
-                child: const Text('Spend'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Level + XP progress
 // ─────────────────────────────────────────────────────────────────────────────
@@ -374,13 +195,14 @@ class _LevelProgressBar extends StatelessWidget {
   const _LevelProgressBar({required this.member});
   final Member member;
 
-  @override
+    @override
   Widget build(BuildContext context) {
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
     // Use total XP to compute level & progress
     final info = levelInfoForXp(member.xp);
+    final nextReward = nextLevelRewardFromLevel(info.level);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,6 +230,15 @@ class _LevelProgressBar extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
           ),
         ),
+
+        // Show upcoming milestone
+        if (nextReward != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            'Next reward: Level ${nextReward.level} – ${nextReward.title}',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
       ],
     );
   }

@@ -82,3 +82,131 @@ LevelInfo levelInfoForXp(int totalXp) {
     progress: prog,
   );
 }
+
+/// A cosmetic / perk reward unlocked at a specific level.
+/// For now this is a static config; later we can move to Firestore.
+class LevelRewardDefinition {
+  final int level;
+  final String emoji;
+  final String title;
+  final String description;
+
+  const LevelRewardDefinition({
+    required this.level,
+    required this.emoji,
+    required this.title,
+    required this.description,
+  });
+}
+
+/// Default level-up rewards (v2 baseline).
+///
+/// You can tweak these anytime, or later replace with per-family config.
+const List<LevelRewardDefinition> kDefaultLevelRewards = [
+  LevelRewardDefinition(
+    level: 2,
+    emoji: '🍬',
+    title: 'Small Treat',
+    description: 'Pick a small snack or candy.',
+  ),
+    LevelRewardDefinition(
+    level: 3,
+    emoji: '🎬',
+    title: 'Pick the movie',
+    description: 'Choose the show to watch.',
+  ),
+    LevelRewardDefinition(
+    level: 4,
+    emoji: '🎖',
+    title: 'Treasure Box Prize',
+    description: 'Pick 2 prizes from the treasure box.',
+  ),
+  LevelRewardDefinition(
+    level: 5,
+    emoji: '🧱',
+    title: 'Room Decoration',
+    description: 'Pick out a decoration for your room',
+  ),
+    LevelRewardDefinition(
+    level: 6,
+    emoji: '💻',
+    title: 'Extra Screen Time',
+    description: 'Earn 60 minutes of bonus screen time.',
+  ),
+    LevelRewardDefinition(
+    level: 7,
+    emoji: '🎮',
+    title: 'Game Night',
+    description: '1 hour game night with Mom or Dad',
+  ),
+  LevelRewardDefinition(
+    level: 8,
+    emoji: '🛏',
+    title: 'Late Bedtime',
+    description: 'Stay up 30 minutes later than usual.',
+  ),
+    LevelRewardDefinition(
+    level: 9,
+    emoji: '🍭',
+    title: 'Gas Station Treats',
+    description: 'Pick out a drink and a snack',
+  ),
+    LevelRewardDefinition(
+    level: 10,
+    emoji: '💰',
+    title: '\$10 to spend',
+    description: 'You get a \$10 bill!',
+  ),
+    LevelRewardDefinition(
+    level: 11,
+    emoji: '👫',
+    title: 'Parents do your chores',
+    description: 'Mom and Dad do your chores for the day.',
+  ),
+  LevelRewardDefinition(
+    level: 12,
+    emoji: '🛏️',
+    title: 'Stay Up Late',
+    description: 'Stay up 20 minutes past usual bedtime.',
+  ),
+    LevelRewardDefinition(
+    level: 13,
+    emoji: '🧑‍🍳',
+    title: 'Choose a meal',
+    description: 'Choose what the family eats for one meal',
+  ),
+    LevelRewardDefinition(
+    level: 14,
+    emoji: '👨‍👩‍👦',
+    title: 'Date Night',
+    description: 'Get a date night with Mom or Dad.',
+  ),
+  LevelRewardDefinition(
+    level: 15,
+    emoji: '🛋',
+    title: 'Later Bedtime',
+    description: 'You\'re bedtime is now an hour later.',
+  ),
+];
+
+/// Reward for this exact level, if any.
+LevelRewardDefinition? levelRewardForLevel(int level) {
+  for (final def in kDefaultLevelRewards) {
+    if (def.level == level) return def;
+  }
+  return null;
+}
+
+/// Next upcoming reward *after* the given level, if any.
+LevelRewardDefinition? nextLevelRewardFromLevel(int currentLevel) {
+  LevelRewardDefinition? best;
+  for (final def in kDefaultLevelRewards) {
+    if (def.level > currentLevel) {
+      if (best == null || def.level < best.level) {
+        best = def;
+      }
+    }
+  }
+  return best;
+}
+

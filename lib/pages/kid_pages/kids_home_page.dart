@@ -1,4 +1,4 @@
-import 'package:chorezilla/pages/kid_pages/child_dashboard.dart';
+import 'package:chorezilla/pages/kid_pages/kid_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

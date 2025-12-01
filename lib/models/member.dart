@@ -5,15 +5,20 @@ class Member {
   final String id;
   final String displayName;
   final FamilyRole role;
-  final String? userUid; 
+  final String? userUid;
   final String? avatarKey;
   final String? pinHash;
+
+  /// Kid wallet fields
   final int level;
   final int xp;
   final int coins;
+
   final List<String> badges;
   final DateTime? createdAt;
   final bool active;
+
+  /// Allowance config
   final bool allowanceEnabled;
   final int allowanceFullAmountCents;
   final int allowanceDaysRequired;
@@ -50,35 +55,49 @@ class Member {
     List<String>? badges,
     DateTime? createdAt,
     bool? active,
-  }) =>
-      Member(
-        id: id,
-        displayName: displayName ?? this.displayName,
-        role: role ?? this.role,
-        userUid: userUid ?? this.userUid,
-        avatarKey: avatarKey ?? this.avatarKey,
-        pinHash: pinHash ?? this.pinHash,
-        level: level ?? this.level,
-        xp: xp ?? this.xp,
-        coins: coins ?? this.coins,
-        badges: badges ?? this.badges,
-        createdAt: createdAt ?? this.createdAt,
-        active: active ?? this.active,
-      );
+    bool? allowanceEnabled,
+    int? allowanceFullAmountCents,
+    int? allowanceDaysRequired,
+    int? allowancePayDay,
+  }) => Member(
+    id: id,
+    displayName: displayName ?? this.displayName,
+    role: role ?? this.role,
+    userUid: userUid ?? this.userUid,
+    avatarKey: avatarKey ?? this.avatarKey,
+    pinHash: pinHash ?? this.pinHash,
+    level: level ?? this.level,
+    xp: xp ?? this.xp,
+    coins: coins ?? this.coins,
+    badges: badges ?? this.badges,
+    createdAt: createdAt ?? this.createdAt,
+    active: active ?? this.active,
+    allowanceEnabled: allowanceEnabled ?? this.allowanceEnabled,
+    allowanceFullAmountCents:
+        allowanceFullAmountCents ?? this.allowanceFullAmountCents,
+    allowanceDaysRequired: allowanceDaysRequired ?? this.allowanceDaysRequired,
+    allowancePayDay: allowancePayDay ?? this.allowancePayDay,
+  );
 
   Map<String, dynamic> toMap() => {
-        'displayName': displayName,
-        'role': roleToString(role),
-        'userUid': userUid,
-        'avatarKey': avatarKey,
-        'pinHash': pinHash,
-        'level': level,
-        'xp': xp,
-        'coins': coins,
-        'badges': badges,
-        'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
-        'active': active,
-      };
+    'displayName': displayName,
+    'role': roleToString(role),
+    'userUid': userUid,
+    'avatarKey': avatarKey,
+    'pinHash': pinHash,
+    'level': level,
+    'xp': xp,
+    'coins': coins,
+    'badges': badges,
+    'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
+    'active': active,
+
+    // Allowance fields
+    'allowanceEnabled': allowanceEnabled,
+    'allowanceFullAmountCents': allowanceFullAmountCents,
+    'allowanceDaysRequired': allowanceDaysRequired,
+    'allowancePayDay': allowancePayDay,
+  };
 
   factory Member.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
@@ -94,7 +113,9 @@ class Member {
       level: (data['level'] as num?)?.toInt() ?? 1,
       xp: (data['xp'] as num?)?.toInt() ?? 0,
       coins: (data['coins'] as num?)?.toInt() ?? 0,
-      badges: (data['badges'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      badges:
+          (data['badges'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
       createdAt: tsAsDate(data['createdAt']),
       active: (data['active'] as bool?) ?? true,
       allowanceEnabled: data['allowanceEnabled'] as bool? ?? false,

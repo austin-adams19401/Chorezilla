@@ -9,6 +9,10 @@ import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/assignment.dart';
 import 'package:chorezilla/models/common.dart';
 
+import 'package:chorezilla/pages/kid_pages/kid_rewards_page.dart';
+import 'package:chorezilla/pages/kid_pages/kid_activity_page.dart';
+
+
 class ChildDashboardPage extends StatefulWidget {
   const ChildDashboardPage({super.key, this.memberId});
 
@@ -131,11 +135,40 @@ void _startStreamsForCurrentKid() {
     }).toList()..sort(_byCompletedAtDescThenTitle);
 
     final submitted = [...app.pendingForKid(member.id)]..sort(_byDueThenTitle);
-
-
+    final pendingRewards = app.pendingRewardsForKid(member.id);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Chorezilla')),
+      appBar: AppBar(
+        title: Row(
+          children: [
+            const Text('Today\'s Chores')
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.history_rounded, size: 28,),
+            tooltip: 'Activity',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => KidActivityPage(memberId: member.id),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.card_giftcard, size: 28),
+            tooltip: 'Rewards',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => KidRewardsPage(memberId: member.id),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           // Main content
@@ -146,6 +179,29 @@ void _startStreamsForCurrentKid() {
                 showInviteButton: false,
                 showSwitchButton: false,
               ),
+
+              if (pendingRewards.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 4,
+                  ),
+                  child: _PendingRewardsBanner(
+                    count: pendingRewards.length,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => KidRewardsPage(
+                            memberId: member.id,
+                            initialTabIndex: 1,
+                          ),
+
+                        ),
+                      );
+                    },
+                  ),
+                ),
+
               const SizedBox(height: 8),
               Expanded(
                 child: DefaultTabController(
@@ -263,7 +319,22 @@ Future<void> _completeAssignment(Assignment a) async {
     final app = context.read<AppState>();
     app.updateMember(member.id, {'level': info.level});
 
+    // Determine any level-up reward.
+    final lvlReward = levelRewardForLevel(info.level);
+
+    if (lvlReward != null) {
+      try {
+        await app.createLevelUpRewardRedemptionForKid(
+          memberId: member.id,
+          level: info.level,
+          rewardTitle: lvlReward.title,
+        );
+      } catch (_) {
+      }
+    }
+
     // Show the level-up dialog and wait for it to close
+    if(!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -315,6 +386,63 @@ Future<void> _completeAssignment(Assignment a) async {
                           color: cs.onSurfaceVariant,
                         ),
                       ),
+
+                      // 👇 Show the level reward if this level has one
+                      if (lvlReward != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                lvlReward.emoji,
+                                style: const TextStyle(fontSize: 28),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Level reward unlocked!',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: cs.onPrimaryContainer,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      lvlReward.title,
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: cs.onPrimaryContainer,
+                                          ),
+                                    ),
+                                    if (lvlReward.description.isNotEmpty) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        lvlReward.description,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: cs.onPrimaryContainer
+                                                  .withValues(alpha: 0.9),
+                                            ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 16),
                       Text(
                         'Keep going to earn more coins and unlock rewards!',
@@ -345,7 +473,6 @@ Future<void> _completeAssignment(Assignment a) async {
     _confettiController.stop();
     _celebrationActive = false;
   }
-
 
   // ---- Helpers --------------------------------------------------------------
 
@@ -679,6 +806,52 @@ class _EmptyState extends StatelessWidget {
     );
   }
 }
+
+class _PendingRewardsBanner extends StatelessWidget {
+  const _PendingRewardsBanner({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    final text = count == 1
+        ? 'You have 1 reward waiting'
+        : 'You have $count rewards waiting';
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: cs.secondaryContainer,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Text('🎁', style: ts.titleLarge),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: ts.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSecondaryContainer,
+                ),
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
 // handy extension
 extension<T> on Iterable<T> {

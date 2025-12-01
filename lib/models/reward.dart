@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'common.dart';
 
 /// High-level buckets for rewards.
-/// You can tweak names later without breaking the UI much.
 enum RewardCategory {
   snack, // Snacks & treats
   time, // Screen time / bedtime shifts
@@ -32,6 +31,10 @@ class Reward {
   /// Category bucket (snack, time, etc.).
   final RewardCategory category;
 
+  /// If true, kid purchases create a request
+  /// that a parent has to fulfill.
+  final bool requiresApproval;
+
   /// True if parent created it (vs built-in starter rewards).
   final bool isCustom;
 
@@ -50,6 +53,7 @@ class Reward {
     required this.category,
     this.description,
     this.icon,
+    this.requiresApproval = false,
     this.isCustom = true,
     this.stock,
     this.active = true,
@@ -63,6 +67,7 @@ class Reward {
     String? icon,
     int? coinCost,
     RewardCategory? category,
+    bool? requiresApproval,
     bool? isCustom,
     int? stock,
     bool? active,
@@ -75,6 +80,7 @@ class Reward {
       icon: icon ?? this.icon,
       coinCost: coinCost ?? this.coinCost,
       category: category ?? this.category,
+      requiresApproval: requiresApproval ?? this.requiresApproval,
       isCustom: isCustom ?? this.isCustom,
       stock: stock ?? this.stock,
       active: active ?? this.active,
@@ -89,6 +95,7 @@ class Reward {
     'icon': icon,
     'coinCost': coinCost,
     'category': category.name,
+    'requiresApproval': requiresApproval,
     'isCustom': isCustom,
     'stock': stock,
     'active': active,
@@ -124,6 +131,7 @@ class Reward {
       icon: data['icon'] as String?,
       coinCost: coinCost,
       category: category,
+      requiresApproval: (data['requiresApproval'] as bool?) ?? false,
       isCustom: (data['isCustom'] as bool?) ?? false,
       stock: (data['stock'] as num?)?.toInt(),
       active: (data['active'] as bool?) ?? true,

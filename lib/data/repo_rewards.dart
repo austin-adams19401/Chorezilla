@@ -16,6 +16,22 @@ extension RewardRepo on ChorezillaRepo {
     );
   }
 
+  // Convenience: watch rewards for a specific category.
+  Stream<List<Reward>> watchRewardsByCategory(
+    String familyId, {
+    required RewardCategory category,
+    bool activeOnly = true,
+  }) {
+    Query q = rewardsColl(
+      firebaseDB,
+      familyId,
+    ).where('category', isEqualTo: category.name);
+    if (activeOnly) {
+      q = q.where('active', isEqualTo: true);
+    }
+    return q.snapshots().map((snap) => snap.docs.map(Reward.fromDoc).toList());
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   // Create reward
   // ─────────────────────────────────────────────────────────────────────────
@@ -26,6 +42,7 @@ extension RewardRepo on ChorezillaRepo {
     String? icon,
     required int coinCost,
     required RewardCategory category,
+    bool requiresApproval = false,
     bool isCustom = true,
     int? stock,
   }) async {
@@ -38,6 +55,7 @@ extension RewardRepo on ChorezillaRepo {
       'coinCost': coinCost,
       'priceCoins': coinCost, // backwards-compat
       'category': category.name,
+      'requiresApproval': requiresApproval,
       'isCustom': isCustom,
       'stock': stock,
       'active': true,
@@ -50,7 +68,6 @@ extension RewardRepo on ChorezillaRepo {
     final ref = rewardsColl(firebaseDB, familyId).doc(rewardId);
     await ref.delete();
   }
-
 
   // ─────────────────────────────────────────────────────────────────────────
   // Enable / disable reward
@@ -65,11 +82,13 @@ extension RewardRepo on ChorezillaRepo {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Pending rewards
+  // Reward redemptions
   // ─────────────────────────────────────────────────────────────────────────
 
-    /// Watch all pending reward redemptions for this family.
-  Stream<List<RewardRedemption>> watchPendingRewardRedemptions(String familyId) {
+  /// Watch all pending reward redemptions for this family (parent queue).
+  Stream<List<RewardRedemption>> watchPendingRewardRedemptions(
+    String familyId,
+  ) {
     return rewardRedemptionsColl(firebaseDB, familyId)
         .where('status', isEqualTo: 'pending')
         .orderBy('createdAt', descending: false)
@@ -77,6 +96,27 @@ extension RewardRepo on ChorezillaRepo {
         .map((s) => s.docs.map(RewardRedemption.fromDoc).toList());
   }
 
+  /// Watch reward redemptions for a specific kid (for "My Rewards").
+  Stream<List<RewardRedemption>> watchRewardRedemptionsForMember(
+    String familyId, {
+    required String memberId,
+    bool onlyPending = false,
+  }) {
+    Query q = rewardRedemptionsColl(
+      firebaseDB,
+      familyId,
+    ).where('memberId', isEqualTo: memberId);
+
+    if (onlyPending) {
+      q = q.where('status', isEqualTo: 'pending');
+    }
+
+    q = q.orderBy('createdAt', descending: true);
+
+    return q.snapshots().map(
+      (s) => s.docs.map(RewardRedemption.fromDoc).toList(),
+    );
+  }
 
   /// Mark a pending reward as given by a parent.
   Future<void> markRewardGiven(
@@ -92,11 +132,8 @@ extension RewardRepo on ChorezillaRepo {
     });
   }
 
-
-
-
   // ─────────────────────────────────────────────────────────────────────────
-  // Seed starter rewards (the defaults you used with your kids)
+  // Seed starter rewards
   // ─────────────────────────────────────────────────────────────────────────
   Future<void> seedStarterRewards(String familyId) async {
     final batch = firebaseDB.batch();
@@ -108,6 +145,7 @@ extension RewardRepo on ChorezillaRepo {
       String? icon,
       required int coinCost,
       required RewardCategory category,
+      bool requiresApproval = false,
     }) {
       final ref = coll.doc();
       batch.set(ref, {
@@ -118,6 +156,7 @@ extension RewardRepo on ChorezillaRepo {
         'coinCost': coinCost,
         'priceCoins': coinCost,
         'category': category.name,
+        'requiresApproval': requiresApproval,
         'isCustom': false,
         'stock': null,
         'active': true,
@@ -125,13 +164,14 @@ extension RewardRepo on ChorezillaRepo {
       });
     }
 
-    // Example starter set (tuned to your 80–90 XP/day reality)
+    // IRL / behavior rewards → parent approval
     addReward(
       title: 'Pick a dessert for the family',
       description: 'You choose what we have for dessert.',
       icon: '🍨',
       coinCost: 15,
       category: RewardCategory.snack,
+      requiresApproval: true,
     );
 
     addReward(
@@ -140,6 +180,7 @@ extension RewardRepo on ChorezillaRepo {
       icon: '🎮',
       coinCost: 5,
       category: RewardCategory.time,
+      requiresApproval: true,
     );
 
     addReward(
@@ -148,6 +189,7 @@ extension RewardRepo on ChorezillaRepo {
       icon: '🌙',
       coinCost: 25,
       category: RewardCategory.time,
+      requiresApproval: true,
     );
 
     addReward(
@@ -156,6 +198,7 @@ extension RewardRepo on ChorezillaRepo {
       icon: '🎬',
       coinCost: 20,
       category: RewardCategory.experience,
+      requiresApproval: true,
     );
 
     addReward(
@@ -164,14 +207,17 @@ extension RewardRepo on ChorezillaRepo {
       icon: '🎲',
       coinCost: 30,
       category: RewardCategory.experience,
+      requiresApproval: true,
     );
 
+    // Digital cosmetics → can be auto-applied later
     addReward(
       title: 'Profile border upgrade',
       description: 'Unlock a fun profile frame in the app.',
       icon: '✨',
       coinCost: 5,
       category: RewardCategory.digital,
+      requiresApproval: false,
     );
 
     addReward(
@@ -180,6 +226,7 @@ extension RewardRepo on ChorezillaRepo {
       icon: '🎨',
       coinCost: 5,
       category: RewardCategory.digital,
+      requiresApproval: false,
     );
 
     addReward(
@@ -188,12 +235,13 @@ extension RewardRepo on ChorezillaRepo {
       icon: '💵',
       coinCost: 50,
       category: RewardCategory.money,
+      requiresApproval: true,
     );
 
     await batch.commit();
   }
 
-    Future<void> createRewardRedemption(
+  Future<void> createRewardRedemption(
     String familyId, {
     required String memberId,
     String? rewardId,
@@ -213,7 +261,6 @@ extension RewardRepo on ChorezillaRepo {
     }
     await ref.set(data);
   }
-
 
   // ─────────────────────────────────────────────────────────────────────────
   // Purchase reward (spend coins + stock + log event)
@@ -256,6 +303,7 @@ extension RewardRepo on ChorezillaRepo {
           'name': reward.title,
           'priceCoins': reward.coinCost,
         },
+        // Still "pending" until parent marks as given.
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -270,9 +318,7 @@ extension RewardRepo on ChorezillaRepo {
     );
   }
 
-/// Create (or no-op if exists) a pending weekly allowance redemption.
-  ///
-  /// Uses a deterministic doc id so we don't duplicate for the same kid+week.
+  /// Create (or no-op if exists) a pending weekly allowance redemption.
   Future<void> createWeeklyAllowanceRedemption(
     String familyId, {
     required String memberId,
@@ -306,7 +352,7 @@ extension RewardRepo on ChorezillaRepo {
       'status': 'pending',
       'createdAt': FieldValue.serverTimestamp(),
 
-      // Extra metadata; your RewardRedemption can ignore these if it wants.
+      // Extra metadata
       'type': 'allowance',
       'payoutCents': payoutCents,
       'weekStart': Timestamp.fromDate(weekStart),
@@ -314,4 +360,37 @@ extension RewardRepo on ChorezillaRepo {
     });
   }
 
+  Future<void> createLevelUpRewardRedemption(
+    String familyId, {
+    required String memberId,
+    required int level,
+    required String rewardTitle,
+  }) async {
+    final coll = rewardRedemptionsColl(firebaseDB, familyId);
+
+    // One doc per kid + level → prevents duplicates
+    final docId = 'level_${memberId}_$level';
+    final ref = coll.doc(docId);
+
+    final existing = await ref.get();
+    if (existing.exists) {
+      // Already created (maybe we re-ran the celebration) → do nothing.
+      return;
+    }
+
+    await ref.set({
+      'memberId': memberId,
+      'rewardId': null, // not tied to a specific Reward document
+      'rewardName': rewardTitle,
+      'coinCost': 0,
+      'status': 'pending', // shows as "Waiting for parent"
+      'createdAt': FieldValue.serverTimestamp(),
+      'givenAt': null,
+      'parentMemberId': null,
+
+      // Extra metadata (safe – your model just ignores unknown fields)
+      'level': level,
+      'source': 'levelUp',
+    });
+  }
 }
