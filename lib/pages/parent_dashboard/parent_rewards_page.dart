@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/reward.dart';
 import 'package:chorezilla/models/reward_redemption.dart';
-import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 
 class ParentRewardsPage extends StatefulWidget {
@@ -776,11 +775,11 @@ class _PendingRewardsCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (kDebugMode)
-                  TextButton(
-                    onPressed: () => _createDevPendingReward(context),
-                    child: const Text('Add fake'),
-                  ),
+                // if (kDebugMode)
+                //   TextButton(
+                //     onPressed: () => _createDevPendingReward(context),
+                //     child: const Text('Add fake'),
+                //   ),
                 const SizedBox(width: 4),
                 Text(
                   '${redemptions.length}',
@@ -806,38 +805,38 @@ class _PendingRewardsCard extends StatelessWidget {
     );
   }
 
-  void _createDevPendingReward(BuildContext context) async {
-    final app = context.read<AppState>();
-    final familyId = app.familyId;
-    if (familyId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('No family loaded.')));
-      return;
-    }
+  // void _createDevPendingReward(BuildContext context) async {
+  //   final app = context.read<AppState>();
+  //   final familyId = app.familyId;
+  //   if (familyId == null) {
+  //     ScaffoldMessenger.of(
+  //       context,
+  //     ).showSnackBar(const SnackBar(content: Text('No family loaded.')));
+  //     return;
+  //   }
 
-    final kids = app.members.where((m) => m.role == FamilyRole.child).toList();
-    if (kids.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No kids to assign dev reward to.')),
-      );
-      return;
-    }
+  //   final kids = app.members.where((m) => m.role == FamilyRole.child).toList();
+  //   if (kids.isEmpty) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       const SnackBar(content: Text('No kids to assign dev reward to.')),
+  //     );
+  //     return;
+  //   }
 
-    final kid = kids.first;
+  //   final kid = kids.first;
 
-    try {
-      await app.repo.createRewardRedemption(
-        familyId,
-        memberId: kid.id,
-        rewardId: null,
-        rewardName: 'Dev test reward',
-        coinCost: 5,
-      );
-    } catch (e) {
-      debugPrint("Error creating dev reward");
-    }
-  }
+  //   try {
+  //     await app.repo.createRewardRedemption(
+  //       familyId,
+  //       memberId: kid.id,
+  //       rewardId: null,
+  //       rewardName: 'Dev test reward',
+  //       coinCost: 5,
+  //     );
+  //   } catch (e) {
+  //     debugPrint("Error creating dev reward");
+  //   }
+  // }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

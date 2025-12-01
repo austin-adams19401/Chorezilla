@@ -269,4 +269,49 @@ extension RewardRepo on ChorezillaRepo {
       coinCost: reward.coinCost,
     );
   }
+
+/// Create (or no-op if exists) a pending weekly allowance redemption.
+  ///
+  /// Uses a deterministic doc id so we don't duplicate for the same kid+week.
+  Future<void> createWeeklyAllowanceRedemption(
+    String familyId, {
+    required String memberId,
+    required int payoutCents,
+    required DateTime weekStart,
+    required DateTime weekEnd,
+  }) async {
+    final coll = rewardRedemptionsColl(firebaseDB, familyId);
+
+    final weekKey =
+        '${weekStart.year.toString().padLeft(4, '0')}-'
+        '${weekStart.month.toString().padLeft(2, '0')}-'
+        '${weekStart.day.toString().padLeft(2, '0')}';
+
+    final docId = 'allowance_${memberId}_$weekKey';
+    final ref = coll.doc(docId);
+
+    final existing = await ref.get();
+    if (existing.exists) {
+      // Already created this week's allowance for this kid.
+      return;
+    }
+
+    final title =
+        'Weekly allowance \$${(payoutCents / 100).toStringAsFixed(2)}';
+
+    await ref.set({
+      'memberId': memberId,
+      'rewardName': title,
+      'coinCost': 0,
+      'status': 'pending',
+      'createdAt': FieldValue.serverTimestamp(),
+
+      // Extra metadata; your RewardRedemption can ignore these if it wants.
+      'type': 'allowance',
+      'payoutCents': payoutCents,
+      'weekStart': Timestamp.fromDate(weekStart),
+      'weekEnd': Timestamp.fromDate(weekEnd),
+    });
+  }
+
 }

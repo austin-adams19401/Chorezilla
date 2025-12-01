@@ -186,6 +186,7 @@ void setCurrentMember(String? memberId) {
   StreamSubscription<List<Assignment>>? _reviewSub;
   StreamSubscription<List<Assignment>>? _familyAssignedSub; 
   StreamSubscription<List<Assignment>>? _missedSub;
+  StreamSubscription<List<Assignment>>? _historyAssignmentsSub;
 
 
   final Map<String, StreamSubscription<List<Assignment>>> _kidAssignedSubs = {};
@@ -314,16 +315,27 @@ void setCurrentMember(String? memberId) {
       }
     });
 
-    // Members (hot list)
     _membersSub?.cancel();
     _membersSub = repo.watchMembers(familyId).listen((list) {
       membersVN.value = list;
+
+      // Hydrate allowance configs from Member model
+      for (final m in list) {
+        _allowanceByMemberId[m.id] = AllowanceConfig(
+          enabled: m.allowanceEnabled,
+          fullAmountCents: m.allowanceFullAmountCents,
+          daysRequiredForFull: m.allowanceDaysRequired,
+          payDay: m.allowancePayDay,
+        );
+      }
+
       if (!_membersLoaded) {
         _membersLoaded = true;
         notifyListeners(); // let router know members are ready
       }
       notifyListeners();
     });
+
 
     // Chores (hot list)
     _choresSub?.cancel();
@@ -1092,8 +1104,9 @@ Future<void> completeAssignment(String assignmentId) async {
     await _reviewSub?.cancel();
     await _familyAssignedSub?.cancel();
     await _missedSub?.cancel();
+    await _historyAssignmentsSub?.cancel();
 
-    _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub = _missedSub = null;
+    _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub = _missedSub = _historyAssignmentsSub = null;
 
     for (final s in _kidAssignedSubs.values) {
       await s.cancel();
@@ -1110,6 +1123,9 @@ Future<void> completeAssignment(String assignmentId) async {
     _kidAssigned.clear();
     _kidPending.clear();
     _kidCompleted.clear();
+
+    _historyAssignments = const [];
+    _historyWeekStart = null;
 
     // Clear slices (doesn't notify by itself)
     membersVN.value = const [];
@@ -1130,6 +1146,7 @@ Future<void> completeAssignment(String assignmentId) async {
     _choresSub?.cancel();
     _reviewSub?.cancel();
     _missedSub?.cancel();
+    _historyAssignmentsSub?.cancel();
 
     for (final s in _kidAssignedSubs.values) {
       s.cancel();
@@ -1137,7 +1154,7 @@ Future<void> completeAssignment(String assignmentId) async {
     for (final s in _kidCompletedSubs.values) {
       s.cancel();
     }
-    for (final s in _kidPendingSubs.values) {   // NEW
+    for (final s in _kidPendingSubs.values) { 
       s.cancel();
     }
     membersVN.dispose();
@@ -1156,6 +1173,10 @@ Future<void> completeAssignment(String assignmentId) async {
     _kidCompleted.remove(memberId);
   }
 
+  DateTime? _historyWeekStart;
+  List<Assignment> _historyAssignments = const [];
+  List<Assignment> get historyAssignments => _historyAssignments;
+
   // ───────────────────────────────────────────────────────────────────────────
   // Allowance & history state
   // ───────────────────────────────────────────────────────────────────────────
@@ -1170,24 +1191,127 @@ Future<void> completeAssignment(String assignmentId) async {
     return _allowanceByMemberId[memberId] ?? AllowanceConfig.disabled();
   }
 
-  Future<void> updateAllowanceForMember(
+Future<void> updateAllowanceForMember(
     String memberId,
     AllowanceConfig config,
   ) async {
     _allowanceByMemberId[memberId] = config;
     notifyListeners();
 
-    // TODO: persist to backend (e.g., Firestore document for this member)
+    final famId = _familyId;
+    if (famId == null) return;
+
+    await repo.updateMember(famId, memberId, {
+      'allowanceEnabled': config.enabled,
+      'allowanceFullAmountCents': config.fullAmountCents,
+      'allowanceDaysRequired': config.daysRequiredForFull,
+      'allowancePayDay': config.payDay,
+    });
   }
+
+    /// For the given weekStart (Mon-based), create pending allowance
+  /// redemptions for all kids with enabled allowance and a positive payout.
+  ///
+  /// Assumes you've already called [watchHistoryWeek(weekStart)] at least once
+  /// so that [_historyAssignments] and overrides are in a consistent state.
+  Future<void> createAllowanceRewardsForWeek(DateTime weekStart) async {
+    final famId = _familyId;
+    if (famId == null) return;
+
+    final histories = buildWeeklyHistory(weekStart);
+    final weekEnd = weekStart.add(const Duration(days: 6));
+
+    for (final h in histories) {
+      final config = h.allowanceConfig;
+      final result = h.allowanceResult;
+
+      if (!config.enabled) continue;
+      if (result == null) continue;
+      if (result.payoutCents <= 0) {
+        continue; // kid didn't earn anything this week
+      }
+
+      await repo.createWeeklyAllowanceRedemption(
+        famId,
+        memberId: h.member.id,
+        payoutCents: result.payoutCents,
+        weekStart: weekStart,
+        weekEnd: weekEnd,
+      );
+    }
+  }
+
+    /// Auto-create allowance rewards for a given week *if* that week has
+  /// completely finished (weekEnd < today).
+  ///
+  /// Safe to call repeatedly; underlying writes are idempotent.
+  Future<void> ensureAllowanceRewardsForWeekIfEligible(
+    DateTime weekStart,
+  ) async {
+    final today = normalizeDate(DateTime.now());
+    final weekEnd = weekStart.add(const Duration(days: 6));
+
+    // Only auto-pay for weeks that are fully in the past.
+    if (!weekEnd.isBefore(today)) {
+      return;
+    }
+
+    await createAllowanceRewardsForWeek(weekStart);
+  }
+
 
   /// Get the status for a specific kid + date.
+  /// Priority:
+  /// 1) Manual override (e.g., parent excused the day).
+  /// 2) Auto-computed from assignments for the currently watched history week.
+  /// 3) Fallback to noChores.
   DayStatus dayStatusFor(String memberId, DateTime date) {
     final key = _dateKey(date);
-    return _dayStatusByMemberId[memberId]?[key] ?? DayStatus.noChores;
+
+    // 1) Manual override
+    final manual = _dayStatusByMemberId[memberId]?[key];
+    if (manual != null) return manual;
+
+    // 2) Auto from assignments if this date is in the watched history week
+    if (_historyWeekStart != null) {
+      final ws = weekStartFor(date);
+      if (ws.isAtSameMomentAs(_historyWeekStart!)) {
+        return _computeDayStatusFromAssignments(memberId, date);
+      }
+    }
+
+    // 3) Default
+    return DayStatus.noChores;
   }
 
-  /// Set / override status for a specific kid + date.
-  Future<void> setDayStatus({
+  String _dayStatusToWire(DayStatus status) {
+    switch (status) {
+      case DayStatus.completed:
+        return 'completed';
+      case DayStatus.missed:
+        return 'missed';
+      case DayStatus.excused:
+        return 'excused';
+      case DayStatus.noChores:
+        return 'noChores';
+    }
+  }
+
+  DayStatus _dayStatusFromWire(String raw) {
+    switch (raw) {
+      case 'completed':
+        return DayStatus.completed;
+      case 'missed':
+        return DayStatus.missed;
+      case 'excused':
+        return DayStatus.excused;
+      case 'noChores':
+      default:
+        return DayStatus.noChores;
+    }
+  }
+
+Future<void> setDayStatus({
     required String memberId,
     required DateTime date,
     required DayStatus status,
@@ -1197,7 +1321,56 @@ Future<void> completeAssignment(String assignmentId) async {
     map[key] = status;
     notifyListeners();
 
-    // TODO: persist to backend
+    final famId = _familyId;
+    if (famId == null) return;
+
+    final db = FirebaseFirestore.instance;
+    final famRef = db.collection('families').doc(famId);
+    final overrides = famRef.collection('dayStatusOverrides');
+
+    final day = normalizeDate(date);
+    final docId = '${memberId}_$key';
+
+    if (status == DayStatus.noChores) {
+      // Optional: removing override removes the manual flag and falls back to auto
+      await overrides.doc(docId).delete();
+    } else {
+      await overrides.doc(docId).set({
+        'memberId': memberId,
+        'date': Timestamp.fromDate(day),
+        'status': _dayStatusToWire(status),
+      }, SetOptions(merge: true));
+    }
+  }
+
+  DayStatus _computeDayStatusFromAssignments(String memberId, DateTime date) {
+    if (_historyAssignments.isEmpty) return DayStatus.noChores;
+
+    final day = normalizeDate(date);
+    final targetKey = _dateKey(day);
+
+    var anyAssignments = false;
+    var allDone = true;
+
+    for (final asn in _historyAssignments) {
+      if (asn.memberId != memberId) continue;
+
+      final due = asn.due;
+      if (due == null) continue;
+
+      final dueDay = normalizeDate(due);
+      if (_dateKey(dueDay) != targetKey) continue;
+
+      anyAssignments = true;
+
+      if (asn.status != AssignmentStatus.pending &&
+          asn.status != AssignmentStatus.completed) {
+        allDone = false;
+      }
+    }
+
+    if (!anyAssignments) return DayStatus.noChores;
+    return allDone ? DayStatus.completed : DayStatus.missed;
   }
 
   String _dateKey(DateTime date) {
@@ -1205,6 +1378,69 @@ Future<void> completeAssignment(String assignmentId) async {
     return '${d.year.toString().padLeft(4, '0')}-'
         '${d.month.toString().padLeft(2, '0')}-'
         '${d.day.toString().padLeft(2, '0')}';
+  }  
+
+void watchHistoryWeek(DateTime weekStart) {
+    final famId = _familyId;
+    if (famId == null) {
+      _historyAssignmentsSub?.cancel();
+      _historyAssignmentsSub = null;
+      _historyAssignments = const [];
+      _historyWeekStart = null;
+      return;
+    }
+
+    final ws = weekStartFor(weekStart); // Monday-based
+    if (_historyWeekStart != null && _historyWeekStart!.isAtSameMomentAs(ws)) {
+      return;
+    }
+
+    _historyWeekStart = ws;
+    _historyAssignmentsSub?.cancel();
+
+    final end = ws.add(const Duration(days: 7));
+    _historyAssignmentsSub = repo
+        .watchAssignmentsDueRange(famId, start: ws, end: end)
+        .listen((list) {
+          _historyAssignments = list;
+          notifyListeners();
+        });
+
+    // Fire-and-forget load of manual overrides for this week
+    _loadDayOverridesForWeek(famId, ws, end);
+  }
+
+  Future<void> _loadDayOverridesForWeek(
+    String familyId,
+    DateTime start,
+    DateTime end,
+  ) async {
+    final db = FirebaseFirestore.instance;
+    final famRef = db.collection('families').doc(familyId);
+    final overrides = famRef.collection('dayStatusOverrides');
+
+    final snap = await overrides
+        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+        .where('date', isLessThan: Timestamp.fromDate(end))
+        .get();
+
+    for (final doc in snap.docs) {
+      final data = doc.data();
+      final memberId = data['memberId'] as String? ?? '';
+      final ts = data['date'] as Timestamp?;
+      final statusStr = data['status'] as String? ?? '';
+
+      if (memberId.isEmpty || ts == null) continue;
+
+      final day = normalizeDate(ts.toDate());
+      final key = _dateKey(day);
+      final status = _dayStatusFromWire(statusStr);
+
+      final map = _dayStatusByMemberId.putIfAbsent(memberId, () => {});
+      map[key] = status;
+    }
+
+    notifyListeners();
   }
 
   /// View model for a single kid for one week.
@@ -1263,7 +1499,9 @@ Future<void> completeAssignment(String assignmentId) async {
 
     return result;
   }
+  
 }
+
 
 /// A ready-to-render view model for the parent history tab.
 class WeeklyKidHistory {

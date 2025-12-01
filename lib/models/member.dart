@@ -14,6 +14,10 @@ class Member {
   final List<String> badges;
   final DateTime? createdAt;
   final bool active;
+  final bool allowanceEnabled;
+  final int allowanceFullAmountCents;
+  final int allowanceDaysRequired;
+  final int allowancePayDay;
 
   const Member({
     required this.id,
@@ -28,6 +32,10 @@ class Member {
     this.badges = const [],
     this.createdAt,
     this.active = true,
+    this.allowanceEnabled = false,
+    this.allowanceFullAmountCents = 0,
+    this.allowanceDaysRequired = 7,
+    this.allowancePayDay = DateTime.sunday,
   });
 
   Member copyWith({
@@ -86,11 +94,13 @@ class Member {
       level: (data['level'] as num?)?.toInt() ?? 1,
       xp: (data['xp'] as num?)?.toInt() ?? 0,
       coins: (data['coins'] as num?)?.toInt() ?? 0,
-      badges:
-          (data['badges'] as List?)?.map((e) => e.toString()).toList() ??
-          const [],
+      badges: (data['badges'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       createdAt: tsAsDate(data['createdAt']),
       active: (data['active'] as bool?) ?? true,
+      allowanceEnabled: data['allowanceEnabled'] as bool? ?? false,
+      allowanceFullAmountCents: data['allowanceFullAmountCents'] as int? ?? 0,
+      allowanceDaysRequired: data['allowanceDaysRequired'] as int? ?? 7,
+      allowancePayDay: data['allowancePayDay'] as int? ?? DateTime.sunday,
     );
   }
 }

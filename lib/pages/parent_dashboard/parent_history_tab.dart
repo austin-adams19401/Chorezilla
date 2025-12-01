@@ -32,8 +32,17 @@ class _ParentHistoryTabState extends State<ParentHistoryTab> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+
+    // Make sure we're streaming assignments for this week
+    app.watchHistoryWeek(_weekStart);
+
+    // Build history based on current assignments + overrides
     final histories = app.buildWeeklyHistory(_weekStart);
     final weekEnd = _weekStart.add(const Duration(days: 6));
+
+    // Fire-and-forget: if this is a *past* week and kids earned
+    // allowance, auto-create pending allowance rewards.
+    app.ensureAllowanceRewardsForWeekIfEligible(_weekStart);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -494,7 +503,6 @@ class _AllowanceConfigSheetState extends State<_AllowanceConfigSheet> {
               ),
               const SizedBox(height: 12),
 
-              // No enable/disable toggle here – this sheet is "configure ON"
               TextField(
                 controller: _amountController,
                 keyboardType: const TextInputType.numberWithOptions(
@@ -515,7 +523,7 @@ class _AllowanceConfigSheetState extends State<_AllowanceConfigSheet> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<int>(
-                value: _payDay,
+                initialValue: _payDay,
                 decoration: const InputDecoration(labelText: 'Pay day'),
                 items: const [
                   DropdownMenuItem(

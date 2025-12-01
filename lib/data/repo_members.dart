@@ -12,7 +12,6 @@ extension MemberRepo on ChorezillaRepo {
     return q.snapshots().map((s) => s.docs.map(Member.fromDoc).toList());
   }
 
-  // Writes: Members
   Future<String> addChild(
     String familyId, {
     required String displayName,
@@ -32,6 +31,10 @@ extension MemberRepo on ChorezillaRepo {
       'badges': [],
       'createdAt': FieldValue.serverTimestamp(),
       'active': true,
+      'allowanceEnabled': false,
+      'allowanceFullAmountCents': 0,
+      'allowanceDaysRequired': 7,
+      'allowancePayDay': DateTime.sunday,
     });
     return ref.id;
   }
