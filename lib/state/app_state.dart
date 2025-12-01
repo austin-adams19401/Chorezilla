@@ -182,6 +182,7 @@ void setCurrentMember(String? memberId) {
   List<Assignment> get familyAssigned => familyAssignedVN.value;
   List<Assignment> get missedAssignments => missedAssignmentsVN.value;
   List<Reward> get rewards => rewardsVN.value;
+  
 
 
 

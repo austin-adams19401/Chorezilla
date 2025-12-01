@@ -526,7 +526,7 @@ class _TodoList extends StatelessWidget {
   final String memberId;
   final List<Assignment> items;
   final Set<String> busyIds;
-  final Future<void> Function(Assignment) onComplete;  
+  final Future<void> Function(Assignment) onComplete;
   final List<Assignment> completedToday;
 
   @override
@@ -545,71 +545,114 @@ class _TodoList extends StatelessWidget {
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      children: [
-        if (hasTodos) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-            child: Text(
-              'To do',
-              style: ts.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onSurface,
-              ),
-            ),
-          ),
-          ...items.map((a) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _AssignmentTile(
-                assignment: a,
-                completed: false,
-                trailing: FilledButton(
-                  onPressed: busyIds.contains(a.id)
-                      ? null
-                      : () => onComplete(a),
-                  child: busyIds.contains(a.id)
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Mark done'),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+
+        int crossAxisCount;
+        if (width < 480) {
+          crossAxisCount = 1; // narrow phones → full-width
+        } else if (width < 800) {
+          crossAxisCount = 2; // larger phones / small tablets
+        } else {
+          crossAxisCount = 3; // big tablets
+        }
+
+        const gridSpacing = 12.0;
+        // Approx “row height” for your existing _AssignmentTile.
+        const tileHeight = 96.0;
+
+        return CustomScrollView(
+          slivers: [
+            if (hasTodos) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(
+                    'To do',
+                    style: ts.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
                 ),
               ),
-            );
-          }),
-          if (hasCompleted) const SizedBox(height: 16),
-        ],
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: gridSpacing,
+                    mainAxisSpacing: gridSpacing,
+                    mainAxisExtent: tileHeight, // 👈 fixed row-like height
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final a = items[index];
+                    final busy = busyIds.contains(a.id);
+                    return _AssignmentTile(
+                      assignment: a,
+                      completed: false,
+                      trailing: FilledButton(
+                        onPressed: busy ? null : () => onComplete(a),
+                        child: busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Mark done'),
+                      ),
+                    );
+                  }, childCount: items.length),
+                ),
+              ),
+            ],
 
-        if (hasCompleted) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
-            child: Text(
-              'Done today',
-              style: ts.titleSmall?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: cs.onSurfaceVariant,
+            if (hasCompleted) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Text(
+                    'Done today',
+                    style: ts.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
-          ...completedToday.map((a) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _AssignmentTile(
-                assignment: a,
-                completed: true,
-                trailing: Icon(Icons.check_circle_rounded, color: cs.primary),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: gridSpacing,
+                    mainAxisSpacing: gridSpacing,
+                    mainAxisExtent: tileHeight, // 👈 same fixed height
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final a = completedToday[index];
+                    return _AssignmentTile(
+                      assignment: a,
+                      completed: true,
+                      trailing: Icon(
+                        Icons.check_circle_rounded,
+                        color: cs.primary,
+                      ),
+                    );
+                  }, childCount: completedToday.length),
+                ),
               ),
-            );
-          }),
-        ],
-      ],
+            ],
+          ],
+        );
+      },
     );
   }
-
 }
+
 
 class _SubmittedList extends StatelessWidget {
   const _SubmittedList({required this.items});

@@ -268,22 +268,45 @@ class _RewardStoreTab extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-      itemCount: rewards.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final r = rewards[index];
-        final canAfford = member.coins >= r.coinCost;
-        final soldOut = r.stock != null && r.stock! <= 0;
-        final busy = busyRewardIds.contains(r.id);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
 
-        return _RewardTile(
-          reward: r,
-          canAfford: canAfford && !soldOut && !busy,
-          soldOut: soldOut,
-          busy: busy,
-          onPressed: () => onPurchase(member, r),
+        int crossAxisCount;
+        if (width < 480) {
+          crossAxisCount = 1; // phones → full-width card rows
+        } else if (width < 900) {
+          crossAxisCount = 2; // tablets
+        } else {
+          crossAxisCount = 3; // big screens
+        }
+
+        const tileHeight = 160.0;
+
+        return GridView.builder(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent:
+                tileHeight, // 👈 fixed height, no giant empty bottom
+          ),
+          itemCount: rewards.length,
+          itemBuilder: (context, index) {
+            final r = rewards[index];
+            final canAfford = member.coins >= r.coinCost;
+            final soldOut = r.stock != null && r.stock! <= 0;
+            final busy = busyRewardIds.contains(r.id);
+
+            return _RewardTile(
+              reward: r,
+              canAfford: canAfford && !soldOut && !busy,
+              soldOut: soldOut,
+              busy: busy,
+              onPressed: () => onPurchase(member, r),
+            );
+          },
         );
       },
     );
@@ -350,7 +373,7 @@ class _RewardTile extends StatelessWidget {
                 children: [
                   Text(
                     reward.title,
-                    maxLines: 1,
+                    maxLines: 2, // 👈 allow a bit more room
                     overflow: TextOverflow.ellipsis,
                     style: ts.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
