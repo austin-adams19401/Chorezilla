@@ -10,6 +10,7 @@ enum RewardCategory {
   experience, // Outings, family activities
   digital, // In-app cosmetics / perks
   money, // Allowance / cash
+  toy,
   other, // Catch-all / backwards-compat
 }
 

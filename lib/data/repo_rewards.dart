@@ -163,80 +163,249 @@ extension RewardRepo on ChorezillaRepo {
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
+// 5 coins
+addReward(
+  title: 'Candy',
+  description: 'Pick a small candy treat.',
+  icon: '🍬',
+  coinCost: 5,
+  category: RewardCategory.snack,
+  requiresApproval: true,
+);
 
-    // IRL / behavior rewards → parent approval
-    addReward(
-      title: 'Pick a dessert for the family',
-      description: 'You choose what we have for dessert.',
-      icon: '🍨',
-      coinCost: 15,
-      category: RewardCategory.snack,
-      requiresApproval: true,
-    );
+addReward(
+  title: 'Sticker',
+  description: 'Choose a fun sticker.',
+  icon: '🏷️',
+  coinCost: 5,
+  category: RewardCategory.toy,
+  requiresApproval: true,
+);
 
-    addReward(
-      title: 'Extra 15 min screen',
-      description: 'Extra 15 minutes of game or show time.',
-      icon: '🎮',
-      coinCost: 5,
-      category: RewardCategory.time,
-      requiresApproval: true,
-    );
+addReward(
+  title: 'Temporary Tattoo',
+  description: 'Pick a temporary tattoo to wear.',
+  icon: '🖋️',
+  coinCost: 5,
+  category: RewardCategory.toy,
+  requiresApproval: true,
+);
 
-    addReward(
-      title: 'Stay up 15 min late',
-      description: 'Bedtime shift: stay up 15 minutes later.',
-      icon: '🌙',
-      coinCost: 25,
-      category: RewardCategory.time,
-      requiresApproval: true,
-    );
+// 10 coins
+addReward(
+  title: 'Dessert',
+  description: 'You choose what we have for dessert tonight.',
+  icon: '🍰',
+  coinCost: 10,
+  category: RewardCategory.snack,
+  requiresApproval: true,
+);
 
-    addReward(
-      title: 'Family movie picker',
-      description: 'You pick the movie for family night.',
-      icon: '🎬',
-      coinCost: 20,
-      category: RewardCategory.experience,
-      requiresApproval: true,
-    );
+addReward(
+  title: 'Treasure Box',
+  description: 'Pick one prize from the family treasure box.',
+  icon: '🧰',
+  coinCost: 10,
+  category: RewardCategory.toy,
+  requiresApproval: true,
+);
 
-    addReward(
-      title: 'One-on-one game with a Parent',
-      description: '20 minutes of 1:1 game time with a parent.',
-      icon: '🎲',
-      coinCost: 30,
-      category: RewardCategory.experience,
-      requiresApproval: true,
-    );
+addReward(
+  title: 'Choose Dinner',
+  description: 'You decide what the family has for dinner.',
+  icon: '🍽️',
+  coinCost: 10,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
 
-    // Digital cosmetics → can be auto-applied later
-    addReward(
-      title: 'Profile border upgrade',
-      description: 'Unlock a fun profile frame in the app.',
-      icon: '✨',
-      coinCost: 5,
-      category: RewardCategory.digital,
-      requiresApproval: false,
-    );
+addReward(
+  title: 'Bedtime Story',
+  description: 'Choose a special bedtime story and extra reading time.',
+  icon: '📚',
+  coinCost: 10,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
 
-    addReward(
-      title: 'Change avatar background',
-      description: 'Customize your avatar background in the app.',
-      icon: '🎨',
-      coinCost: 5,
-      category: RewardCategory.digital,
-      requiresApproval: false,
-    );
+// 20 coins
+addReward(
+  title: 'Choose Car Music',
+  description: 'You control the music in the car for the trip.',
+  icon: '🚗',
+  coinCost: 20,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
 
-    addReward(
-      title: '\$5 allowance bonus',
-      description: 'Extra \$5 in allowance this week.',
-      icon: '💵',
-      coinCost: 50,
-      category: RewardCategory.money,
-      requiresApproval: true,
-    );
+addReward(
+  title: 'Double XP for 1 Day',
+  description: 'Earn double XP on all chores for one full day.',
+  icon: '✨',
+  coinCost: 20,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'Go to the Park',
+  description: 'Special trip to the park to play.',
+  icon: '🏞️',
+  coinCost: 20,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'Extra Backscratch',
+  description: 'Get an extra-long backscratch or cuddle time.',
+  icon: '🤗',
+  coinCost: 20,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+// 30 coins
+addReward(
+  title: 'Stay Up 30 Minutes Late',
+  description: 'Bedtime is moved 30 minutes later for one night.',
+  icon: '🌙',
+  coinCost: 30,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+addReward(
+  title: '3D Print',
+  description: 'Design and print a small item on the 3D printer.',
+  icon: '🖨️',
+  coinCost: 30,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'Bake Cookies',
+  description: 'Bake a batch of cookies together.',
+  icon: '🍪',
+  coinCost: 30,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'Gas Station Treats',
+  description: 'Trip to the gas station for a drink or snack.',
+  icon: '🍩',
+  coinCost: 30,
+  category: RewardCategory.snack,
+  requiresApproval: true,
+);
+
+// 40 coins
+addReward(
+  title: 'Game Night',
+  description: 'Family game night with games you choose.',
+  icon: '🎲',
+  coinCost: 40,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'Movie Night',
+  description: 'Family movie night with your movie choice.',
+  icon: '🎬',
+  coinCost: 40,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+// 50 coins
+addReward(
+  title: 'Room Decoration',
+  description: 'Pick a new decoration or poster for your room.',
+  icon: '🖼️',
+  coinCost: 50,
+  category: RewardCategory.toy,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'New Toy',
+  description: 'Choose a small new toy within the family budget.',
+  icon: '🧸',
+  coinCost: 50,
+  category: RewardCategory.toy,
+  requiresApproval: true,
+);
+
+// 80 coins
+addReward(
+  title: 'Sleepover in Living Room',
+  description: 'Sleep in the living room with blankets, pillows, and a movie or game.',
+  icon: '🛋️',
+  coinCost: 80,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+addReward(
+  title: '\$5 Cash',
+  description: 'Get \$5 to save or spend (with parent help).',
+  icon: '💵',
+  coinCost: 80,
+  category: RewardCategory.money,
+  requiresApproval: true,
+);
+
+// 150 coins
+addReward(
+  title: 'New Video Game',
+  description: 'Pick a new video game within the family budget.',
+  icon: '🎮',
+  coinCost: 150,
+  category: RewardCategory.toy,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'Bike Upgrade',
+  description: 'Get an upgrade or accessory for your bike.',
+  icon: '🚲',
+  coinCost: 150,
+  category: RewardCategory.toy,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'Go to Arcade',
+  description: 'Trip to the arcade for games and fun.',
+  icon: '🕹️',
+  coinCost: 150,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
+// 750 coins
+addReward(
+  title: '\$100 Cash',
+  description: 'Big reward: \$100 to save or spend with parent guidance.',
+  icon: '💰',
+  coinCost: 750,
+  category: RewardCategory.money,
+  requiresApproval: true,
+);
+
+addReward(
+  title: 'Go to Sports Game',
+  description: 'Go to a live sports game together.',
+  icon: '🏟️',
+  coinCost: 750,
+  category: RewardCategory.experience,
+  requiresApproval: true,
+);
+
 
     await batch.commit();
   }

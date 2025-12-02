@@ -181,17 +181,23 @@ void setCurrentMember(String? memberId) {
   List<Assignment> get reviewQueue => reviewQueueVN.value;
   List<Assignment> get familyAssigned => familyAssignedVN.value;
   List<Assignment> get missedAssignments => missedAssignmentsVN.value;
-  List<Reward> get rewards => rewardsVN.value;
+  List<Reward> _rewards = const [];
+  bool _rewardsBootstrapped = false;
+
+  List<Reward> get rewards => _rewards;
+  bool get rewardsBootstrapped => _rewardsBootstrapped;
+
   
-
-
-
-
   // Kid-specific caches (child dashboard convenience)
   final Map<String, List<Assignment>> _kidAssigned = <String, List<Assignment>>{};
   final Map<String, List<Assignment>> _kidCompleted = <String, List<Assignment>>{};
   List<Assignment> assignedForKid(String memberId) => _kidAssigned[memberId] ?? const [];
   List<Assignment> completedForKid(String memberId) => _kidCompleted[memberId] ?? const [];
+  final Set<String> _kidAssignmentsBootstrapped = <String>{};
+
+  bool kidAssignmentsBootstrapped(String memberId) =>
+      _kidAssignmentsBootstrapped.contains(memberId);
+
 
   // ───────────────────────────────────────────────────────────────────────────
   // Subscriptions
@@ -340,7 +346,11 @@ final Map<String, List<RewardRedemption>> _pendingRewardsByMemberId =
     );
     _familyLoaded = false;
     _membersLoaded = false;
-    _todayAssignmentsEnsured = false; // NEW
+    _todayAssignmentsEnsured = false; 
+    _rewards = const [];
+    _rewardsBootstrapped = false;
+    rewardsVN.value = const [];
+
 
     // Family doc (rare changes — name/settings)
     _familySub?.cancel();
@@ -390,9 +400,9 @@ final Map<String, List<RewardRedemption>> _pendingRewardsByMemberId =
     // Rewards (store catalog)
     _rewardsSub?.cancel();
     _rewardsSub = repo.watchRewards(familyId).listen((list) {
-      rewardsVN.value = list;
-      notifyListeners();
+      _applyRewardsSnapshot(list);
     });
+
 
     // Review queue (completed awaiting approval)
     _reviewSub?.cancel();
@@ -470,6 +480,7 @@ Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
 
     debugPrint('KID_STREAMS: starting for member=$memberId family=$famId');
 
+    _kidAssignmentsBootstrapped.remove(memberId);
     // ASSIGNED
     _kidAssignedSubs[memberId]?.cancel();
     _kidAssignedSubs[memberId] =
@@ -485,6 +496,8 @@ Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
             );
           }
           _kidAssigned[memberId] = list;
+          _kidAssignmentsBootstrapped.add(memberId);
+
           notifyListeners();
         });
 
@@ -771,7 +784,6 @@ Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
     debugPrint('DELETE_CHORE: chore $choreId deleted.');
   }
 
-
   /// This uses the `defaultAssignees` list stored on the Chore template,
   /// not the per-day Assignment docs. That way avatars stay stable even
   /// when today's instance moves from assigned → pending → approved.
@@ -793,10 +805,6 @@ Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
   }
 
 
-  /// Remove assignment(s) for these member ids for a chore.
-  ///
-  /// We look at the in-memory `familyAssignedVN` list (which only contains
-  /// status == 'assigned') and delete those docs by id.
   Future<void> unassignChore({
     required String choreId,
     required Set<String> memberIds,
@@ -807,31 +815,51 @@ Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
     if (famId == null) {
       throw StateError('No family selected when calling unassignChore');
     }
-    
 
-    // Find the currently-assigned docs we need to remove.
+    final db = FirebaseFirestore.instance;
+    final famRef = db.collection('families').doc(famId);
+    final assignmentsRef = famRef.collection('assignments');
+
+    // 1) Delete currently "assigned" docs for these kids (for today)
     final toDelete = familyAssignedVN.value
         .where((a) => a.choreId == choreId && memberIds.contains(a.memberId))
         .toList();
 
-    if (toDelete.isEmpty) {
-      debugPrint(
-        'unassignChore: nothing to delete for chore=$choreId members=$memberIds',
+    if (toDelete.isNotEmpty) {
+      final batch = db.batch();
+      for (final a in toDelete) {
+        batch.delete(assignmentsRef.doc(a.id));
+      }
+      await batch.commit();
+    }
+
+    // 2) Remove them from defaultAssignees on the chore template
+    try {
+      final choreRef = famRef.collection('chores').doc(choreId);
+      final snap = await choreRef.get();
+      final data = snap.data();
+
+      final existing = ((data?['defaultAssignees'] as List?) ?? const [])
+          .cast<String>()
+          .toSet();
+
+      // subtract the given memberIds
+      final updated = existing.difference(memberIds);
+
+      if (updated.length == existing.length) {
+        // nothing changed
+        return;
+      }
+
+      await updateChoreDefaultAssignees(
+        choreId: choreId,
+        memberIds: updated.toList(),
       );
-      return;
+    } catch (e) {
+      debugPrint('unassignChore: failed to update defaultAssignees: $e');
     }
-
-    final db = FirebaseFirestore.instance;
-    final col = db.collection('families').doc(famId).collection('assignments');
-
-    final batch = db.batch();
-    for (final a in toDelete) {
-      // NOTE: if your Assignment model uses a different id field name,
-      // e.g. `assignmentId`, change `a.id` accordingly.
-      batch.delete(col.doc(a.id));
-    }
-    await batch.commit();
   }
+
 
 Future<void> assignChore({
     required String choreId,
@@ -923,19 +951,27 @@ Future<void> assignChore({
       });
     }
 
-    await batch.commit();
+        await batch.commit();
     debugPrint('ASSIGN_CHORE: batch committed ${mems.length} docs.');
-
+    // Keep defaultAssignees in sync: read latest from Firestore, then union.
     try {
-      // Find the latest in-memory copy of this chore
-      final currentChore = chores.firstWhere((c) => c.id == choreId);
+      final famIdNonNull = famId; // we already validated famId != null above
+      final db = FirebaseFirestore.instance;
+      final famRef = db.collection('families').doc(famIdNonNull);
+      final choreRef = famRef.collection('chores').doc(choreId);
 
-      // Existing defaults + newly assigned kids
-      final existingDefaults = currentChore.defaultAssignees.toSet();
+      final snap = await choreRef.get();
+      final data = snap.data();
+
+      final existingDefaults =
+          ((data?['defaultAssignees'] as List?) ?? const [])
+              .cast<String>()
+              .toSet();
+
       final updatedDefaults = {...existingDefaults, ...ids};
 
-      // If nothing actually changed, skip the write
       if (updatedDefaults.length == existingDefaults.length) {
+        // no new defaults added
         return;
       }
 
@@ -1079,11 +1115,12 @@ Future<void> completeAssignment(String assignmentId) async {
     }
   }
 
-    /// Ensure that for today's date, each default assignee of each recurring chore
+  /// Ensure that for today's date, each default assignee of each recurring chore
   /// has an Assignment doc (status = 'assigned').
   ///
-  /// Idempotent: safe to call multiple times. It checks existing assignments
-  /// with due == today and only creates missing ones.
+  /// Idempotent across devices:
+  /// - Uses a logical dayKey ("YYYY-MM-DD") instead of raw Timestamp equality.
+  /// - Uses deterministic doc IDs per (chore, member, day).
   Future<void> ensureAssignmentsForToday() async {
     final famId = _familyId;
     final fam = _family;
@@ -1101,11 +1138,19 @@ Future<void> completeAssignment(String assignmentId) async {
     final today = DateTime(now.year, now.month, now.day);
     final todayTs = Timestamp.fromDate(today);
 
-    debugPrint('ensureAssignmentsForToday: famId=$famId date=$today');
+    // NEW: a stable string key for the calendar day, independent of timezone internals.
+    final dayKey =
+        '${today.year.toString().padLeft(4, '0')}-'
+        '${today.month.toString().padLeft(2, '0')}-'
+        '${today.day.toString().padLeft(2, '0')}';
 
-    // 1) Load all assignments that are already due today (any status).
+    debugPrint(
+      'ensureAssignmentsForToday: famId=$famId date=$today dayKey=$dayKey',
+    );
+
+    // 1) Load all assignments that are already for this dayKey (any status).
     final existingSnap = await assignmentsRef
-        .where('due', isEqualTo: todayTs)
+        .where('dayKey', isEqualTo: dayKey)
         .get();
 
     // Map: choreId -> set of memberIds that already have an assignment today.
@@ -1147,7 +1192,10 @@ Future<void> completeAssignment(String assignmentId) async {
           settings: fam.settings,
         );
 
-        final aRef = assignmentsRef.doc();
+        // NEW: deterministic doc ID per (chore, member, day)
+        final docId = 'asg_${chore.id}_${member.id}_$dayKey';
+        final aRef = assignmentsRef.doc(docId);
+
         batch.set(aRef, {
           'familyId': famId,
           'choreId': chore.id,
@@ -1160,10 +1208,11 @@ Future<void> completeAssignment(String assignmentId) async {
           'coinAward': award.coins,
           'requiresApproval': chore.requiresApproval,
           'status': 'assigned',
-          'due': todayTs, // 👈 this anchors assignments to today's date
+          'due': todayTs, // still useful for ordering / UI
+          'dayKey': dayKey, // 👈 logical calendar day, used for idempotence
           'assignedAt': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
-        });
+        }, SetOptions(merge: true)); // merge for safety
 
         createdCount++;
       }
@@ -1176,9 +1225,10 @@ Future<void> completeAssignment(String assignmentId) async {
 
     await batch.commit();
     debugPrint(
-      'ensureAssignmentsForToday: created $createdCount new assignments for $today.',
+      'ensureAssignmentsForToday: created $createdCount new assignments for $today (dayKey=$dayKey).',
     );
   }
+
 
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -1229,6 +1279,7 @@ Future<void> completeAssignment(String assignmentId) async {
     _kidCompleted.clear();
     _kidRewardRedemptions.clear();
     _pendingRewardsByMemberId.clear();
+    _kidAssignmentsBootstrapped.clear();
 
     _historyAssignments = const [];
     _historyWeekStart = null;
@@ -1239,6 +1290,14 @@ Future<void> completeAssignment(String assignmentId) async {
     reviewQueueVN.value = const [];
     familyAssignedVN.value = const [];
     rewardsVN.value = const [];
+
+    _rewards = const [];
+    _rewardsBootstrapped = false;
+
+    await setViewMode(AppViewMode.parent);
+
+    notifyListeners(); // structural reset
+
 
     await setViewMode(AppViewMode.parent);
 
@@ -1292,6 +1351,7 @@ Future<void> completeAssignment(String assignmentId) async {
     _kidPending.remove(memberId);
     _kidCompleted.remove(memberId);
     _kidRewardRedemptions.remove(memberId);
+    _kidAssignmentsBootstrapped.remove(memberId);
   }
 
 
@@ -1381,6 +1441,15 @@ Future<void> updateAllowanceForMember(
     await createAllowanceRewardsForWeek(weekStart);
   }
 
+  void _applyRewardsSnapshot(List<Reward> newRewards) {
+    _rewards = newRewards;
+    rewardsVN.value = newRewards; // keep ValueNotifier in sync
+
+    if (!_rewardsBootstrapped) {
+      _rewardsBootstrapped = true;
+    }
+    notifyListeners();
+  }
 
   /// Get the status for a specific kid + date.
   /// Priority:

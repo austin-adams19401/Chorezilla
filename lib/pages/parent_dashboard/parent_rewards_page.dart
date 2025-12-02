@@ -132,11 +132,18 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
 
                   const SizedBox(height: 8),
 
-                  // ── Rewards grid ────────────────────────────────────────
-                  StreamBuilder<List<Reward>>(
-                    stream: app.repo.watchRewards(familyId, activeOnly: false),
-                    builder: (context, snap) {
-                      final rewards = snap.data ?? const <Reward>[];
+                  // ── Rewards grid (AppState + loading spinner) ───────────
+                  Builder(
+                    builder: (context) {
+                      final rewards = app.rewards;
+
+                      // While rewards are still loading, show a spinner instead of an empty state.
+                      if (!app.rewardsBootstrapped) {
+                        return const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
 
                       if (rewards.isEmpty) {
                         return _EmptyRewards(
@@ -159,14 +166,15 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                             .toList();
                       }
 
-                      // Sort by category, then coin cost, then title
                       visible.sort((a, b) {
+                        final costCmp = a.coinCost.compareTo(b.coinCost);
+                        if (costCmp != 0) return costCmp;
+
                         final catCmp = a.category.index.compareTo(
                           b.category.index,
                         );
                         if (catCmp != 0) return catCmp;
-                        final costCmp = a.coinCost.compareTo(b.coinCost);
-                        if (costCmp != 0) return costCmp;
+
                         return a.title.compareTo(b.title);
                       });
 
@@ -185,8 +193,10 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                           ),
                         );
                       }
-                      final isLandscape = constraints.maxWidth > constraints.maxHeight;
-                      final childAspectRatio = isLandscape ? 3.8 : 2.4;
+
+                      final isLandscape =
+                          constraints.maxWidth > constraints.maxHeight;
+                      final childAspectRatio = isLandscape ? 3.8 : 1.25;
 
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
@@ -386,7 +396,7 @@ class _RewardCard extends StatelessWidget {
                     children: [
                       Text(
                         reward.title,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: ts.titleSmall?.copyWith(
                           fontWeight: FontWeight.w600,
@@ -707,6 +717,8 @@ String _categoryLabel(RewardCategory cat) {
       return 'Money / allowance';
     case RewardCategory.other:
       return 'Other';
+    case RewardCategory.toy:
+      return 'Toy';
   }
 }
 
@@ -722,6 +734,8 @@ IconData _categoryIcon(RewardCategory cat) {
       return Icons.videogame_asset_rounded;
     case RewardCategory.money:
       return Icons.attach_money_rounded;
+    case RewardCategory.toy:
+      return Icons.toys_rounded;
     case RewardCategory.other:
       return Icons.star_border_rounded;
   }

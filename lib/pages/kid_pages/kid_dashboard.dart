@@ -117,6 +117,8 @@ void _startStreamsForCurrentKid() {
     }
 
     _handleLevelChange(member);
+    final choresLoaded = app.kidAssignmentsBootstrapped(member.id);
+
 
     final todos = [...app.assignedForKid(member.id)]..sort(_byDueThenTitle);
 
@@ -214,17 +216,26 @@ void _startStreamsForCurrentKid() {
                           Tab(text: 'Submitted'),
                         ],
                       ),
-                      Expanded(
+                                            Expanded(
                         child: TabBarView(
                           children: [
-                            _TodoList(
-                              memberId: member.id,
-                              items: todos,
-                              busyIds: _busyIds,
-                              onComplete: _completeAssignment, 
-                              completedToday: completedToday,
-                            ),
-                            _SubmittedList(items: submitted),
+                            // Tab 1: To Do
+                            if (!choresLoaded)
+                              const Center(child: CircularProgressIndicator())
+                            else
+                              _TodoList(
+                                memberId: member.id,
+                                items: todos,
+                                busyIds: _busyIds,
+                                onComplete: _completeAssignment,
+                                completedToday: completedToday,
+                              ),
+
+                            // Tab 2: Submitted
+                            if (!choresLoaded)
+                              const Center(child: CircularProgressIndicator())
+                            else
+                              _SubmittedList(items: submitted),
                           ],
                         ),
                       ),
