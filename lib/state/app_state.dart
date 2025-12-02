@@ -1014,15 +1014,6 @@ Future<void> completeAssignment(String assignmentId) async {
     // 2) Let the repo handle status + XP/coins (uses the new signature)
     await repo.completeAssignment(famId, assignmentId);
 
-    // 3) (Optional) also log a daily completion event like before
-    // const dayStartHour = 4; // TODO: wire to family.settings.dayStartHour
-    // await repo.logCompletionEvent(
-    //   familyId: famId,
-    //   choreId: assignment.choreId,
-    //   memberId: assignment.memberId,
-    //   dayStartHour: dayStartHour,
-    // );
-
     // 4) Optimistically update local kid cache so the To Do list updates immediately
     final memberId = assignment.memberId;
     final existingAssigned = _kidAssigned[memberId];

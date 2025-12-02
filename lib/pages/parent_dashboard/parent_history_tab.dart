@@ -136,7 +136,7 @@ class _KidHistoryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: avatar + name + allowance toggle
+            // Header: avatar + name + help + allowance toggle
             Row(
               children: [
                 _MemberAvatar(member: member),
@@ -146,6 +146,11 @@ class _KidHistoryCard extends StatelessWidget {
                     member.displayName,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.help_outline_rounded, size: 20),
+                  tooltip: 'How this weekly view works',
+                  onPressed: () => _showHistoryHelpDialog(context),
                 ),
                 _AllowanceToggle(
                   member: member,
@@ -330,7 +335,7 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
             ),
             const SizedBox(height: 12),
 
-            /// NEW: RadioGroup manages groupValue & onChanged
+            /// RadioGroup manages groupValue & onChanged
             RadioGroup<DayStatus>(
               groupValue: _status,
               onChanged: (DayStatus? value) {
@@ -369,7 +374,7 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
                     status: _status,
                   );
                   if (!context.mounted) return;
-                    Navigator.of(context).pop();
+                  Navigator.of(context).pop();
                 },
                 child: const Text('Save'),
               ),
@@ -625,4 +630,58 @@ class _AllowanceSummary extends StatelessWidget {
       ],
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Help dialog for history / allowance
+// ─────────────────────────────────────────────────────────────────────────────
+
+Future<void> _showHistoryHelpDialog(BuildContext context) {
+  final theme = Theme.of(context);
+  final ts = theme.textTheme;
+  final cs = theme.colorScheme;
+
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Weekly history & allowance'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Each card shows one kid’s week at a glance.',
+            style: ts.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '• Tap a day to mark it as completed, missed, or excused.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          Text(
+            '• Icons: check = good day, X = missed, calendar with dash = excused, hollow circle = no chores.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          Text(
+            '• The green bar at the bottom shows how much allowance they earned for this week.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          Text(
+            '• Turn allowance on/off and edit the rules with the toggle on the right.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          Text(
+            '• For past weeks where allowance is enabled, the app can create a “weekly allowance” reward in the Rewards tab.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Got it'),
+        ),
+      ],
+    ),
+  );
 }

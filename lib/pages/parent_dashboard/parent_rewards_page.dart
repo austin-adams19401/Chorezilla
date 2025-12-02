@@ -48,11 +48,22 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Rewards & Store',
-                          style: ts.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Rewards & Store',
+                                style: ts.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.help_outline_rounded),
+                              tooltip: 'How rewards & coins work',
+                              onPressed: () => _showStoreHelpDialog(context),
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -293,6 +304,56 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
       builder: (ctx) => const _RewardEditorSheet(),
     );
   }
+
+  Future<void> _showStoreHelpDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    final ts = theme.textTheme;
+    final cs = theme.colorScheme;
+
+    return showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('How rewards & coins work'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Use this page to set up the family reward store.',
+              style: ts.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '• Kids earn coins by completing chores.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• Active rewards show up in each kid\'s store.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• Disabled rewards are hidden from kids but kept for later.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• Categories and coin cost help you balance fun vs effort.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• When kids buy a reward, it will appear in "Rewards to give".',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -506,7 +567,6 @@ class _RewardCard extends StatelessWidget {
     );
   }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reward editor bottom sheet (create new)
@@ -789,11 +849,11 @@ class _PendingRewardsCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // if (kDebugMode)
-                //   TextButton(
-                //     onPressed: () => _createDevPendingReward(context),
-                //     child: const Text('Add fake'),
-                //   ),
+                IconButton(
+                  icon: const Icon(Icons.help_outline_rounded, size: 20),
+                  tooltip: 'What is this?',
+                  onPressed: () => _showPendingRewardsHelpDialog(context),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   '${redemptions.length}',
@@ -819,38 +879,8 @@ class _PendingRewardsCard extends StatelessWidget {
     );
   }
 
-  // void _createDevPendingReward(BuildContext context) async {
-  //   final app = context.read<AppState>();
-  //   final familyId = app.familyId;
-  //   if (familyId == null) {
-  //     ScaffoldMessenger.of(
-  //       context,
-  //     ).showSnackBar(const SnackBar(content: Text('No family loaded.')));
-  //     return;
-  //   }
-
-  //   final kids = app.members.where((m) => m.role == FamilyRole.child).toList();
-  //   if (kids.isEmpty) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       const SnackBar(content: Text('No kids to assign dev reward to.')),
-  //     );
-  //     return;
-  //   }
-
-  //   final kid = kids.first;
-
-  //   try {
-  //     await app.repo.createRewardRedemption(
-  //       familyId,
-  //       memberId: kid.id,
-  //       rewardId: null,
-  //       rewardName: 'Dev test reward',
-  //       coinCost: 5,
-  //     );
-  //   } catch (e) {
-  //     debugPrint("Error creating dev reward");
-  //   }
-  // }
+  // Dev helper left commented out from your version.
+  // void _createDevPendingReward(BuildContext context) async { ... }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -962,4 +992,58 @@ class _KidGroupRow extends StatelessWidget {
       ],
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Help dialog for pending rewards
+// ─────────────────────────────────────────────────────────────────────────────
+
+Future<void> _showPendingRewardsHelpDialog(BuildContext context) {
+  final theme = Theme.of(context);
+  final ts = theme.textTheme;
+  final cs = theme.colorScheme;
+
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('What are "Rewards to give"?'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'This list shows rewards your kids have already paid for with coins, but haven\'t received yet.',
+            style: ts.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '• Kids spend coins in their store to request rewards.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          Text(
+            '• Those requests show up here, grouped by kid.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          Text(
+            '• When you\'ve actually given the reward in real life, tap "Mark given".',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          Text(
+            '• Marking a reward as given removes it from this list (coins are not refunded).',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+          Text(
+            '• Level-up rewards and weekly allowance rewards also appear here.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          child: const Text('Got it'),
+        ),
+      ],
+    ),
+  );
 }

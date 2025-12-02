@@ -239,8 +239,8 @@ Future<void> completeAssignment(
 
       debugPrint('');
 
-      if (asn.status != AssignmentStatus.completed) {
-        throw Exception('Only completed assignments can be rejected');
+      if (asn.status != AssignmentStatus.pending) {
+        throw Exception('Only pending assignments can be rejected');
       }
       tx.update(asnRef, {'status': 'rejected'});
       final evRef = eventsColl(firebaseDB, familyId).doc();

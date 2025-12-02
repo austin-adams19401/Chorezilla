@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/profile_header.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:confetti/confetti.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'package:chorezilla/state/app_state.dart';
@@ -11,7 +16,6 @@ import 'package:chorezilla/models/common.dart';
 
 import 'package:chorezilla/pages/kid_pages/kid_rewards_page.dart';
 import 'package:chorezilla/pages/kid_pages/kid_activity_page.dart';
-
 
 class ChildDashboardPage extends StatefulWidget {
   const ChildDashboardPage({super.key, this.memberId});
@@ -35,6 +39,9 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   bool _celebrationActive = false;
   bool _showConfetti = false;
 
+  // NEW: image picker for photo proof
+  final ImagePicker _imagePicker = ImagePicker();
+
   @override
   void initState() {
     super.initState();
@@ -44,7 +51,9 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 5),
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startStreamsForCurrentKid());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _startStreamsForCurrentKid(),
+    );
   }
 
   @override
@@ -73,7 +82,7 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     _startStreamsForCurrentKid();
   }
 
-void _startStreamsForCurrentKid() {
+  void _startStreamsForCurrentKid() {
     final member = _resolveMember(_app);
     if (member == null) return;
 
@@ -84,11 +93,13 @@ void _startStreamsForCurrentKid() {
     _app.startKidStreams(member.id);
   }
 
-
   Member? _resolveMember(AppState app) {
     if (!app.isReady) return null;
     if (widget.memberId != null) {
-      return app.members.where((m) => m.id == widget.memberId).cast<Member?>().firstOrNull;
+      return app.members
+          .where((m) => m.id == widget.memberId)
+          .cast<Member?>()
+          .firstOrNull;
     }
     return app.currentMember ?? app.members.firstOrNull;
   }
@@ -99,16 +110,12 @@ void _startStreamsForCurrentKid() {
     final app = context.watch<AppState>();
 
     if (!app.isReady) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final member = _resolveMember(app);
     if (member == null) {
-      return const Scaffold(
-        body: Center(child: Text('No kid selected')),
-      );
+      return const Scaffold(body: Center(child: Text('No kid selected')));
     }
     if (member.role != FamilyRole.child) {
       return const Scaffold(
@@ -118,7 +125,6 @@ void _startStreamsForCurrentKid() {
 
     _handleLevelChange(member);
     final choresLoaded = app.kidAssignmentsBootstrapped(member.id);
-
 
     final todos = [...app.assignedForKid(member.id)]..sort(_byDueThenTitle);
 
@@ -141,14 +147,10 @@ void _startStreamsForCurrentKid() {
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const Text('Today\'s Chores')
-          ],
-        ),
+        title: Row(children: const [Text('Today\'s Chores')]),
         actions: [
           IconButton(
-            icon: const Icon(Icons.history_rounded, size: 28,),
+            icon: const Icon(Icons.history_rounded, size: 28),
             tooltip: 'Activity',
             onPressed: () {
               Navigator.of(context).push(
@@ -197,7 +199,6 @@ void _startStreamsForCurrentKid() {
                             memberId: member.id,
                             initialTabIndex: 1,
                           ),
-
                         ),
                       );
                     },
@@ -216,7 +217,7 @@ void _startStreamsForCurrentKid() {
                           Tab(text: 'Submitted'),
                         ],
                       ),
-                                            Expanded(
+                      Expanded(
                         child: TabBarView(
                           children: [
                             // Tab 1: To Do
@@ -270,10 +271,101 @@ void _startStreamsForCurrentKid() {
 
   // ---- Actions --------------------------------------------------------------
 
-Future<void> _completeAssignment(Assignment a) async {
+  Future<void> _completeAssignment(Assignment a) async {
     final app = context.read<AppState>();
     setState(() => _busyIds.add(a.id));
+
     try {
+      File? file;
+
+      // Only ask for photo proof if this assignment requires parent approval.
+      if (a.requiresApproval) {
+        // 1) Ask how they want to proceed (camera / gallery / no photo / cancel)
+        final choice = await showDialog<ProofChoice>(
+          context: context,
+          barrierDismissible: false, // 👈 can't tap outside to dismiss
+          builder: (ctx) {
+            return AlertDialog(
+              title: const Text('Add a photo?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.camera_alt),
+                    title: const Text('Take photo'),
+                    onTap: () => Navigator.of(ctx).pop(ProofChoice.camera),
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.photo_library),
+                    title: const Text('Choose from gallery'),
+                    onTap: () => Navigator.of(ctx).pop(ProofChoice.gallery),
+                  ),
+                  const Divider(height: 16),
+                  ListTile(
+                    leading: const Icon(Icons.check_circle_outline),
+                    title: const Text('Mark done without photo'),
+                    onTap: () => Navigator.of(ctx).pop(ProofChoice.skip),
+                  ),
+                  const SizedBox(height: 4),
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(ctx).pop(null),
+                    icon: const Icon(Icons.close),
+                    label: const Text('Cancel'),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+
+        // User hit back or tapped "Cancel" → do NOT complete.
+        if (choice == null) {
+          return; // finally will still clear _busyIds
+        }
+
+        // User explicitly chose to complete without photo.
+        if (choice == ProofChoice.skip) {
+          file = null;
+        } else {
+          // camera or gallery
+          final source = choice == ProofChoice.camera
+              ? ImageSource.camera
+              : ImageSource.gallery;
+
+          final picked = await _imagePicker.pickImage(
+            source: source,
+            imageQuality: 75,
+          );
+
+          // If they backed out of camera/gallery, treat that as cancel.
+          if (picked == null) {
+            return;
+          }
+
+          file = File(picked.path);
+        }
+      }
+
+      // If we got a file, upload & attach proof.
+      if (file != null) {
+        try {
+          final url = await _uploadProofPhoto(a, file);
+          await _attachProofToAssignment(a, url);
+        } catch (e, st) {
+          debugPrint('Error uploading proof photo: $e\n$st');
+
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Couldn\'t upload the photo. Completing the chore without it.',
+              ),
+            ),
+          );
+        }
+      }
+
+      // 3) Existing completion logic (status, XP, coins, streaks, etc.)
       await app.completeAssignment(a.id);
 
       if (!mounted) return;
@@ -285,6 +377,36 @@ Future<void> _completeAssignment(Assignment a) async {
     } finally {
       if (mounted) setState(() => _busyIds.remove(a.id));
     }
+  }
+
+  /// Upload the proof photo to Firebase Storage and return the download URL.
+  Future<String> _uploadProofPhoto(Assignment a, File file) async {
+    final storage = FirebaseStorage.instance;
+    final ts = DateTime.now().millisecondsSinceEpoch;
+    final ref = storage.ref().child(
+      'families/${a.familyId}/proofs/${a.id}_$ts.jpg',
+    );
+
+    final uploadTask = await ref.putFile(file);
+    return await uploadTask.ref.getDownloadURL();
+  }
+
+  /// Attach the proof to the assignment document in Firestore.
+  ///
+  /// NOTE: This assumes your assignments are stored under:
+  ///   families/{familyId}/assignments/{assignmentId}
+  /// If your path differs, tweak this accordingly.
+  Future<void> _attachProofToAssignment(Assignment a, String photoUrl) async {
+    final db = FirebaseFirestore.instance;
+    final doc = db
+        .collection('families')
+        .doc(a.familyId)
+        .collection('assignments')
+        .doc(a.id);
+
+    await doc.update({
+      'proof': {'photoUrl': photoUrl, 'note': null},
+    });
   }
 
   void _handleLevelChange(Member member) {
@@ -311,7 +433,6 @@ Future<void> _completeAssignment(Assignment a) async {
       _lastSeenLevel = baseline;
     }
   }
-
 
   Future<void> _triggerLevelUpCelebration(Member member, LevelInfo info) async {
     if (!mounted) return;
@@ -340,12 +461,11 @@ Future<void> _completeAssignment(Assignment a) async {
           level: info.level,
           rewardTitle: lvlReward.title,
         );
-      } catch (_) {
-      }
+      } catch (_) {}
     }
 
     // Show the level-up dialog and wait for it to close
-    if(!mounted) return;
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -521,6 +641,8 @@ Future<void> _completeAssignment(Assignment a) async {
   bool get wantKeepAlive => true;
 }
 
+
+
 // ============================================================================
 // Widgets
 // ============================================================================
@@ -620,7 +742,6 @@ class _TodoList extends StatelessWidget {
                 ),
               ),
             ],
-
             if (hasCompleted) ...[
               SliverToBoxAdapter(
                 child: Padding(
@@ -664,7 +785,6 @@ class _TodoList extends StatelessWidget {
   }
 }
 
-
 class _SubmittedList extends StatelessWidget {
   const _SubmittedList({required this.items});
   final List<Assignment> items;
@@ -675,7 +795,8 @@ class _SubmittedList extends StatelessWidget {
       return const _EmptyState(
         emoji: '⌛',
         title: 'Nothing submitted yet',
-        subtitle: 'Pending chores will show up here until a parent reviews them.',
+        subtitle:
+            'Pending chores will show up here until a parent reviews them.',
       );
     }
 
@@ -711,10 +832,6 @@ class _AssignmentTile extends StatelessWidget {
     final ts = Theme.of(context).textTheme;
 
     final icon = assignment.choreIcon?.trim();
-    // final due = assignment.due;
-    // final dueText = _formatDue(due);
-    // final overdue = due != null && due.isBefore(DateTime.now());
-
 
     const double iconBoxSize = 50; // size of the colored square
     final double emojiSize = iconBoxSize * 0.65; // scale text with box
@@ -737,7 +854,7 @@ class _AssignmentTile extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: completed ? cs.surfaceContainerHighest : null, 
+      color: completed ? cs.surfaceContainerHighest : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -756,9 +873,7 @@ class _AssignmentTile extends StatelessWidget {
                   padding: const EdgeInsets.all(2.0),
                   child: Text(
                     icon == null || icon.isEmpty ? '🧩' : icon,
-                    style: TextStyle(
-                      fontSize: emojiSize, 
-                    ),
+                    style: TextStyle(fontSize: emojiSize),
                   ),
                 ),
               ),
@@ -777,11 +892,7 @@ class _AssignmentTile extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(
-                        Icons.add,
-                        size: 16,
-                        color: cs.secondary,
-                      ),
+                      Icon(Icons.add, size: 16, color: cs.secondary),
                       const SizedBox(width: 1),
                       Text('${assignment.xp} pts', style: xpStyle),
                     ],
@@ -796,22 +907,6 @@ class _AssignmentTile extends StatelessWidget {
       ),
     );
   }
-
-//   String? _formatDue(DateTime? due) {
-//     if (due == null) return null;
-//     final now = DateTime.now();
-//     final dDate = DateTime(due.year, due.month, due.day);
-//     final nDate = DateTime(now.year, now.month, now.day);
-//     final diff = dDate.difference(nDate).inDays;
-
-//     if (diff == 0) return 'Due today';
-//     if (diff == 1) return 'Due tomorrow';
-//     if (diff == -1) return 'Due yesterday';
-//     if (diff > 1 && diff <= 7) return 'Due in $diff days';
-//     if (diff < -1 && diff >= -7) return '${diff.abs()} days overdue';
-//     // Fallback date
-//     return '${due.month}/${due.day}';
-//   }
 }
 
 class _StatusPill extends StatelessWidget {
@@ -827,14 +922,24 @@ class _StatusPill extends StatelessWidget {
         color: cs.secondaryContainer,
         borderRadius: BorderRadius.circular(10),
       ),
-      child: Text(text, style: TextStyle(color: cs.onSecondaryContainer, fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: cs.onSecondaryContainer,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
 
 // Simple empty-state widget
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.emoji, required this.title, required this.subtitle});
+  const _EmptyState({
+    required this.emoji,
+    required this.title,
+    required this.subtitle,
+  });
   final String emoji;
   final String title;
   final String subtitle;
@@ -853,7 +958,11 @@ class _EmptyState extends StatelessWidget {
             const SizedBox(height: 8),
             Text(title, style: ts.titleMedium),
             const SizedBox(height: 4),
-            Text(subtitle, style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant), textAlign: TextAlign.center),
+            Text(
+              subtitle,
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -905,7 +1014,6 @@ class _PendingRewardsBanner extends StatelessWidget {
     );
   }
 }
-
 
 // handy extension
 extension<T> on Iterable<T> {

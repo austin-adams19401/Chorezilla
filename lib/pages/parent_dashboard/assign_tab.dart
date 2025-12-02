@@ -9,7 +9,6 @@ import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/assignment.dart';
 
-
 class AssignTab extends StatefulWidget {
   const AssignTab({super.key});
 
@@ -52,7 +51,7 @@ class _AssignTabState extends State<AssignTab> {
     );
 
     if (confirmed != true) return;
-    if (!mounted) return; 
+    if (!mounted) return;
 
     final app = context.read<AppState>();
 
@@ -64,7 +63,7 @@ class _AssignTabState extends State<AssignTab> {
         SnackBar(content: Text('Chore "${chore.title}" deleted.')),
       );
     } catch (e) {
-      if (!mounted) return; 
+      if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
@@ -72,10 +71,9 @@ class _AssignTabState extends State<AssignTab> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    final app = context.read<AppState>(); 
+    final app = context.read<AppState>();
     return Scaffold(
       body: Column(
         children: [
@@ -353,9 +351,17 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
                 Row(
                   children: [
                     const Icon(Icons.add_task_rounded),
-                    Text(
-                      isEdit ? '  Edit chore' : '  New chore',
-                      style: Theme.of(context).textTheme.titleLarge,
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        isEdit ? 'Edit chore' : 'New chore',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.help_outline_rounded),
+                      tooltip: 'How chores work',
+                      onPressed: () => _showChoreHelpDialog(context),
                     ),
                   ],
                 ),
@@ -420,7 +426,8 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Requires parent approval'),
                   subtitle: const Text(
-                    'Chore will need to be checked by a parent before its marked complete.'),
+                    'Chore will need to be checked by a parent before it\'s marked complete.',
+                  ),
                   value: _requiresApproval,
                   onChanged: (v) => setState(() => _requiresApproval = v),
                 ),
@@ -567,6 +574,60 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  void _showChoreHelpDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    final ts = theme.textTheme;
+    final cs = theme.colorScheme;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Chore details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This is where you define what a chore is and how it works.',
+              style: ts.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '• Title & description are what kids see in their list.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• Icon (emoji) helps kids quickly recognize the chore.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• Difficulty controls how many XP points the chore is worth.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• "Requires parent approval" sends completed chores to the Approve tab before coins/XP are awarded.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• Recurrence (once/daily/weekly/custom) and days of the week describe how often the chore should be done.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• Time is optional and mainly a reference for when you expect the chore to be finished.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _EmojiPicker extends StatelessWidget {
@@ -651,9 +712,8 @@ class _AssignSheet extends StatefulWidget {
 
 class _AssignSheetState extends State<_AssignSheet> {
   final Set<String> _kidIds = {};
-  late final Set<String>
-  _initialKidIds; // NEW: snapshot of assignments when opened
-  bool _initialized = false; // NEW: guard so we only seed state once
+  late final Set<String> _initialKidIds; // snapshot of assignments when opened
+  bool _initialized = false;
 
   DateTime _due = DateTime.now();
   bool _busy = false;
@@ -662,7 +722,7 @@ class _AssignSheetState extends State<_AssignSheet> {
   Widget build(BuildContext context) {
     final app = context.read<AppState>();
 
-    // NEW: seed local state once from existing assignments
+    // Seed local state once from existing assignments
     if (!_initialized) {
       final existing = app.assignedMemberIdsForChore(widget.chore.id);
       _initialKidIds = Set<String>.from(existing);
@@ -698,9 +758,16 @@ class _AssignSheetState extends State<_AssignSheet> {
                           style: const TextStyle(fontSize: 22),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          'Assign "${widget.chore.title}"',
-                          style: Theme.of(context).textTheme.titleLarge,
+                        Expanded(
+                          child: Text(
+                            'Assign "${widget.chore.title}"',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.help_outline_rounded),
+                          tooltip: 'How assigning works',
+                          onPressed: () => _showAssignHelpDialog(context),
                         ),
                       ],
                     ),
@@ -721,7 +788,6 @@ class _AssignSheetState extends State<_AssignSheet> {
                           return FilterChip(
                             label: Text(k.displayName),
                             selected: sel,
-                            // NEW: toggling chips now means assign/unassign
                             onSelected: (v) {
                               setState(() {
                                 if (v) {
@@ -764,7 +830,6 @@ class _AssignSheetState extends State<_AssignSheet> {
                         ),
                         const Spacer(),
                         FilledButton(
-                          // NEW: button enabled only if something actually changed
                           onPressed: _busy || !hasChanges
                               ? null
                               : _saveAssignments,
@@ -807,7 +872,6 @@ class _AssignSheetState extends State<_AssignSheet> {
     }
   }
 
-  // NEW: compare sets without needing any extra imports
   bool _sameSet(Set<String> a, Set<String> b) {
     if (identical(a, b)) return true;
     if (a.length != b.length) return false;
@@ -817,7 +881,6 @@ class _AssignSheetState extends State<_AssignSheet> {
     return true;
   }
 
-  // NEW: assigns newly-added kids and unassigns removed kids
   Future<void> _saveAssignments() async {
     setState(() => _busy = true);
     try {
@@ -848,5 +911,51 @@ class _AssignSheetState extends State<_AssignSheet> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _showAssignHelpDialog(BuildContext context) {
+    final theme = Theme.of(context);
+    final ts = theme.textTheme;
+    final cs = theme.colorScheme;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Assigning chores to kids'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Choose which kids should see this chore and when it\'s due.',
+              style: ts.bodyMedium,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '• Tap a kid\'s name to assign or unassign them from this chore.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• The due date is the next day you expect this chore to be done.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• When you tap Save, new kids are assigned and removed kids are unassigned.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+            Text(
+              '• Assigned chores show up on the kid dashboard based on their due dates and recurrence.',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -78,7 +78,7 @@ class KidActivityPage extends StatelessWidget {
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               itemCount: items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final item = items[index];
                 return _ActivityTile(item: item);
@@ -179,7 +179,7 @@ class _ActivityTile extends StatelessWidget {
       final abs = item.coinDelta!.abs();
       chips.add(
         _DeltaChip(
-          label: (isNegative ? '-' : '+') + '$abs coins',
+          label: '${isNegative ? '-' : '+'}$abs coins',
           color: isNegative ? cs.errorContainer : cs.secondaryContainer,
           textColor: isNegative ? cs.onErrorContainer : cs.onSecondaryContainer,
         ),
