@@ -1,3 +1,4 @@
+import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
 import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
@@ -21,6 +22,10 @@ class ParentDrawer extends StatelessWidget {
     final displayName = user?.displayName ?? 'Parent';
     final email = user?.email ?? '';
     final familyName = family?.name ?? 'Your family';
+
+    final member = app.currentMember;
+    final isParent = member != null && member.role != FamilyRole.child;
+    final notificationsEnabled = member?.notificationsEnabled ?? true;
 
     return Drawer(
       child: SafeArea(
@@ -70,24 +75,24 @@ class ParentDrawer extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Text(
-                'Appearance',
+                'Notifications',
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: cs.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-            Card(
-              margin: const EdgeInsets.symmetric(horizontal: 12),
-              child: SwitchListTile.adaptive(
-                secondary: const Icon(Icons.brightness_6_rounded),
-                value: app.themeMode == ThemeMode.dark,
-                onChanged: (val) {
-                  app.setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
-                },
-                title: const Text('Dark mode'),
-                subtitle: const Text('Toggle app theme'),
+            SwitchListTile(
+              title: const Text('Chore notifications'),
+              subtitle: const Text(
+                'Alerts when kids submit chores for approval',
               ),
+              value: notificationsEnabled,
+              onChanged: (value) async {
+                await app.updateMember(member!.id, {
+                  'notificationsEnabled': value,
+                });
+              },
             ),
 
             const Divider(height: 24),
@@ -196,7 +201,6 @@ class ParentDrawer extends StatelessWidget {
                 _showRedeemCodeDialog(context);
               },
             ),
-
             const Divider(height: 24),
 
             // ── Sign out ───────────────────────────────────────────────────

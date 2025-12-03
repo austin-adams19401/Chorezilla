@@ -677,6 +677,7 @@ class _TodoList extends StatelessWidget {
 
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -693,7 +694,7 @@ class _TodoList extends StatelessWidget {
 
         const gridSpacing = 12.0;
         // Approx “row height” for your existing _AssignmentTile.
-        const tileHeight = 96.0;
+        const tileHeight = 120.0;
 
         return CustomScrollView(
           slivers: [
@@ -717,14 +718,17 @@ class _TodoList extends StatelessWidget {
                     crossAxisCount: crossAxisCount,
                     crossAxisSpacing: gridSpacing,
                     mainAxisSpacing: gridSpacing,
-                    mainAxisExtent: tileHeight, // 👈 fixed row-like height
+                    mainAxisExtent: tileHeight,
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final a = items[index];
                     final busy = busyIds.contains(a.id);
+                    final isRejected = a.status == AssignmentStatus.rejected;
+
                     return _AssignmentTile(
                       assignment: a,
                       completed: false,
+                      rejected: isRejected,
                       trailing: FilledButton(
                         onPressed: busy ? null : () => onComplete(a),
                         child: busy
@@ -762,7 +766,7 @@ class _TodoList extends StatelessWidget {
                     crossAxisCount: crossAxisCount,
                     crossAxisSpacing: gridSpacing,
                     mainAxisSpacing: gridSpacing,
-                    mainAxisExtent: tileHeight, // 👈 same fixed height
+                    mainAxisExtent: tileHeight, 
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final a = completedToday[index];
@@ -820,11 +824,13 @@ class _AssignmentTile extends StatelessWidget {
     required this.assignment,
     required this.trailing,
     this.completed = false,
+    this.rejected = false,
   });
 
   final Assignment assignment;
   final Widget trailing;
   final bool completed;
+  final bool rejected;
 
   @override
   Widget build(BuildContext context) {
@@ -841,20 +847,31 @@ class _AssignmentTile extends StatelessWidget {
       fontWeight: FontWeight.w600,
     );
 
-    final titleStyle = completed
-        ? baseTitleStyle?.copyWith(
-            decoration: TextDecoration.lineThrough,
-            color: cs.onSurfaceVariant,
-          )
-        : baseTitleStyle;
+    TextStyle? titleStyle;
+    if (completed) {
+      titleStyle = baseTitleStyle?.copyWith(
+        decoration: TextDecoration.lineThrough,
+        color: cs.onSurfaceVariant,
+      );
+    } else if (rejected) {
+
+      titleStyle = baseTitleStyle?.copyWith(
+        color: cs.error, // or cs.errorContainer if you want it softer
+      );
+    } else {
+      titleStyle = baseTitleStyle;
+    }
 
     final xpStyle = completed
         ? ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant)
         : ts.bodyMedium;
 
+
     return Card(
       elevation: 0,
-      color: completed ? cs.surfaceContainerHighest : null,
+      color: 
+        completed ? cs.surfaceContainerHighest 
+        : rejected ? cs.errorContainer : cs.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -885,7 +902,7 @@ class _AssignmentTile extends StatelessWidget {
                 children: [
                   Text(
                     assignment.choreTitle,
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: titleStyle,
                   ),

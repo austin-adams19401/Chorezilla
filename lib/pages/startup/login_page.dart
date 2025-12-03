@@ -1,6 +1,5 @@
 import 'package:chorezilla/components/auth_scaffold.dart';
 import 'package:chorezilla/components/inputs.dart';
-import 'package:chorezilla/components/outlined_button.dart';
 import 'package:chorezilla/pages/startup/forgot_pw_page.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:flutter/material.dart';
@@ -142,14 +141,6 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
             const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: () => Navigator.of(context).pushNamed('/kid-join'),
-              style: outlinedButton,
-              child: Text(
-                'Kid Login (Join with Code)',
-                style: TextStyle(fontSize: 16)
-              ),
-            ),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pushReplacementNamed('/register');

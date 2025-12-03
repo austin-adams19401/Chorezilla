@@ -4,6 +4,7 @@ import 'package:chorezilla/components/rewards_nav_icon.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/pages/parent_dashboard/manage_chores_tab.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_history_tab.dart';
+import 'package:chorezilla/pages/parent_dashboard/parent_notifications.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_rewards_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -60,16 +61,25 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final navTarget = context.select((AppState s) => s.pendingNavTarget);
+
+    // If a notification asked us to go to the Approve tab, switch bottom nav to "Chores".
+    if (navTarget == 'parent_approve' && _index != 1) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _index = 1);
+      });
+    }
     // ── Bottom-nav pages ───────────────────────────────────────────────────
     // 0: Today
     // 1: Chores (Assign + Review tabs)
     // 2: Rewards
     // 3: History
-    final pages = const [
-      ParentTodayTab(),
-      ParentChoresTab(),
-      ParentRewardsPage(),
-      ParentHistoryTab(), 
+    final pages = [
+      const ParentTodayTab(),
+      ParentChoresTab(initialTabIndex: navTarget == 'parent_approve' ? 1 : 0),
+      const ParentRewardsPage(),
+      const ParentHistoryTab(), 
     ];
 
     return Scaffold(
@@ -94,7 +104,13 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
         ],
       ),
       drawer: const ParentDrawer(),
-      body: pages[_index],
+      body: Column(
+        children: [
+          const ParentNotificationRegistrar(), // 🔔 registers tokens for this device
+          Expanded(child: pages[_index]),
+        ],
+      ),
+
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),

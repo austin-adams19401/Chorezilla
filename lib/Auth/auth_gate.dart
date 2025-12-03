@@ -21,28 +21,22 @@ class AuthGate extends StatelessWidget {
 
     // 1) Not signed in → Login
     if (user == null) {
-      debugPrint('AUTH GATE: No user, go to Login');
       return const LoginPage();
     }
 
     // 2) Wait until we’ve loaded viewMode from SharedPreferences
     if (!app.viewModeLoaded) {
-      debugPrint('AUTH GATE: viewMode not loaded yet, show spinner');
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // 3) Signed in but family/members streams still booting → splash loader
     if (!app.bootLoaded) {
-      debugPrint(
-        'AUTH GATE: boot not loaded yet (family/members), show spinner',
-      );
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // 4) Signed in + streams ready:
     //    No family yet → go to setup flow to create it
     if (family == null) {
-      debugPrint('AUTH GATE: no family yet, go to ParentSetupPage');
       return const ParentSetupPage();
     }
 
@@ -51,18 +45,13 @@ class AuthGate extends StatelessWidget {
     final onboardingComplete = family.onboardingComplete;
 
     if (!hasKids || !onboardingComplete) {
-      debugPrint(
-        'AUTH GATE: onboarding incomplete (hasKids=$hasKids, onboarding=$onboardingComplete), go to setup',
-      );
       return const ParentSetupPage();
     }
 
     // 6) All set → decide root by view mode
     if (app.viewMode == AppViewMode.kid) {
-      debugPrint('AUTH GATE: viewMode=kid → KidHomePage');
       return const KidsHomePage();
     } else {
-      debugPrint('AUTH GATE: viewMode=parent → ParentDashboardPage');
       return const ParentDashboardPage();
     }
   }

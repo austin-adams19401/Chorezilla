@@ -56,6 +56,26 @@ class AppState extends ChangeNotifier {
   AuthStatus authState = AuthStatus.unknown;
   User? _firebaseUser;
   User? get firebaseUser => _firebaseUser;
+  // ───────────────────────────────────────────────────────────────────────────
+  // Notification nav intent
+  // ─────────────────────────────────────────────────────────────────────────── 
+  String? _pendingNavTarget; // e.g. 'parent_approve'
+  String? _pendingAssignmentId; // for future: focus a specific assignment
+
+  String? get pendingNavTarget => _pendingNavTarget;
+  String? get pendingAssignmentId => _pendingAssignmentId;
+
+  void setAssignmentReviewIntent({required String assignmentId}) {
+    _pendingNavTarget = 'parent_approve';
+    _pendingAssignmentId = assignmentId;
+    notifyListeners();
+  }
+
+  void clearNavIntent() {
+    _pendingNavTarget = null;
+    _pendingAssignmentId = null;
+    notifyListeners();
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Theme
@@ -547,13 +567,12 @@ Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
         });
   }
 
-  Stream<List<Assignment>> _watchAssignmentsForKid(
+Stream<List<Assignment>> _watchAssignmentsForKid(
     String familyId,
     String memberId,
     AssignmentStatus status,
   ) {
     final db = FirebaseFirestore.instance;
-    final statusWire = _statusToWire(status);
 
     // Define "today" as [todayMidnight, tomorrowMidnight)
     final now = DateTime.now();
@@ -562,19 +581,34 @@ Stream<List<Assignment>> _watchMissedAssignmentsForFamily(String familyId) {
     final startTs = Timestamp.fromDate(today);
     final endTs = Timestamp.fromDate(tomorrow);
 
-    Query q = db
+    // Base query: same for all statuses
+    Query base = db
         .collection('families')
         .doc(familyId)
         .collection('assignments')
         .where('memberId', isEqualTo: memberId)
-        .where('status', isEqualTo: statusWire)
         .where('due', isGreaterThanOrEqualTo: startTs)
         .where('due', isLessThan: endTs)
         .orderBy('due');
 
+    Query q;
+
+    if (status == AssignmentStatus.assigned) {
+      // 👇 For the "assigned" stream, include *both* assigned and rejected
+      final assignedWire = _statusToWire(AssignmentStatus.assigned);
+      final rejectedWire = _statusToWire(AssignmentStatus.rejected);
+
+      q = base.where('status', whereIn: [assignedWire, rejectedWire]);
+    } else {
+      // 👇 For all other streams (pending, completed, etc.) keep old behaviour
+      final statusWire = _statusToWire(status);
+      q = base.where('status', isEqualTo: statusWire);
+    }
+
     // NOTE: Firestore may ask you to create a composite index the first time.
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
+
 
 
   Stream<List<Assignment>> _watchReviewQueue(String familyId) {
@@ -925,6 +959,7 @@ Future<void> assignChore({
     debugPrint('ASSIGN_CHORE: award xp=${award.xp} coins=${award.coins}');
 
     final normalizedDue = DateTime(due.year, due.month, due.day);
+    final dayKey = _dateKey(normalizedDue);
 
     final batch = db.batch();
     for (final m in mems) {
@@ -946,6 +981,7 @@ Future<void> assignChore({
         'requiresApproval': chore.requiresApproval,
         'status': 'assigned', // key for kid streams & home tab
         'due': Timestamp.fromDate(normalizedDue),
+        'dayKey': dayKey,
         'assignedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
       });
@@ -1130,10 +1166,7 @@ Future<void> completeAssignment(String assignmentId) async {
     final todayTs = Timestamp.fromDate(today);
 
     // NEW: a stable string key for the calendar day, independent of timezone internals.
-    final dayKey =
-        '${today.year.toString().padLeft(4, '0')}-'
-        '${today.month.toString().padLeft(2, '0')}-'
-        '${today.day.toString().padLeft(2, '0')}';
+    final dayKey = _dateKey(today);
 
     debugPrint(
       'ensureAssignmentsForToday: famId=$famId date=$today dayKey=$dayKey',

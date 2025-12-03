@@ -52,6 +52,7 @@ dependencies:
   package_info_plus: ^9.0.0
   intl: ^0.20.2
   image_picker: ^1.2.1
+  firebase_messaging: ^16.0.4
 
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4
@@ -72,14 +73,16 @@ flutter_launcher_icons:
   android: true
   ios: true
   # Use one big square PNG; the tool will generate all sizes
-  image_path: "assets/icons/mascot/chorezilla_square_1024.png"
+  image_path_android: "assets/icons/mascot/mascot_no_bg.png"
+  image_path_ios: "assets/icons/mascot/mascot_no_bg.png"
 
   # Adaptive icon (Android 8+): use your square art as the foreground and a solid bg color
-  adaptive_icon_foreground: "assets/icons/mascot/chorezilla_square_1024.png"  # or reuse the same square PNG
-  adaptive_icon_background: "#0B2545"   # your navy background
+  adaptive_icon_foreground: "assets/icons/mascot/mascot_no_bg.png"
+  adaptive_icon_background: "#0B2545"
 
   # iOS tips
   remove_alpha_ios: true
+  background_color_ios: "#0B2545"
 
 
 # The following section is specific to Flutter packages.

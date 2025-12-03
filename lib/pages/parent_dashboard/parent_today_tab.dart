@@ -68,10 +68,6 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
       builder: (context, snap) {
         final items = snap.data ?? const <Assignment>[];
 
-        debugPrint(
-          'TODAY ASSIGNMENTS: ${items.map((a) => '${a.memberName} / ${a.choreTitle} @ ${a.due}').toList()}',
-        );
-
         if (snap.connectionState == ConnectionState.waiting && items.isEmpty) {
           return const Center(child: CircularProgressIndicator());
         }

@@ -56,8 +56,7 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
         .map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
 
-  // Writes
-  Future<List<String>> assignChoreToMembers(
+Future<List<String>> assignChoreToMembers(
     String familyId, {
     required Chore chore,
     required List<Member> members,
@@ -66,13 +65,20 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
   }) async {
     final batch = firebaseDB.batch();
     final createdIds = <String>[];
+
+    // Normalize to calendar day and build a stable dayKey
+    final normalizedDue = DateTime(due.year, due.month, due.day);
+    final dayKey = _dayKeyFor(normalizedDue);
+
     for (final m in members) {
       final ref = assignmentsColl(firebaseDB, familyId).doc();
       final awards = calcAwards(
         difficulty: chore.difficulty,
         settings: settings,
       );
+
       createdIds.add(ref.id);
+
       batch.set(ref, {
         'familyId': familyId,
         'memberId': m.id,
@@ -83,16 +89,26 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
         'difficulty': chore.difficulty,
         'xp': awards.xp,
         'coinAward': awards.coins,
-        'requiresApproval': false,
+        'requiresApproval': false, 
         'status': 'assigned',
         'assignedAt': FieldValue.serverTimestamp(),
-        'due': Timestamp.fromDate(due),
+        'createdAt': FieldValue.serverTimestamp(),
+        'due': Timestamp.fromDate(normalizedDue),
+        'dayKey': dayKey,
         'proof': null,
       });
     }
+
     await batch.commit();
     return createdIds;
   }
+
+  // Helper in this file (private to the library)
+  String _dayKeyFor(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
 
   Future<void> markCompleted({
     required String familyId,
@@ -236,8 +252,6 @@ Future<void> completeAssignment(
       final asnSnap = await tx.get(asnRef);
       if (!asnSnap.exists) throw Exception('Assignment not found');
       final asn = Assignment.fromDoc(asnSnap);
-
-      debugPrint('');
 
       if (asn.status != AssignmentStatus.pending) {
         throw Exception('Only pending assignments can be rejected');

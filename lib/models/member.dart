@@ -24,6 +24,8 @@ class Member {
   final int allowanceDaysRequired;
   final int allowancePayDay;
 
+  final bool notificationsEnabled;
+
   const Member({
     required this.id,
     required this.displayName,
@@ -41,6 +43,7 @@ class Member {
     this.allowanceFullAmountCents = 0,
     this.allowanceDaysRequired = 7,
     this.allowancePayDay = DateTime.sunday,
+    this.notificationsEnabled = true,
   });
 
   Member copyWith({
@@ -77,6 +80,7 @@ class Member {
         allowanceFullAmountCents ?? this.allowanceFullAmountCents,
     allowanceDaysRequired: allowanceDaysRequired ?? this.allowanceDaysRequired,
     allowancePayDay: allowancePayDay ?? this.allowancePayDay,
+    notificationsEnabled: notificationsEnabled,
   );
 
   Map<String, dynamic> toMap() => {
@@ -97,6 +101,7 @@ class Member {
     'allowanceFullAmountCents': allowanceFullAmountCents,
     'allowanceDaysRequired': allowanceDaysRequired,
     'allowancePayDay': allowancePayDay,
+    'notificationsEnabled': notificationsEnabled,
   };
 
   factory Member.fromDoc(DocumentSnapshot doc) {
@@ -122,6 +127,7 @@ class Member {
       allowanceFullAmountCents: data['allowanceFullAmountCents'] as int? ?? 0,
       allowanceDaysRequired: data['allowanceDaysRequired'] as int? ?? 7,
       allowancePayDay: data['allowancePayDay'] as int? ?? DateTime.sunday,
+      notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true, 
     );
   }
 }

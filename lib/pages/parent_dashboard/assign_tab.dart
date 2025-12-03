@@ -299,6 +299,7 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
   final _title = TextEditingController();
   final _desc = TextEditingController();
   final _icon = TextEditingController(text: '🧹');
+  final int kMaxChoreTitleLength = 30;
   int _difficulty = 3;
   String _recType = 'daily'; // once | daily | weekly | custom
   final Set<int> _days = {}; // 1..7
@@ -369,7 +370,8 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
 
                 TextField(
                   controller: _title,
-                  decoration: const InputDecoration(labelText: 'Title'),
+                  maxLength: kMaxChoreTitleLength,
+                  decoration: const InputDecoration(labelText: 'Title', helperText: 'max 40 characters'),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -532,7 +534,14 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
   }
 
   Future<void> _save() async {
-    if (_title.text.trim().isEmpty) return;
+      final rawTitle = _title.text.trim();
+    if (rawTitle.isEmpty) return;
+
+    // Enforce max length just to be safe
+    final title = rawTitle.length > kMaxChoreTitleLength
+        ? rawTitle.substring(0, kMaxChoreTitleLength)
+        : rawTitle;
+
     setState(() => _busy = true);
     try {
       final app = context.read<AppState>();
@@ -545,7 +554,7 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
       );
       if (widget.chore == null) {
         await app.createChore(
-          title: _title.text.trim(),
+          title: title,
           description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
           iconKey: _icon.text,
           difficulty: _difficulty,
@@ -555,7 +564,7 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
       } else {
         await app.updateChore(
           choreId: widget.chore!.id,
-          title: _title.text.trim(),
+          title: title,
           description: _desc.text.trim().isEmpty ? null : _desc.text.trim(),
           iconKey: _icon.text,
           difficulty: _difficulty,

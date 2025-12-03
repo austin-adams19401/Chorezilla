@@ -5,7 +5,44 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b84a41e4-fb7a-43c9-b1ed-6ac5f59ec7f9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_history_tab.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_history_tab.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/debug/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/debug/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-hdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/drawable-hdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-mdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/drawable-mdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-xhdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/drawable-xhdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-xxhdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/drawable-xxhdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/drawable-xxxhdpi/ic_launcher_foreground.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/drawable-xxxhdpi/ic_launcher_foreground.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-hdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/mipmap-hdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-mdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/mipmap-mdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xhdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/mipmap-xhdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xxhdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/mipmap-xxhdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../functions/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/../functions/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../functions/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/../functions/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../functions/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/../functions/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/Auth/auth_gate.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/Auth/auth_gate.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/components/parent_menu_drawer.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/components/parent_menu_drawer.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/data/repo_assignments.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/data/repo_assignments.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/functions/index.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/functions/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/main.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/models/member.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/models/member.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_dashboard.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_dashboard.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/assign_tab.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/assign_tab.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/manage_chores_tab.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/manage_chores_tab.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_dashboard.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_dashboard.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_today_tab.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_today_tab.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/pages/startup/login_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/startup/login_page.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../lib/state/app_state.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/state/app_state.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../linux/flutter/generated_plugin_registrant.cc" beforeDir="false" afterPath="$PROJECT_DIR$/../linux/flutter/generated_plugin_registrant.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../linux/flutter/generated_plugins.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/../linux/flutter/generated_plugins.cmake" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../macos/Flutter/GeneratedPluginRegistrant.swift" beforeDir="false" afterPath="$PROJECT_DIR$/../macos/Flutter/GeneratedPluginRegistrant.swift" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/../pubspec.lock" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../pubspec.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../windows/flutter/generated_plugin_registrant.cc" beforeDir="false" afterPath="$PROJECT_DIR$/../windows/flutter/generated_plugin_registrant.cc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../windows/flutter/generated_plugins.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/../windows/flutter/generated_plugins.cmake" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -15,7 +52,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=G122024090001459)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=C:\Users\austina\.android\avd\Pixel_8_Pro.avd)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -95,7 +132,7 @@
     "cidr.known.project.marker": "true",
     "com.android.tools.idea.streaming.zoom.toolbar.visible": "false",
     "dart.analysis.tool.window.visible": "false",
-    "git-widget-placeholder": "v2",
+    "git-widget-placeholder": "v3",
     "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "C:/Users/austina/Documents/Personal/projects/chorezilla/Chorezilla/android",
     "recommended.upgrade.last.time.stamp": "1761155592429",

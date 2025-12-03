@@ -7,7 +7,12 @@ import 'package:chorezilla/pages/parent_dashboard/assign_tab.dart';
 import 'package:chorezilla/pages/parent_dashboard/approve_tab.dart';
 
 class ParentChoresTab extends StatefulWidget {
-  const ParentChoresTab({super.key});
+  const ParentChoresTab({
+    super.key,
+    this.initialTabIndex = 0, // 0 = Assign, 1 = Review
+  });
+
+  final int initialTabIndex;
 
   @override
   State<ParentChoresTab> createState() => _ParentChoresTabState();
@@ -16,11 +21,38 @@ class ParentChoresTab extends StatefulWidget {
 class _ParentChoresTabState extends State<ParentChoresTab>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  bool _clearedIntent = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+
+    // Clamp initial index to [0, 1] for safety
+    int initial = widget.initialTabIndex;
+    if (initial < 0) initial = 0;
+    if (initial > 1) initial = 1;
+
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: initial,
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Clear nav intent (if any) once this tab has been built the first time
+    if (!_clearedIntent) {
+      _clearedIntent = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final app = context.read<AppState>();
+        if (app.pendingNavTarget == 'parent_approve') {
+          app.clearNavIntent();
+        }
+      });
+    }
   }
 
   @override
@@ -103,7 +135,7 @@ class _ParentChoresTabState extends State<ParentChoresTab>
         // ── Tab bodies ─────────────────────────────────────────────────────
         Expanded(
           child: TabBarView(
-            controller: _tabController, // 👈 this was missing
+            controller: _tabController,
             children: const [AssignTab(), ApproveTab()],
           ),
         ),
