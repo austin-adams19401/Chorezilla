@@ -59,7 +59,6 @@ class Chorezilla extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
 
     return MaterialApp(
       theme: AppTheme.light,

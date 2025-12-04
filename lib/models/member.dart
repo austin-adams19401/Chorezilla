@@ -8,6 +8,7 @@ class Member {
   final String? userUid;
   final String? avatarKey;
   final String? pinHash;
+  final int? age;
 
   /// Kid wallet fields
   final int level;
@@ -33,6 +34,7 @@ class Member {
     this.userUid,
     this.avatarKey,
     this.pinHash,
+    this.age,
     this.level = 1,
     this.xp = 0,
     this.coins = 0,
@@ -52,6 +54,7 @@ class Member {
     String? userUid,
     String? avatarKey,
     String? pinHash,
+    int? age,
     int? level,
     int? xp,
     int? coins,
@@ -69,6 +72,7 @@ class Member {
     userUid: userUid ?? this.userUid,
     avatarKey: avatarKey ?? this.avatarKey,
     pinHash: pinHash ?? this.pinHash,
+    age: age ?? this.age,
     level: level ?? this.level,
     xp: xp ?? this.xp,
     coins: coins ?? this.coins,
@@ -89,6 +93,7 @@ class Member {
     'userUid': userUid,
     'avatarKey': avatarKey,
     'pinHash': pinHash,
+    'age': age,
     'level': level,
     'xp': xp,
     'coins': coins,
@@ -115,6 +120,7 @@ class Member {
       userUid: data['userUid'] as String?,
       avatarKey: data['avatarKey'] as String?,
       pinHash: data['pinHash'] as String?,
+      age: data['age'] as int?,
       level: (data['level'] as num?)?.toInt() ?? 1,
       xp: (data['xp'] as num?)?.toInt() ?? 0,
       coins: (data['coins'] as num?)?.toInt() ?? 0,
@@ -128,6 +134,56 @@ class Member {
       allowanceDaysRequired: data['allowanceDaysRequired'] as int? ?? 7,
       allowancePayDay: data['allowancePayDay'] as int? ?? DateTime.sunday,
       notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true, 
+    );
+  }
+
+    // --- Local cache mapping (no Firestore Timestamp) ---
+  Map<String, dynamic> toCacheMap() => {
+    'id': id,
+    'displayName': displayName,
+    'role': roleToString(role),
+    'userUid': userUid,
+    'avatarKey': avatarKey,
+    'pinHash': pinHash,
+    'age': age,
+    'level': level,
+    'xp': xp,
+    'coins': coins,
+    'badges': badges,
+    'createdAt': createdAt?.toIso8601String(),
+    'active': active,
+    'allowanceEnabled': allowanceEnabled,
+    'allowanceFullAmountCents': allowanceFullAmountCents,
+    'allowanceDaysRequired': allowanceDaysRequired,
+    'allowancePayDay': allowancePayDay,
+    'notificationsEnabled': notificationsEnabled,
+  };
+
+  factory Member.fromCacheMap(Map<String, dynamic> data) {
+    return Member(
+      id: data['id'] as String? ?? '',
+      displayName: data['displayName'] as String? ?? 'Member',
+      role: roleFromString(data['role'] as String? ?? 'parent'),
+      userUid: data['userUid'] as String?,
+      avatarKey: data['avatarKey'] as String?,
+      pinHash: data['pinHash'] as String?,
+      age: data['age'] as int?,
+      level: (data['level'] as num?)?.toInt() ?? 1,
+      xp: (data['xp'] as num?)?.toInt() ?? 0,
+      coins: (data['coins'] as num?)?.toInt() ?? 0,
+      badges:
+          (data['badges'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
+      createdAt: parseIsoDateTimeOrNull(data['createdAt']),
+      active: (data['active'] as bool?) ?? true,
+      allowanceEnabled: data['allowanceEnabled'] as bool? ?? false,
+      allowanceFullAmountCents:
+          (data['allowanceFullAmountCents'] as num?)?.toInt() ?? 0,
+      allowanceDaysRequired:
+          (data['allowanceDaysRequired'] as num?)?.toInt() ?? 7,
+      allowancePayDay:
+          (data['allowancePayDay'] as num?)?.toInt() ?? DateTime.sunday,
+      notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true,
     );
   }
 }

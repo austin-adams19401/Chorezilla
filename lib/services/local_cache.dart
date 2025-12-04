@@ -1,90 +1,151 @@
-// import 'dart:convert';
-// import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
-// import 'package:chorezilla/models/family.dart';
-// import 'package:chorezilla/models/member.dart';
-// import 'package:chorezilla/models/chore.dart';
-// import 'package:chorezilla/models/assignment.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-// class LocalCache {
-//   static const _familyKey = 'cz_family';
-//   static const _membersKey = 'cz_members';
-//   static const _choresKey = 'cz_chores';
-//   static String _assignmentsKeyForDate(DateTime date) =>
-//       'cz_assignments_${date.year}${date.month}${date.day}';
+import 'package:chorezilla/models/family.dart';
+import 'package:chorezilla/models/member.dart';
+import 'package:chorezilla/models/chore.dart';
+import 'package:chorezilla/models/assignment.dart';
 
-//   Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
+class KidAssignmentsCache {
+  final List<Assignment> assigned;
+  final List<Assignment> pending;
+  final List<Assignment> completed;
 
-//   // ---- Family ----
-//   Future<void> saveFamily(Family family) async {
-//     final prefs = await _prefs;
-//     prefs.setString(_familyKey, jsonEncode(family.toJson()));
-//   }
+  KidAssignmentsCache({
+    required this.assigned,
+    required this.pending,
+    required this.completed,
+  });
 
-//   Future<Family?> loadFamily() async {
-//     final prefs = await _prefs;
-//     final raw = prefs.getString(_familyKey);
-//     if (raw == null) return null;
-//     return Family.fromJson(jsonDecode(raw));
-//   }
+  Map<String, dynamic> toJson() => {
+        'assigned': assigned.map((a) => a.toCacheMap()).toList(),
+        'pending': pending.map((a) => a.toCacheMap()).toList(),
+        'completed': completed.map((a) => a.toCacheMap()).toList(),
+      };
 
-//   // ---- Members ----
-//   Future<void> saveMembers(List<Member> members) async {
-//     final prefs = await _prefs;
-//     final list = members.map((m) => m.toJson()..['id'] = m.id).toList();
-//     prefs.setString(_membersKey, jsonEncode(list));
-//   }
+  factory KidAssignmentsCache.fromJson(Map<String, dynamic> json) {
+    List<Assignment> parse(String key) {
+      final raw = json[key];
+      if (raw is List) {
+        return raw
+            .map((e) => Assignment.fromCacheMap(e as Map<String, dynamic>))
+            .toList();
+      }
+      return const <Assignment>[];
+    }
 
-//   Future<List<Member>?> loadMembers() async {
-//     final prefs = await _prefs;
-//     final raw = prefs.getString(_membersKey);
-//     if (raw == null) return null;
-//     final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-//     return list
-//         .map((m) => Member.fromJson(m..remove('id'), m['id'] as String))
-//         .toList();
-//   }
+    return KidAssignmentsCache(
+      assigned: parse('assigned'),
+      pending: parse('pending'),
+      completed: parse('completed'),
+    );
+  }
+}
 
-//   // ---- Chores ----
-//   Future<void> saveChores(List<Chore> chores) async {
-//     final prefs = await _prefs;
-//     prefs.setString(
-//       _choresKey,
-//       jsonEncode(chores.map((c) => c.toJson()..['id'] = c.id).toList()),
-//     );
-//   }
+class LocalCache {
+  static const _familyKeyPrefix = 'cz_family_';
+  static const _membersKeyPrefix = 'cz_members_';
+  static const _choresKeyPrefix = 'cz_chores_';
+  static const _kidTodayKeyPrefix = 'cz_kid_today_';
 
-//   Future<List<Chore>?> loadChores() async {
-//     final prefs = await _prefs;
-//     final raw = prefs.getString(_choresKey);
-//     if (raw == null) return null;
-//     final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-//     return list
-//         .map((c) => Chore.fromJson(c..remove('id'), c['id'] as String))
-//         .toList();
-//   }
+  Future<SharedPreferences> get _prefs =>
+      SharedPreferences.getInstance();
 
-//   // ---- Today’s assignments ----
-//   Future<void> saveTodayAssignments(
-//     DateTime today,
-//     List<Assignment> assignments,
-//   ) async {
-//     final prefs = await _prefs;
-//     final key = _assignmentsKeyForDate(today);
-//     prefs.setString(
-//       key,
-//       jsonEncode(assignments.map((a) => a.toJson()..['id'] = a.id).toList()),
-//     );
-//   }
+  String _dayKey(DateTime d) {
+    final n = DateTime(d.year, d.month, d.day); // normalize
+    return '${n.year.toString().padLeft(4, '0')}-'
+        '${n.month.toString().padLeft(2, '0')}-'
+        '${n.day.toString().padLeft(2, '0')}';
+  }
 
-//   Future<List<Assignment>?> loadTodayAssignments(DateTime today) async {
-//     final prefs = await _prefs;
-//     final key = _assignmentsKeyForDate(today);
-//     final raw = prefs.getString(key);
-//     if (raw == null) return null;
-//     final list = (jsonDecode(raw) as List).cast<Map<String, dynamic>>();
-//     return list
-//         .map((a) => Assignment.fromJson(a..remove('id'), a['id'] as String))
-//         .toList();
-//   }
-// }
+  // ---------- Family ----------
+  Future<void> saveFamily(Family family) async {
+    final prefs = await _prefs;
+    final json = jsonEncode(family.toCacheMap());
+    await prefs.setString('$_familyKeyPrefix${family.id}', json);
+  }
+
+  Future<Family?> loadFamily(String familyId) async {
+    final prefs = await _prefs;
+    final raw = prefs.getString('$_familyKeyPrefix$familyId');
+    if (raw == null) return null;
+    final map = jsonDecode(raw) as Map<String, dynamic>;
+    return Family.fromCacheMap(map);
+  }
+
+  // ---------- Members ----------
+  Future<void> saveMembers(String familyId, List<Member> members) async {
+    final prefs = await _prefs;
+    final list = members.map((m) => m.toCacheMap()).toList();
+    await prefs.setString(
+      '$_membersKeyPrefix$familyId',
+      jsonEncode(list),
+    );
+  }
+
+  Future<List<Member>?> loadMembers(String familyId) async {
+    final prefs = await _prefs;
+    final raw = prefs.getString('$_membersKeyPrefix$familyId');
+    if (raw == null) return null;
+    final list = jsonDecode(raw) as List<dynamic>;
+    return list
+        .map((e) => Member.fromCacheMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ---------- Chores ----------
+  Future<void> saveChores(String familyId, List<Chore> chores) async {
+    final prefs = await _prefs;
+    final list = chores.map((c) => c.toCacheMap()).toList();
+    await prefs.setString(
+      '$_choresKeyPrefix$familyId',
+      jsonEncode(list),
+    );
+  }
+
+  Future<List<Chore>?> loadChores(String familyId) async {
+    final prefs = await _prefs;
+    final raw = prefs.getString('$_choresKeyPrefix$familyId');
+    if (raw == null) return null;
+    final list = jsonDecode(raw) as List<dynamic>;
+    return list
+        .map((e) => Chore.fromCacheMap(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  // ---------- Kid "Today" assignments ----------
+  Future<void> saveKidTodayAssignments({
+    required String familyId,
+    required String memberId,
+    required DateTime day,
+    required List<Assignment> assigned,
+    required List<Assignment> pending,
+    required List<Assignment> completed,
+  }) async {
+    final prefs = await _prefs;
+    final key = '$_kidTodayKeyPrefix${familyId}_${memberId}_${_dayKey(day)}';
+
+    final cache = KidAssignmentsCache(
+      assigned: assigned,
+      pending: pending,
+      completed: completed,
+    );
+
+    await prefs.setString(key, jsonEncode(cache.toJson()));
+  }
+
+  Future<KidAssignmentsCache?> loadKidTodayAssignments({
+    required String familyId,
+    required String memberId,
+    required DateTime day,
+  }) async {
+    final prefs = await _prefs;
+    final key = '$_kidTodayKeyPrefix${familyId}_${memberId}_${_dayKey(day)}';
+    final raw = prefs.getString(key);
+    if (raw == null) return null;
+
+    final map = jsonDecode(raw) as Map<String, dynamic>;
+    return KidAssignmentsCache.fromJson(map);
+  }
+}

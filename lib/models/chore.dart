@@ -86,4 +86,38 @@ class Chore {
     'defaultAssignees': defaultAssignees,
     'requiresApproval': requiresApproval,
   };
+
+    // --- Local cache mapping ---
+  Map<String, dynamic> toCacheMap() => {
+    'id': id,
+    'title': title,
+    'description': description,
+    'icon': icon,
+    'difficulty': difficulty,
+    'points': points,
+    'active': active,
+    'recurrence': recurrence?.toMap(),
+    'defaultAssignees': defaultAssignees,
+    'requiresApproval': requiresApproval,
+  };
+
+  factory Chore.fromCacheMap(Map<String, dynamic> m) {
+    return Chore(
+      id: m['id'] as String? ?? '',
+      title: m['title'] as String? ?? '',
+      description: m['description'] as String?,
+      icon: m['icon'] as String?,
+      difficulty: (m['difficulty'] as num?)?.toInt() ?? 1,
+      points: (m['points'] as num?)?.toInt() ?? 0,
+      active: (m['active'] as bool?) ?? true,
+      recurrence: m['recurrence'] == null
+          ? null
+          : Recurrence.fromMap(m['recurrence'] as Map<String, dynamic>?),
+      defaultAssignees:
+          (m['defaultAssignees'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
+      requiresApproval: (m['requiresApproval'] as bool?) ?? false,
+    );
+  }
+
 }

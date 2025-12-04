@@ -1,4 +1,3 @@
-import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
 import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
@@ -24,7 +23,6 @@ class ParentDrawer extends StatelessWidget {
     final familyName = family?.name ?? 'Your family';
 
     final member = app.currentMember;
-    final isParent = member != null && member.role != FamilyRole.child;
     final notificationsEnabled = member?.notificationsEnabled ?? true;
 
     return Drawer(

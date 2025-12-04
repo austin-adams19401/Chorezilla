@@ -1,4 +1,5 @@
 import 'package:chorezilla/data/chorezilla_repo.dart';
+import 'package:chorezilla/pages/family_setup/parent_pin_setup_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -16,15 +17,11 @@ class ParentSetupPage extends StatelessWidget {
     final app = context.watch<AppState>();
     final family = app.family;
 
-    final kids =
-        app.members
-            .where((m) => m.role == FamilyRole.child)
-            .toList()
-          ..sort(
-            (a, b) => a.displayName.toLowerCase().compareTo(
-              b.displayName.toLowerCase(),
-            ),
-          );
+    final kids = app.members.where((m) => m.role == FamilyRole.child).toList()
+      ..sort(
+        (a, b) =>
+            a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+      );
 
     debugPrint('PARENT SETUP: kids: ${kids.toString()}');
 
@@ -82,9 +79,32 @@ class ParentSetupPage extends StatelessWidget {
                 },
               ),
             ),
+            const SizedBox(height: 12),
+
+            // NEW: Parent PIN card
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.lock_outline_rounded),
+                title: const Text('Parent PIN'),
+                subtitle: Text(
+                  app.hasParentPin
+                      ? 'PIN set – tap to change'
+                      : 'Create a parent PIN to lock kid mode',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () async {
+                  await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                      builder: (_) => const ParentPinSetupPage(),
+                    ),
+                  );
+                  // After returning, AppState will re-read family + PIN and rebuild
+                },
+              ),
+            ),
             const SizedBox(height: 24),
 
-            // ---------- Current Kids section (copied layout from AddKidsPage) ----------
+            // ---------- Current Kids section ----------
             Align(
               alignment: Alignment.centerLeft,
               child: Text('Current Kids', style: ts.titleMedium),
@@ -144,10 +164,34 @@ class ParentSetupPage extends StatelessWidget {
                   : FilledButton.icon(
                       onPressed: () async {
                         final app = context.read<AppState>();
-                        final familyId = app.family?.id;
-                        if (familyId == null) return;
+                        final family = app.family;
+                        if (family == null) return;
 
-                        await app.repo.updateFamily(familyId, {'onboardingComplete': true});
+                        // Make sure a parent PIN exists.
+                        if (!app.hasParentPin) {
+                          final ok = await Navigator.of(context).push<bool>(
+                            MaterialPageRoute(
+                              builder: (_) => const ParentPinSetupPage(),
+                            ),
+                          );
+
+                          // If they backed out or didn't complete, don't finish setup.
+                          if (ok != true && !app.hasParentPin) {
+                            if(!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Please create a parent PIN before finishing setup.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                        }
+
+                        await app.repo.updateFamily(family.id, {
+                          'onboardingComplete': true,
+                        });
                       },
                       icon: const Icon(Icons.check),
                       label: const Text('Finish setup'),

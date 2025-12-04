@@ -56,6 +56,7 @@ class Family {
   final FamilyStats stats;
   final DateTime? createdAt;
   final bool onboardingComplete;
+  final String? parentPinHash;
 
   const Family({
     required this.id,
@@ -66,7 +67,7 @@ class Family {
     this.settings = const FamilySettings(),
     this.stats = const FamilyStats(),
     this.createdAt,
-    
+    this.parentPinHash,
   });
 
   Map<String, dynamic> toMap() => {
@@ -77,6 +78,7 @@ class Family {
         'settings': settings.toMap(),
         'stats': stats.toMap(),
         'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
+        'parentPinHash': parentPinHash,
       };
 
   factory Family.fromDoc(DocumentSnapshot doc) {
@@ -90,6 +92,35 @@ class Family {
       settings: FamilySettings.fromMap(data['settings'] as Map<String, dynamic>?),
       stats: FamilyStats.fromMap(data['stats'] as Map<String, dynamic>?),
       createdAt: tsAsDate(data['createdAt']),
+      parentPinHash: data['parentPinHash'] as String?,
     );
   }
+
+    // --- Local cache mapping (no Firestore Timestamp) ---
+  Map<String, dynamic> toCacheMap() => {
+    'id': id,
+    'name': name,
+    'ownerUid': ownerUid,
+    'onboardingComplete': onboardingComplete,
+    'joinCode': joinCode,
+    'settings': settings.toMap(), // already JSON-safe
+    'stats': stats.toMap(),
+    'createdAt': createdAt?.toIso8601String(),
+  };
+
+  factory Family.fromCacheMap(Map<String, dynamic> data) {
+    return Family(
+      id: data['id'] as String? ?? '',
+      name: data['name'] as String? ?? 'Family',
+      ownerUid: data['ownerUid'] as String? ?? '',
+      onboardingComplete: (data['onboardingComplete'] as bool?) ?? false,
+      joinCode: data['joinCode'] as String?,
+      settings: FamilySettings.fromMap(
+        data['settings'] as Map<String, dynamic>?,
+      ),
+      stats: FamilyStats.fromMap(data['stats'] as Map<String, dynamic>?),
+      createdAt: parseIsoDateTimeOrNull(data['createdAt']),
+    );
+  }
+
 }

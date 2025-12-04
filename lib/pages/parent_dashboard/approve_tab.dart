@@ -396,8 +396,8 @@ class _ApproveTabState extends State<ApproveTab> {
                         ),
                       );
                     },
-                    errorBuilder: (_, __, ___) => Container(
-                      color: cs.surfaceVariant,
+                    errorBuilder: (_, _, _) => Container(
+                      color: cs.surfaceContainerHighest,
                       alignment: Alignment.center,
                       child: Text(
                         'Could not load photo',

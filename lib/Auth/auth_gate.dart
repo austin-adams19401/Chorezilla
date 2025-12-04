@@ -8,6 +8,7 @@ import 'package:chorezilla/state/app_state.dart';
 
 import 'package:chorezilla/pages/parent_dashboard/parent_dashboard.dart';
 import 'package:chorezilla/pages/startup/login_page.dart';
+
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -24,7 +25,7 @@ class AuthGate extends StatelessWidget {
       return const LoginPage();
     }
 
-    // 2) Wait until we’ve loaded viewMode from SharedPreferences
+    // 2) Wait until we've loaded viewMode from SharedPreferences
     if (!app.viewModeLoaded) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -34,19 +35,48 @@ class AuthGate extends StatelessWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    // 3.5) Family is boot-loaded, but we DON'T yet know parent PIN state
+    // (Firestore family doc hasn't arrived with parentPinHash).
+    // → stay on splash instead of flashing ParentSetupPage.
+    if (!app.parentPinLoaded) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     // 4) Signed in + streams ready:
     //    No family yet → go to setup flow to create it
     if (family == null) {
       return const ParentSetupPage();
     }
 
-    // 5) Check kids + onboardingComplete
+    debugPrint(
+      'AuthGate state: bootLoaded=${app.bootLoaded} '
+      'parentPinLoaded=${app.parentPinLoaded} hasParentPin=${app.hasParentPin} '
+      'family=${family.id} kids=${members.length}',
+    );
+
+
+    // 5) Check kids + onboardingComplete + parent PIN
     final hasKids = members.any((m) => m.role == FamilyRole.child && m.active);
     final onboardingComplete = family.onboardingComplete;
+    final hasParentPin = app.hasParentPin;
 
-    if (!hasKids || !onboardingComplete) {
+    debugPrint(
+      'AuthGate state: bootLoaded=${app.bootLoaded} '
+      'parentPinLoaded=${app.parentPinLoaded} hasParentPin=${app.hasParentPin} '
+      'family=${family.id} kids=${members.length}',
+    );
+
+
+    // If any of these are missing, stay in Parent Setup
+    if (!hasKids || !onboardingComplete || !hasParentPin) {
       return const ParentSetupPage();
     }
+    debugPrint(
+      'AuthGate state: bootLoaded=${app.bootLoaded} '
+      'parentPinLoaded=${app.parentPinLoaded} hasParentPin=${app.hasParentPin} '
+      'family=${family.id} kids=${members.length}',
+    );
+
 
     // 6) All set → decide root by view mode
     if (app.viewMode == AppViewMode.kid) {
@@ -56,3 +86,4 @@ class AuthGate extends StatelessWidget {
     }
   }
 }
+

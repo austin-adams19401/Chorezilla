@@ -96,3 +96,12 @@ extension UniqueByKey<T, KeyType> on Iterable<T> {
     return uniqueItems;
   }
 }
+
+DateTime? parseIsoDateTimeOrNull(dynamic value) {
+  if (value == null) return null;
+  if (value is String && value.isNotEmpty) {
+    return DateTime.tryParse(value);
+  }
+  return null;
+}
+

@@ -110,4 +110,52 @@ class Assignment {
           : Proof.fromMap(data['proof'] as Map<String, dynamic>),
     );
   }
+
+    // --- Local cache mapping (no Firestore Timestamp) ---
+  Map<String, dynamic> toCacheMap() => {
+    'id': id,
+    'familyId': familyId,
+    'memberId': memberId,
+    'memberName': memberName,
+    'choreId': choreId,
+    'choreTitle': choreTitle,
+    'choreIcon': choreIcon,
+    'difficulty': difficulty,
+    'xp': xp,
+    'coinAward': coinAward,
+    'requiresApproval': requiresApproval,
+    'status': statusToString(status),
+    'assignedAt': assignedAt?.toIso8601String(),
+    'due': due?.toIso8601String(),
+    'startedAt': startedAt?.toIso8601String(),
+    'completedAt': completedAt?.toIso8601String(),
+    'approvedAt': approvedAt?.toIso8601String(),
+    'proof': proof?.toMap(),
+  };
+
+  factory Assignment.fromCacheMap(Map<String, dynamic> data) {
+    return Assignment(
+      id: data['id'] as String? ?? '',
+      familyId: data['familyId'] as String? ?? '',
+      memberId: data['memberId'] as String? ?? '',
+      memberName: data['memberName'] as String? ?? '',
+      choreId: data['choreId'] as String? ?? '',
+      choreTitle: data['choreTitle'] as String? ?? '',
+      choreIcon: data['choreIcon'] as String?,
+      difficulty: (data['difficulty'] as num?)?.toInt() ?? 1,
+      xp: (data['xp'] as num?)?.toInt() ?? 0,
+      coinAward: (data['coinAward'] as num?)?.toInt() ?? 0,
+      requiresApproval: (data['requiresApproval'] as bool?) ?? false,
+      status: statusFromString(data['status'] as String? ?? 'assigned'),
+      assignedAt: parseIsoDateTimeOrNull(data['assignedAt']),
+      due: parseIsoDateTimeOrNull(data['due']),
+      startedAt: parseIsoDateTimeOrNull(data['startedAt']),
+      completedAt: parseIsoDateTimeOrNull(data['completedAt']),
+      approvedAt: parseIsoDateTimeOrNull(data['approvedAt']),
+      proof: data['proof'] == null
+          ? null
+          : Proof.fromMap(data['proof'] as Map<String, dynamic>),
+    );
+  }
+
 }
