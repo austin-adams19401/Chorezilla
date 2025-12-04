@@ -77,7 +77,7 @@ class Chorezilla extends StatelessWidget {
         '/edit': (_) => const EditFamilyPage(),
         // Dashboards
         '/parent': (_) => const ParentDashboardPage(),
-        '/kids': (_) => const ChildDashboardPage(),
+        '/kids': (_) => const KidDashboardPage(),
         // Join family with a code
         '/kid-join': (_) => const KidJoinPage(),
         '/parent-join': (_) => const ParentJoinPage(),

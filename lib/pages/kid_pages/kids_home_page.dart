@@ -271,7 +271,7 @@ class _KidCard extends StatelessWidget {
     app.setCurrentMember(member.id);
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ChildDashboardPage(memberId: member.id),
+        builder: (_) => KidDashboardPage(memberId: member.id),
       ),
     );
   }
@@ -419,7 +419,6 @@ Future<String?> _showKidPinDialog(BuildContext context, String kidName) async {
     },
   );
 
-  controller.dispose();
   return result;
 }
 

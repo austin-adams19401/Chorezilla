@@ -13,7 +13,6 @@ extension AppStateFamilyStreams on AppState {
     _membersLoaded = false;
     _parentPinHash = null;
     _parentPinKnown = false;
-    _todayAssignmentsEnsured = false;
     _rewards = const [];
     _rewardsBootstrapped = false;
     rewardsVN.value = const [];
@@ -22,7 +21,6 @@ extension AppStateFamilyStreams on AppState {
     // Hydrate from cache
     await _loadCachedFamilyData(familyId);
 
-    // Family doc (rare changes — name/settings)
     _familySub?.cancel();
     _familySub = repo.watchFamily(familyId).listen((fam) {
       _family = fam;
@@ -36,6 +34,9 @@ extension AppStateFamilyStreams on AppState {
         _familyLoaded = true;
       }
       _notifyStateChanged();
+
+      // Safe: ensureAssignmentsForToday is idempotent
+      ensureAssignmentsForToday();
     });
 
     _membersSub?.cancel();
@@ -58,6 +59,9 @@ extension AppStateFamilyStreams on AppState {
         _membersLoaded = true;
       }
       _notifyStateChanged();
+
+      // Safe & cheap; will no-op until family + chores are ready
+      ensureAssignmentsForToday();
     });
 
     // Chores (hot list)
@@ -68,10 +72,7 @@ extension AppStateFamilyStreams on AppState {
 
       _notifyStateChanged();
 
-      if (!_todayAssignmentsEnsured) {
-        _todayAssignmentsEnsured = true;
-        ensureAssignmentsForToday();
-      }
+      ensureAssignmentsForToday();      
     });
 
     // Rewards (store catalog)
@@ -164,7 +165,6 @@ extension AppStateFamilyStreams on AppState {
     }
   }
 
-  // Watch all assignments in a family for a given status (no member filter)
   Stream<List<Assignment>> _watchAssignmentsForFamily(
     String familyId,
     AssignmentStatus status,
@@ -174,20 +174,26 @@ extension AppStateFamilyStreams on AppState {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
-    final startTs = Timestamp.fromDate(today);
-    final endTs = Timestamp.fromDate(tomorrow);
+    final dayKey = _dateKey(
+      today,
+    ); // same helper used in ensureAssignmentsForToday
 
     Query q = db
         .collection('families')
         .doc(familyId)
         .collection('assignments')
         .where('status', isEqualTo: statusWire)
-        .where('due', isGreaterThanOrEqualTo: startTs)
-        .where('due', isLessThan: endTs)
-        .orderBy('due');
+        .where('dayKey', isEqualTo: dayKey)
+        // pick an order field that you *know* exists; 'assignedAt' is good if you set it
+        .orderBy('assignedAt', descending: false);
 
-    return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
+    return q.snapshots().map((s) {
+      final list = s.docs.map(Assignment.fromDoc).toList();
+      debugPrint(
+        '_watchAssignmentsForFamily($statusWire): got ${list.length} docs for dayKey=$dayKey',
+      );
+      return list;
+    });
   }
 
   Future<void> _loadCachedFamilyData(String familyId) async {

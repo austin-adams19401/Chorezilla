@@ -469,17 +469,22 @@ extension AppStateWrites on AppState {
     }
   }
 
-  /// Ensure that for today's date, each default assignee of each recurring chore
-  /// has an Assignment doc (status = 'assigned').
-  ///
-  /// Idempotent across devices:
-  /// - Uses a logical dayKey ("YYYY-MM-DD") instead of raw Timestamp equality.
-  /// - Uses deterministic doc IDs per (chore, member, day).
   Future<void> ensureAssignmentsForToday() async {
     final famId = _familyId;
     final fam = _family;
+
     if (famId == null || fam == null) {
-      debugPrint('ensureAssignmentsForToday: no family loaded, skipping.');
+      debugPrint(
+        'ensureAssignmentsForToday: no family loaded (famId=$famId, fam=$_family), skipping.',
+      );
+      return;
+    }
+
+    // If you have a getter `chores` that might be null, guard it.
+    if (chores.isEmpty) {
+      debugPrint(
+        'ensureAssignmentsForToday: chores list is empty, nothing to auto-assign.',
+      );
       return;
     }
 
@@ -496,13 +501,17 @@ extension AppStateWrites on AppState {
     final dayKey = _dateKey(today);
 
     debugPrint(
-      'ensureAssignmentsForToday: famId=$famId date=$today dayKey=$dayKey',
+      'ensureAssignmentsForToday: famId=$famId date=$today dayKey=$dayKey (chores=${chores.length})',
     );
 
     // 1) Load all assignments that are already for this dayKey (any status).
     final existingSnap = await assignmentsRef
         .where('dayKey', isEqualTo: dayKey)
         .get();
+
+    debugPrint(
+      'ensureAssignmentsForToday: found ${existingSnap.docs.length} existing assignments for dayKey=$dayKey',
+    );
 
     // Map: choreId -> set of memberIds that already have an assignment today.
     final Map<String, Set<String>> existingByChore = {};
@@ -523,6 +532,12 @@ extension AppStateWrites on AppState {
       if (chore.defaultAssignees.isEmpty) continue;
 
       final alreadyForChore = existingByChore[chore.id] ?? const <String>{};
+
+      debugPrint(
+        'ensureAssignmentsForToday: evaluating chore=${chore.title} '
+        '(id=${chore.id}), defaultAssignees=${chore.defaultAssignees}, '
+        'already=${alreadyForChore.toList()}',
+      );
 
       for (final memberId in chore.defaultAssignees) {
         if (alreadyForChore.contains(memberId)) {
@@ -547,6 +562,11 @@ extension AppStateWrites on AppState {
         final docId = 'asg_${chore.id}_${member.id}_$dayKey';
         final aRef = assignmentsRef.doc(docId);
 
+        debugPrint(
+          'ensureAssignmentsForToday: creating assignment docId=$docId '
+          'for member=${member.displayName} chore=${chore.title}',
+        );
+
         batch.set(aRef, {
           'familyId': famId,
           'choreId': chore.id,
@@ -570,7 +590,9 @@ extension AppStateWrites on AppState {
     }
 
     if (createdCount == 0) {
-      debugPrint('ensureAssignmentsForToday: no new assignments needed.');
+      debugPrint(
+        'ensureAssignmentsForToday: no new assignments needed for $dayKey.',
+      );
       return;
     }
 

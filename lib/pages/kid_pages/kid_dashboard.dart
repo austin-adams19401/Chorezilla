@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:chorezilla/components/leveling.dart';
@@ -7,7 +8,10 @@ import 'package:confetti/confetti.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+
+import 'package:chorezilla/data/chorezilla_repo.dart';
 
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/member.dart';
@@ -17,17 +21,17 @@ import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/pages/kid_pages/kid_rewards_page.dart';
 import 'package:chorezilla/pages/kid_pages/kid_activity_page.dart';
 
-class ChildDashboardPage extends StatefulWidget {
-  const ChildDashboardPage({super.key, this.memberId});
+class KidDashboardPage extends StatefulWidget {
+  const KidDashboardPage({super.key, this.memberId});
 
   /// If omitted, we’ll fall back to AppState.currentMember.
   final String? memberId;
 
   @override
-  State<ChildDashboardPage> createState() => _ChildDashboardPageState();
+  State<KidDashboardPage> createState() => _KidDashboardPageState();
 }
 
-class _ChildDashboardPageState extends State<ChildDashboardPage>
+class _KidDashboardPageState extends State<KidDashboardPage>
     with AutomaticKeepAliveClientMixin {
   final Set<String> _busyIds = {}; // assignmentIds being completed
   String? _watchingMemberId;
@@ -39,8 +43,13 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   bool _celebrationActive = false;
   bool _showConfetti = false;
 
-  // NEW: image picker for photo proof
+  // image picker for photo proof
   final ImagePicker _imagePicker = ImagePicker();
+
+  // NEW: local "today" stream, same as ParentTodayTab → filtered per kid
+  StreamSubscription<List<Assignment>>? _todayAssignmentsSub;
+  List<Assignment> _todayAssignmentsForKid = [];
+  bool _todayAssignmentsBootstrapped = false;
 
   @override
   void initState() {
@@ -51,22 +60,35 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 5),
     );
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _startStreamsForCurrentKid(),
-    );
+
+    // Bind streams once the widget is in the tree
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final member = _resolveMember(_app);
+      if (member != null) {
+        _bindStreamsForMember(member);
+      }
+    });
   }
 
   @override
-  void didUpdateWidget(covariant ChildDashboardPage oldWidget) {
+  void didUpdateWidget(covariant KidDashboardPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If the page was rebuilt with a different memberId, restart streams
+
+    // If the widget was rebuilt with a different explicit memberId, re-bind.
     if (oldWidget.memberId != widget.memberId) {
-      _restartStreams();
+      final member = _resolveMember(_app);
+      if (member != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _bindStreamsForMember(member);
+        });
+      }
     }
   }
 
   @override
   void dispose() {
+    _todayAssignmentsSub?.cancel();
     if (_watchingMemberId != null) {
       _app.stopKidStreams(_watchingMemberId!);
     }
@@ -74,23 +96,57 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     super.dispose();
   }
 
-  void _restartStreams() {
-    if (_watchingMemberId != null) {
-      _app.stopKidStreams(_watchingMemberId!);
-      _watchingMemberId = null;
+  /// Bind both:
+  ///  - AppState's kid streams (for rewards, etc.)
+  ///  - Local "today" assignments stream filtered for this kid
+  void _bindStreamsForMember(Member member) {
+    final familyId = _app.familyId;
+    if (familyId == null) {
+      debugPrint('ChildDashboardPage: no familyId; cannot bind kid streams.');
+      return;
     }
-    _startStreamsForCurrentKid();
-  }
 
-  void _startStreamsForCurrentKid() {
-    final member = _resolveMember(_app);
-    if (member == null) return;
+    // Avoid rebinding if we're already watching this kid and stream exists.
+    if (_watchingMemberId == member.id && _todayAssignmentsSub != null) {
+      return;
+    }
+
+    // Stop previous AppState kid streams when switching kids
+    if (_watchingMemberId != null && _watchingMemberId != member.id) {
+      _app.stopKidStreams(_watchingMemberId!);
+    }
 
     _watchingMemberId = member.id;
-
     _lastSeenLevel = null;
 
+    // Start AppState-level kid streams (for rewards, etc.)
     _app.startKidStreams(member.id);
+
+    // Local "today" stream – same as ParentTodayTab, filtered by memberId
+    _todayAssignmentsSub?.cancel();
+    _todayAssignmentsBootstrapped = false;
+    _todayAssignmentsForKid = [];
+
+    debugPrint(
+      'ChildDashboardPage: binding today stream for kid=${member.displayName} '
+      '(${member.id}) family=$familyId',
+    );
+
+    _todayAssignmentsSub = _app.repo.watchAssignmentsDueToday(familyId).listen((
+      all,
+    ) {
+      final filtered = all.where((a) => a.memberId == member.id).toList();
+
+      debugPrint(
+        'ChildDashboardPage[todayStream]: kid=${member.displayName} total=${filtered.length}',
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _todayAssignmentsForKid = filtered;
+        _todayAssignmentsBootstrapped = true;
+      });
+    });
   }
 
   Member? _resolveMember(AppState app) {
@@ -123,26 +179,54 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
       );
     }
 
+    // If currentMember changed under us (via profile switcher), re-bind streams.
+    if (_watchingMemberId != member.id) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _bindStreamsForMember(member);
+      });
+    }
+
     _handleLevelChange(member);
-    final choresLoaded = app.kidAssignmentsBootstrapped(member.id);
 
-    final todos = [...app.assignedForKid(member.id)]..sort(_byDueThenTitle);
+    final choresLoaded = _todayAssignmentsBootstrapped;
 
-    // All completed for this kid
-    final completedAll = app.completedForKid(member.id);
-
-    // Filter to only "today"
+    // "Today" window (local time)
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
     final tomorrowStart = todayStart.add(const Duration(days: 1));
 
-    final completedToday = completedAll.where((a) {
-      final t = a.completedAt;
+    bool isToday(DateTime? t) {
       if (t == null) return false;
       return !t.isBefore(todayStart) && t.isBefore(tomorrowStart);
-    }).toList()..sort(_byCompletedAtDescThenTitle);
+    }
 
-    final submitted = [...app.pendingForKid(member.id)]..sort(_byDueThenTitle);
+    final allForKid = _todayAssignmentsForKid;
+
+    final todos =
+        allForKid.where((a) => a.status == AssignmentStatus.assigned).toList()
+          ..sort(_byDueThenTitle);
+
+    final submitted =
+        allForKid.where((a) => a.status == AssignmentStatus.pending).toList()
+          ..sort(_byDueThenTitle);
+
+    final completedToday =
+        allForKid
+            .where(
+              (a) =>
+                  a.status == AssignmentStatus.completed &&
+                  isToday(a.completedAt),
+            )
+            .toList()
+          ..sort(_byCompletedAtDescThenTitle);
+
+    debugPrint(
+      'ChildDashboardPage: kid=${member.displayName} '
+      'todos=${todos.length} submitted=${submitted.length} '
+      'completedToday=${completedToday.length} (loaded=$choresLoaded)',
+    );
+
     final pendingRewards = app.pendingRewardsForKid(member.id);
 
     return Scaffold(
@@ -280,10 +364,10 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
 
       // Only ask for photo proof if this assignment requires parent approval.
       if (a.requiresApproval) {
-        // 1) Ask how they want to proceed (camera / gallery / no photo / cancel)
+        // Ask how they want to proceed (camera / gallery / no photo / cancel)
         final choice = await showDialog<ProofChoice>(
           context: context,
-          barrierDismissible: false, // 👈 can't tap outside to dismiss
+          barrierDismissible: false, // can't tap outside to dismiss
           builder: (ctx) {
             return AlertDialog(
               title: const Text('Add a photo?'),
@@ -365,7 +449,7 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
         }
       }
 
-      // 3) Existing completion logic (status, XP, coins, streaks, etc.)
+      // Existing completion logic (status, XP, coins, streaks, etc.)
       await app.completeAssignment(a.id);
 
       if (!mounted) return;
@@ -392,10 +476,6 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   }
 
   /// Attach the proof to the assignment document in Firestore.
-  ///
-  /// NOTE: This assumes your assignments are stored under:
-  ///   families/{familyId}/assignments/{assignmentId}
-  /// If your path differs, tweak this accordingly.
   Future<void> _attachProofToAssignment(Assignment a, String photoUrl) async {
     final db = FirebaseFirestore.instance;
     final doc = db
@@ -413,23 +493,17 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
     final info = levelInfoForXp(member.xp);
     final currentLevel = info.level;
 
-    // Use lastSeen if we have it, otherwise fall back to the stored level.
-    // If that is also null (shouldn’t really happen), fall back to current.
     final storedLevel = member.level; // from your Member model
     final baseline = _lastSeenLevel ?? storedLevel;
 
     if (currentLevel > baseline) {
-      // LEVEL UP! 🎉
       _lastSeenLevel = currentLevel;
 
-      // Defer celebration until after the current frame, so we can safely
-      // call setState + showDialog.
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _triggerLevelUpCelebration(member, info);
       });
     } else {
-      // keep them in sync so we don’t backslide
       _lastSeenLevel = baseline;
     }
   }
@@ -437,21 +511,17 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   Future<void> _triggerLevelUpCelebration(Member member, LevelInfo info) async {
     if (!mounted) return;
 
-    // If a celebration is already showing, don’t stack another.
     if (_celebrationActive) return;
     _celebrationActive = true;
 
-    // Turn on confetti
     setState(() {
       _showConfetti = true;
     });
     _confettiController.play();
 
-    // Persist the new level so we don’t re-celebrate this same level
     final app = context.read<AppState>();
     app.updateMember(member.id, {'level': info.level});
 
-    // Determine any level-up reward.
     final lvlReward = levelRewardForLevel(info.level);
 
     if (lvlReward != null) {
@@ -464,7 +534,6 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
       } catch (_) {}
     }
 
-    // Show the level-up dialog and wait for it to close
     if (!mounted) return;
     await showDialog<void>(
       context: context,
@@ -518,7 +587,6 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
                         ),
                       ),
 
-                      // 👇 Show the level reward if this level has one
                       if (lvlReward != null) ...[
                         const SizedBox(height: 16),
                         Container(
@@ -596,7 +664,6 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
       },
     );
 
-    // After dialog closes, stop confetti + clear flag
     if (!mounted) return;
     setState(() {
       _showConfetti = false;
@@ -641,8 +708,6 @@ class _ChildDashboardPageState extends State<ChildDashboardPage>
   bool get wantKeepAlive => true;
 }
 
-
-
 // ============================================================================
 // Widgets
 // ============================================================================
@@ -677,7 +742,6 @@ class _TodoList extends StatelessWidget {
 
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -693,7 +757,6 @@ class _TodoList extends StatelessWidget {
         }
 
         const gridSpacing = 12.0;
-        // Approx “row height” for your existing _AssignmentTile.
         const tileHeight = 120.0;
 
         return CustomScrollView(
@@ -766,7 +829,7 @@ class _TodoList extends StatelessWidget {
                     crossAxisCount: crossAxisCount,
                     crossAxisSpacing: gridSpacing,
                     mainAxisSpacing: gridSpacing,
-                    mainAxisExtent: tileHeight, 
+                    mainAxisExtent: tileHeight,
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final a = completedToday[index];
@@ -839,10 +902,9 @@ class _AssignmentTile extends StatelessWidget {
 
     final icon = assignment.choreIcon?.trim();
 
-    const double iconBoxSize = 50; // size of the colored square
-    final double emojiSize = iconBoxSize * 0.65; // scale text with box
+    const double iconBoxSize = 50;
+    final double emojiSize = iconBoxSize * 0.65;
 
-    // Style variants when completed
     final baseTitleStyle = ts.titleMedium?.copyWith(
       fontWeight: FontWeight.w600,
     );
@@ -854,10 +916,7 @@ class _AssignmentTile extends StatelessWidget {
         color: cs.onSurfaceVariant,
       );
     } else if (rejected) {
-
-      titleStyle = baseTitleStyle?.copyWith(
-        color: cs.error, // or cs.errorContainer if you want it softer
-      );
+      titleStyle = baseTitleStyle?.copyWith(color: cs.error);
     } else {
       titleStyle = baseTitleStyle;
     }
@@ -866,12 +925,13 @@ class _AssignmentTile extends StatelessWidget {
         ? ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant)
         : ts.bodyMedium;
 
-
     return Card(
       elevation: 0,
-      color: 
-        completed ? cs.surfaceContainerHighest 
-        : rejected ? cs.errorContainer : cs.surfaceContainer,
+      color: completed
+          ? cs.surfaceContainerHighest
+          : rejected
+          ? cs.errorContainer
+          : cs.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(12),

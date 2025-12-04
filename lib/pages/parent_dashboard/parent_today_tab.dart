@@ -46,7 +46,7 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
     if (!_loadedPref) {
       _loadPref();
     }
-    if (_boundFamilyId != app.familyId) {
+    if (_boundFamilyId != app.familyId && app.familyId != null) {
       _boundFamilyId = app.familyId;
       _todayStream = app.repo.watchAssignmentsDueToday(_boundFamilyId!);
       setState(() {});
@@ -67,6 +67,25 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
       stream: _todayStream,
       builder: (context, snap) {
         final items = snap.data ?? const <Assignment>[];
+
+        // 🔍 Extra debug so we can see what's really happening
+        debugPrint(
+          'ParentTodayTab: state=${snap.connectionState} '
+          'hasError=${snap.hasError} items=${items.length}',
+        );
+
+        if (snap.hasError) {
+          // If Firestore is complaining about indexes / rules, show it.
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Error loading today\'s assignments:\n${snap.error}',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
 
         if (snap.connectionState == ConnectionState.waiting && items.isEmpty) {
           return const Center(child: CircularProgressIndicator());
@@ -155,19 +174,16 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-
-                  // How wide each kid card can be; this controls how many columns we get.
-                  // With maxCrossAxisExtent, Flutter chooses the number of columns.
                   return GridView.builder(
                     padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                     gridDelegate:
-                      const SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 260, // ~3–4 per row on tablets
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        // width / height; < 1.0 ⇒ taller tiles
-                        childAspectRatio: 0.8,
-                      ),
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 260, // ~3–4 per row on tablets
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          // width / height; < 1.0 ⇒ taller tiles
+                          childAspectRatio: 0.8,
+                        ),
                     itemCount: summaries.length,
                     itemBuilder: (context, index) {
                       final s = summaries[index];
@@ -488,7 +504,6 @@ class _KidTodayCard extends StatelessWidget {
       },
     );
   }
-
 
   String _initialsFor(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));

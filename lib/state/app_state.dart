@@ -139,8 +139,6 @@ class AppState extends ChangeNotifier {
   bool get bootLoaded => _familyLoaded && _membersLoaded;
   bool get parentPinLoaded => _parentPinKnown;
 
-  bool _todayAssignmentsEnsured = false;
-
   // Active member selection for child dashboard/profile header
   String? _currentMemberId;
   Member? get currentMember {

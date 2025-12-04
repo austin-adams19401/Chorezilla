@@ -25,20 +25,7 @@ extension AssignmentRepo on ChorezillaRepo {
     required DateTime start,
     required DateTime end,
   }) {
-    final q = assignmentsColl(firebaseDB, familyId)
-        .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('due', isLessThanOrEqualTo: Timestamp.fromDate(end))
-        .orderBy('due');
-
-    return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
-  }
-
-Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day);
-    final end = start.add(const Duration(days: 1));
-
-    final q = assignmentsColl(firebaseDB, familyId)
+  final q = assignmentsColl(firebaseDB, familyId)
         .where('due', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
         .where('due', isLessThan: Timestamp.fromDate(end))
         .orderBy('due');
@@ -46,12 +33,51 @@ Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
 
+  Stream<List<Assignment>> watchAssignmentsDueToday(String familyId) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dayKey = _dayKeyFor(today);
+
+    // Super simple query: equality on dayKey only.
+    // No orderBy → no composite index required, avoids subtle index/remote issues.
+    final q = assignmentsColl(
+      firebaseDB,
+      familyId,
+    ).where('dayKey', isEqualTo: dayKey);
+
+    return q.snapshots().map((s) {
+      final list = s.docs.map(Assignment.fromDoc).toList()
+        ..sort((a, b) {
+          final ad = a.due;
+          final bd = b.due;
+          if (ad == null && bd == null) {
+            return a.choreTitle.compareTo(b.choreTitle);
+          } else if (ad == null) {
+            return 1;
+          } else if (bd == null) {
+            return -1;
+          } else {
+            final cmp = ad.compareTo(bd);
+            return cmp != 0 ? cmp : a.choreTitle.compareTo(b.choreTitle);
+          }
+        });
+
+      debugPrint(
+        'watchAssignmentsDueToday: fam=$familyId dayKey=$dayKey count=${list.length}',
+      );
+      return list;
+    });
+  }
+
 
 
   Stream<List<Assignment>> watchReviewQueue(String familyId) {
+    final pending = statusToString(AssignmentStatus.pending);
+
     return assignmentsColl(firebaseDB, familyId)
-        .where('status', isEqualTo: statusToString(AssignmentStatus.completed))
-        .orderBy('completedAt', descending: true)
+        .where('requiresApproval', isEqualTo: true)
+        .where('status', isEqualTo: pending)
+        .orderBy('due')
         .snapshots()
         .map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
@@ -89,7 +115,7 @@ Future<List<String>> assignChoreToMembers(
         'difficulty': chore.difficulty,
         'xp': awards.xp,
         'coinAward': awards.coins,
-        'requiresApproval': false, 
+        'requiresApproval': chore.requiresApproval,
         'status': 'assigned',
         'assignedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
