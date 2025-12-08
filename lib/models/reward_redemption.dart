@@ -6,15 +6,16 @@ enum RewardRedemptionStatus { pending, fulfilled, cancelled }
 class RewardRedemption {
   final String id;
   final String memberId;
-  final String? rewardId; // optional: may be null for dev/test
+  final String? rewardId; 
   final String rewardName;
   final int coinCost;
-  final String status; // 'pending' | 'given'
+  final String status; 
   final DateTime? createdAt;
   final DateTime? givenAt;
   final String? parentMemberId;
 
   bool get isPending => status == 'pending';
+  bool get isCancelled => status == 'cancelled';
 
   const RewardRedemption({
     required this.id,

@@ -132,6 +132,62 @@ extension RewardRepo on ChorezillaRepo {
     });
   }
 
+    /// Refund a pending reward: return coins to the kid and mark as cancelled.
+  Future<void> refundRewardRedemption(
+    String familyId, {
+    required RewardRedemption redemption,
+    String? parentMemberId,
+  }) async {
+    final db = firebaseDB;
+
+    final redemptionRef = rewardRedemptionsColl(
+      db,
+      familyId,
+    ).doc(redemption.id);
+    final memberRef = membersColl(db, familyId).doc(redemption.memberId);
+
+    await db.runTransaction((tx) async {
+      // Reload redemption inside the transaction
+      final redeemSnap = await tx.get(redemptionRef);
+      if (!redeemSnap.exists) {
+        throw Exception('Reward redemption not found');
+      }
+
+      final data = redeemSnap.data() as Map<String, dynamic>;
+      final status = data['status'] as String? ?? 'pending';
+
+      // Only allow refund while still pending
+      if (status != 'pending') {
+        return; // no-op if already given or cancelled
+      }
+
+      final coinCost =
+          (data['coinCost'] as num?)?.toInt() ?? redemption.coinCost;
+
+      // If there was a coin cost, credit it back.
+      if (coinCost > 0) {
+        final memSnap = await tx.get(memberRef);
+        if (!memSnap.exists) {
+          throw Exception('Member not found');
+        }
+
+        final memData = memSnap.data() as Map<String, dynamic>;
+        final currentCoins = (memData['coins'] as num?)?.toInt() ?? 0;
+
+        tx.update(memberRef, {'coins': currentCoins + coinCost});
+      }
+
+      // Mark redemption as cancelled so it falls out of the pending queue
+      tx.update(redemptionRef, {
+        'status': 'cancelled',
+        // Clear givenAt just in case
+        'givenAt': null,
+        if (parentMemberId != null) 'parentMemberId': parentMemberId,
+      });
+    });
+  }
+
+
   // ─────────────────────────────────────────────────────────────────────────
   // Seed starter rewards
   // ─────────────────────────────────────────────────────────────────────────

@@ -32,6 +32,7 @@ class _ParentHistoryTabState extends State<ParentHistoryTab> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final cs = Theme.of(context).colorScheme;
 
     // Make sure we're streaming assignments for this week
     app.watchHistoryWeek(_weekStart);
@@ -44,78 +45,279 @@ class _ParentHistoryTabState extends State<ParentHistoryTab> {
     // allowance, auto-create pending allowance rewards.
     app.ensureAllowanceRewardsForWeekIfEligible(_weekStart);
 
+    // Summary stats for hero
+    final kidCount = histories.length;
+    final totalDays = histories.fold<int>(
+      0,
+      (sum, h) => sum + h.dayStatuses.length,
+    );
+    final completedDays = histories.fold<int>(
+      0,
+      (sum, h) =>
+          sum + h.dayStatuses.where((s) => s == DayStatus.completed).length,
+    );
+    final completionRatio = totalDays > 0 ? completedDays / totalDays : 0.0;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _WeekHeader(
+        _HistoryHero(
           weekStart: _weekStart,
           weekEnd: weekEnd,
+          kidCount: kidCount,
+          completedDays: completedDays,
+          totalDays: totalDays,
+          completionRatio: completionRatio,
           onPrevWeek: () => _shiftWeek(-1),
           onNextWeek: () => _shiftWeek(1),
         ),
-        const Divider(height: 1),
         Expanded(
-          child: histories.isEmpty
-              ? const Center(child: Text('No kids to show yet.'))
-              : ListView.builder(
-                  itemCount: histories.length,
-                  itemBuilder: (context, index) {
-                    final history = histories[index];
-                    return _KidHistoryCard(
-                      history: history,
-                      weekStart: _weekStart,
-                    );
-                  },
-                ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 2),
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.secondary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+              child: histories.isEmpty
+                  ? const _EmptyHistory()
+                  : ListView.separated(
+                      itemCount: histories.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final history = histories[index];
+                        return _KidHistoryCard(
+                          history: history,
+                          weekStart: _weekStart,
+                        );
+                      },
+                    ),
+            ),
+          ),
         ),
       ],
     );
   }
 }
 
-class _WeekHeader extends StatelessWidget {
-  final DateTime weekStart;
-  final DateTime weekEnd;
-  final VoidCallback onPrevWeek;
-  final VoidCallback onNextWeek;
+// ─────────────────────────────────────────────────────────────────────────────
+// Hero header (gradient, like Today / Rewards)
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _WeekHeader({
+class _HistoryHero extends StatelessWidget {
+  const _HistoryHero({
     required this.weekStart,
     required this.weekEnd,
+    required this.kidCount,
+    required this.completedDays,
+    required this.totalDays,
+    required this.completionRatio,
     required this.onPrevWeek,
     required this.onNextWeek,
   });
 
+  final DateTime weekStart;
+  final DateTime weekEnd;
+  final int kidCount;
+  final int completedDays;
+  final int totalDays;
+  final double completionRatio;
+  final VoidCallback onPrevWeek;
+  final VoidCallback onNextWeek;
+
   @override
   Widget build(BuildContext context) {
-    final fmt = DateFormat.MMMd();
-    final label = '${fmt.format(weekStart)} – ${fmt.format(weekEnd)}';
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    final media = MediaQuery.of(context);
+    final double topInset = media.padding.top;
+
+    final fmt = DateFormat.MMMd();
+    final weekLabel = '${fmt.format(weekStart)} – ${fmt.format(weekEnd)}';
+    final kidsLabel = kidCount == 0
+        ? 'No kids yet'
+        : kidCount == 1
+        ? '1 kid'
+        : '$kidCount kids';
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(20, topInset + 4, 20, 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.secondary, cs.secondary, cs.primary],
+          stops: const [0.0, 0.55, 1.0],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            onPressed: onPrevWeek,
-          ),
+          // Text + stats
           Expanded(
-            child: Center(
-              child: Text(
-                label,
-                style: Theme.of(context).textTheme.titleMedium,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Weekly check-in',
+                    style: ts.headlineSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'See how the week went and what each kid earned.',
+                    style: ts.bodyMedium?.copyWith(color: Colors.white70),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Week selector row
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        color: Colors.white,
+                        onPressed: onPrevWeek,
+                      ),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            weekLabel,
+                            style: ts.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        color: Colors.white,
+                        onPressed: onNextWeek,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Kids + weekly completion bar
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: .12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          kidsLabel,
+                          style: ts.labelMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (totalDays > 0)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              LinearProgressIndicator(
+                                value: completionRatio.clamp(0.0, 1.0),
+                                minHeight: 6,
+                                backgroundColor: Colors.white.withValues(
+                                  alpha: .2,
+                                ),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '$completedDays of $totalDays good days',
+                                style: ts.labelSmall?.copyWith(
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                    ),
+                    onPressed: () => _showHistoryHelpDialog(context),
+                    icon: const Icon(Icons.help_outline_rounded, size: 18),
+                    label: const Text('How this works'),
+                  ),
+                ],
               ),
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
-            onPressed: onNextWeek,
           ),
         ],
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Empty state
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _EmptyHistory extends StatelessWidget {
+  const _EmptyHistory();
+
+  @override
+  Widget build(BuildContext context) {
+    final ts = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('📅', style: ts.displaySmall),
+            const SizedBox(height: 8),
+            Text(
+              'No kids to show yet',
+              style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Once you add kids and start assigning chores,\n'
+              'you\'ll see their weekly history here.',
+              textAlign: TextAlign.center,
+              style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Kid history card
+// ─────────────────────────────────────────────────────────────────────────────
 
 class _KidHistoryCard extends StatelessWidget {
   final WeeklyKidHistory history;
@@ -125,33 +327,71 @@ class _KidHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
+
     final member = history.member;
     final allowanceConfig = history.allowanceConfig;
     final allowanceResult = history.allowanceResult;
 
+    final completedDays = history.dayStatuses
+        .where((s) => s == DayStatus.completed)
+        .length;
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(
+          color: cs.outlineVariant.withValues(alpha: 0.8),
+          width: 1,
+        ),
+      ),
+      color: cs.surface,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              cs.surfaceContainerHighest.withValues(alpha: 0.18),
+              cs.surface,
+            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: avatar + name + help + allowance toggle
+            // Header: avatar + name + allowance toggle
             Row(
               children: [
                 _MemberAvatar(member: member),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    member.displayName,
-                    style: Theme.of(context).textTheme.titleMedium,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        member.displayName,
+                        style: ts.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$completedDays of 7 good days',
+                        style: ts.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.help_outline_rounded, size: 20),
-                  tooltip: 'How this weekly view works',
-                  onPressed: () => _showHistoryHelpDialog(context),
-                ),
+                const SizedBox(width: 4),
                 _AllowanceToggle(
                   member: member,
                   allowanceConfig: allowanceConfig,
@@ -159,9 +399,13 @@ class _KidHistoryCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
+
+            // Day row
             _DayRow(history: history, weekStart: weekStart),
+
+            // Allowance summary (if enabled)
             if (allowanceConfig.enabled) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _AllowanceSummary(
                 config: allowanceConfig,
                 result: allowanceResult,
@@ -180,13 +424,22 @@ class _MemberAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Swap this for your actual avatar widget.
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    final initial = member.displayName.isNotEmpty
+        ? member.displayName.characters.first.toUpperCase()
+        : '?';
+
     return CircleAvatar(
       radius: 18,
+      backgroundColor: cs.primaryContainer,
       child: Text(
-        member.displayName.isNotEmpty
-            ? member.displayName[0].toUpperCase()
-            : '?',
+        initial,
+        style: ts.titleMedium?.copyWith(
+          color: cs.onPrimaryContainer,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -200,6 +453,9 @@ class _DayRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ts = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
     return Row(
       children: List.generate(7, (i) {
         final date = weekStart.add(Duration(days: i));
@@ -207,22 +463,24 @@ class _DayRow extends StatelessWidget {
 
         return Expanded(
           child: InkWell(
+            borderRadius: BorderRadius.circular(12),
             onTap: () {
               showModalBottomSheet(
                 context: context,
+                isScrollControlled: true,
                 builder: (ctx) {
                   return _DayDetailSheet(member: history.member, date: date);
                 },
               );
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
+              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     _weekdayShort(date.weekday),
-                    style: Theme.of(context).textTheme.labelSmall,
+                    style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
                   const SizedBox(height: 4),
                   _DayStatusIcon(status: status),
@@ -292,6 +550,10 @@ class _DayStatusIcon extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Day detail sheet (status picker)
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _DayDetailSheet extends StatefulWidget {
   final Member member;
   final DateTime date;
@@ -317,6 +579,8 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat.yMMMEd();
+    final ts = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return SafeArea(
       child: Padding(
@@ -329,9 +593,18 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              width: 44,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: cs.outlineVariant,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
             Text(
               '${widget.member.displayName} – ${fmt.format(widget.date)}',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
 
@@ -365,7 +638,7 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
+              child: FilledButton(
                 onPressed: () async {
                   final app = context.read<AppState>();
                   await app.setDayStatus(
@@ -386,6 +659,10 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Allowance controls
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _AllowanceToggle extends StatelessWidget {
   final Member member;
   final AllowanceConfig allowanceConfig;
@@ -402,6 +679,9 @@ class _AllowanceToggle extends StatelessWidget {
     final label = enabled
         ? '\$${amount.toStringAsFixed(2)}/wk'
         : 'No allowance';
+
+    final ts = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -427,7 +707,13 @@ class _AllowanceToggle extends StatelessWidget {
         // Tap the label to edit config any time
         InkWell(
           onTap: () => _showConfigSheet(context),
-          child: Text(label, style: Theme.of(context).textTheme.labelSmall),
+          child: Text(
+            label,
+            style: ts.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
       ],
     );
@@ -504,10 +790,11 @@ class _AllowanceConfigSheetState extends State<_AllowanceConfigSheet> {
             children: [
               Text(
                 'Allowance for ${widget.member.displayName}',
-                style: theme.textTheme.titleMedium,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 12),
-
               TextField(
                 controller: _amountController,
                 keyboardType: const TextInputType.numberWithOptions(
@@ -567,7 +854,7 @@ class _AllowanceConfigSheetState extends State<_AllowanceConfigSheet> {
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
+                child: FilledButton(
                   onPressed: () {
                     final app = context.read<AppState>();
 
@@ -612,6 +899,9 @@ class _AllowanceSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!config.enabled) return const SizedBox.shrink();
 
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
     final full = config.fullAmountCents / 100.0;
     final payout = (result?.payoutCents ?? 0) / 100.0;
     final ratio = result?.ratio ?? 0.0;
@@ -620,12 +910,20 @@ class _AllowanceSummary extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        LinearProgressIndicator(value: ratio.clamp(0.0, 1.0)),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: ratio.clamp(0.0, 1.0),
+            minHeight: 6,
+            backgroundColor: cs.surfaceContainerHighest.withValues(alpha: 0.8),
+            valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+          ),
+        ),
         const SizedBox(height: 4),
         Text(
           '$effectiveDays/${config.daysRequiredForFull} days '
           '→ \$${payout.toStringAsFixed(2)} of \$${full.toStringAsFixed(2)}',
-          style: Theme.of(context).textTheme.bodySmall,
+          style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
       ],
     );
@@ -633,7 +931,7 @@ class _AllowanceSummary extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Help dialog for history / allowance
+// Help dialog for history / allowance (unchanged logic)
 // ─────────────────────────────────────────────────────────────────────────────
 
 Future<void> _showHistoryHelpDialog(BuildContext context) {

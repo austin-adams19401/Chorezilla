@@ -78,46 +78,92 @@ class _KidRewardsPageState extends State<KidRewardsPage>
 
     final myRedemptions = app.rewardRedemptionsForKid(member.id);
 
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: Text('${member.displayName}’s rewards')),
-      body: Column(
+      appBar: AppBar(
+        backgroundColor: cs.secondary,
+        foregroundColor: cs.onSecondary,
+        elevation: 0,
+        title: Text("Reward Store"),
+      ),
+      body: Stack(
         children: [
-          _WalletHeader(member: member),
-          const SizedBox(height: 8),
-          Expanded(
-            child: DefaultTabController(
-              length: 2,
-              // 🔑 use widget.initialTabIndex here
-              initialIndex: (widget.initialTabIndex == 1) ? 1 : 0,
-              child: Column(
-                children: [
-                  const TabBar(
-                    tabs: [
-                      Tab(text: 'Store'),
-                      Tab(text: 'My Rewards'),
-                    ],
-                  ),
-                  Expanded(
-                    child: TabBarView(
-                      children: [
-                        _RewardStoreTab(
-                          member: member,
-                          rewards: rewards,
-                          busyRewardIds: _busyRewardIds,
-                          onPurchase: _purchaseReward,
-                        ),
-                        _MyRewardsTab(redemptions: myRedemptions),
-                      ],
-                    ),
-                  ),
-                ],
+          // background gradient
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [cs.secondary, cs.primary],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
               ),
             ),
+          ),
+
+          Column(
+            children: [
+              const SizedBox(height: 4),
+              _WalletHeader(member: member),
+              const SizedBox(height: 8),
+
+              // Store / My Rewards tabs on a rounded sheet
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: cs.secondaryContainer,
+                      borderRadius: const BorderRadius.all(Radius.circular(28)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: .06),
+                          blurRadius: 12,
+                          offset: const Offset(0, -2),
+                        ),
+                      ],
+                    ),
+                    child: DefaultTabController(
+                      length: 2,
+                      initialIndex: (widget.initialTabIndex == 1) ? 1 : 0,
+                      child: Column(
+                        children: [
+                          TabBar(
+                            indicatorColor: cs.secondary,
+                            labelColor: cs.secondary,
+                            unselectedLabelColor: cs.onSurface,
+                            tabs: const [
+                              Tab(text: 'Store'),
+                              Tab(text: 'My Rewards'),
+                            ],
+                          ),
+                          Expanded(
+                            child: TabBarView(
+                              children: [
+                                _RewardStoreTab(
+                                  member: member,
+                                  rewards: rewards,
+                                  busyRewardIds: _busyRewardIds,
+                                  onPurchase: _purchaseReward,
+                                ),
+                                _MyRewardsTab(redemptions: myRedemptions),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
 
   Future<void> _purchaseReward(Member member, Reward reward) async {
     final app = context.read<AppState>();
@@ -165,71 +211,84 @@ class _WalletHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final ts = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: cs.primaryContainer,
-          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            colors: [
+              cs.primary,
+              cs.primaryContainer,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: .10),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
-        child: Row(
+        child: Stack(
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: cs.onPrimaryContainer.withValues(alpha: .1),
+            // Big faint coin in the corner for some personality
+            Positioned(
+              right: -4,
+              top: -10,
               child: Text(
-                (member.avatarKey != null && member.avatarKey!.isNotEmpty)
-                    ? member.avatarKey!
-                    : _initialsFor(member.displayName),
+                '🪙',
                 style: TextStyle(
-                  fontSize: 26,
-                  color: cs.onPrimaryContainer,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 48,
+                  color: cs.onPrimaryContainer.withValues(alpha: .36),
                 ),
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    member.displayName,
-                    style: ts.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: cs.onPrimaryContainer,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${member.xp} XP',
-                    style: ts.bodySmall?.copyWith(
-                      color: cs.onPrimaryContainer.withValues(alpha: .9),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
+
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '${member.coins}',
-                  style: ts.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: cs.onPrimaryContainer,
-                  ),
-                ),
-                Text(
-                  'coins',
-                  style: ts.bodySmall?.copyWith(
-                    color: cs.onPrimaryContainer.withValues(alpha: 0.85),
-                  ),
+                // Avatar + name + coin balance
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          member.displayName,
+                          style: ts.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            color: cs.onPrimaryContainer,
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('🪙', style: TextStyle(fontSize: 22)),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${member.coins} coins to spend',
+                              style: ts.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: cs.onPrimaryContainer,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                  ],
                 ),
               ],
             ),
@@ -290,7 +349,7 @@ class _RewardStoreTab extends StatelessWidget {
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
             mainAxisExtent:
-                tileHeight, // 👈 fixed height, no giant empty bottom
+                tileHeight, 
           ),
           itemCount: rewards.length,
           itemBuilder: (context, index) {
@@ -348,9 +407,16 @@ class _RewardTile extends StatelessWidget {
 
     final bool disabled = !canAfford || soldOut;
 
+    final Color cardColor = soldOut
+        ? cs.surfaceContainerHighest
+        : disabled
+        ? cs.surfaceContainer
+        : cs.surface;
+
     return Card(
       elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      color: cardColor,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
@@ -373,7 +439,7 @@ class _RewardTile extends StatelessWidget {
                 children: [
                   Text(
                     reward.title,
-                    maxLines: 2, // 👈 allow a bit more room
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: ts.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
@@ -387,13 +453,19 @@ class _RewardTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${reward.coinCost} coins',
-                    style: ts.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: disabled ? cs.onSurfaceVariant : cs.primary,
-                    ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Text('🪙'),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${reward.coinCost} coins',
+                        style: ts.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: disabled ? cs.onSurfaceVariant : cs.primary,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -580,13 +652,4 @@ class _EmptyStateKidRewards extends StatelessWidget {
       ),
     );
   }
-}
-
-String _initialsFor(String name) {
-  final parts = name.trim().split(RegExp(r'\s+'));
-  if (parts.isEmpty) return '?';
-  if (parts.length == 1) {
-    return parts.first.substring(0, 1).toUpperCase();
-  }
-  return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
 }

@@ -15,6 +15,8 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     final user = app.firebaseUser;
     final family = app.family;
@@ -27,19 +29,27 @@ class AuthGate extends StatelessWidget {
 
     // 2) Wait until we've loaded viewMode from SharedPreferences
     if (!app.viewModeLoaded) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(body: Center(child: CircularProgressIndicator(backgroundColor: cs.secondary,)));
     }
 
     // 3) Signed in but family/members streams still booting → splash loader
     if (!app.bootLoaded) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(backgroundColor: cs.secondary),
+        ),
+      );
     }
 
     // 3.5) Family is boot-loaded, but we DON'T yet know parent PIN state
     // (Firestore family doc hasn't arrived with parentPinHash).
     // → stay on splash instead of flashing ParentSetupPage.
     if (!app.parentPinLoaded) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(backgroundColor: cs.secondary),
+        ),
+      );
     }
 
     // 4) Signed in + streams ready:

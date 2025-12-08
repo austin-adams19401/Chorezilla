@@ -20,195 +20,292 @@ class _ApproveTabState extends State<ApproveTab> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
     return Scaffold(
-      body: ValueListenableBuilder<List<Assignment>>(
-        valueListenable: app.reviewQueueVN,
-        builder: (_, queue, _) {
-          final items = queue;
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: ValueListenableBuilder<List<Assignment>>(
+          valueListenable: app.reviewQueueVN,
+          builder: (_, queue, _) {
+            final items = queue;
 
-          if (items.isEmpty) {
-            return const Center(child: Text('No chores waiting for review.'));
-          }
+            if (items.isEmpty) {
+              return const _EmptyReview();
+            }
 
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (_, i) {
-              final a = items[i];
-              final chore = _findChore(app, a);
-              final kid = _findMember(app, a);
-
-              final icon = chore?.icon ?? '🧩';
-              final title = chore?.title ?? 'Deleted chore';
-              final kidName = kid?.displayName ?? 'Unknown kid';
-
-              final isBusy = _busyIds.contains(a.id);
-
-              final theme = Theme.of(context);
-              final ts = theme.textTheme;
-              final cs = theme.colorScheme;
-
-              final proof = a.proof;
-              final hasPhoto =
-                  proof?.photoUrl != null && proof!.photoUrl!.trim().isNotEmpty;
-              final hasNote =
-                  proof?.note != null && proof!.note!.trim().isNotEmpty;
-
-              return Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: cs.outlineVariant, width: 1.5),
-                ),
-                elevation: 0,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            return Column(
+              children: [
+                // Header card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Header row: icon + title + help icon
-                      Row(
-                        children: [
-                          Text(
-                            icon.isNotEmpty ? icon : '🧩',
-                            style: const TextStyle(fontSize: 28),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: ts.titleMedium?.copyWith(
+                      Icon(
+                        Icons.fact_check_rounded,
+                        color: cs.onPrimaryContainer,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Chores to review',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: cs.onPrimaryContainer,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.help_outline_rounded,
-                              size: 20,
-                            ),
-                            tooltip: 'How review & approval works',
-                            onPressed: () => _showApproveHelpDialog(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Completed by $kidName',
-                        style: ts.bodyMedium?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // NEW: Photo proof (thumbnail)
-                      if (hasPhoto) ...[
-                        Text(
-                          'Photo proof',
-                          style: ts.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: () => _showProofDialog(context, a),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: AspectRatio(
-                              aspectRatio: 4 / 3,
-                              child: Image.network(
-                                proof.photoUrl!,
-                                fit: BoxFit.cover,
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return const Center(
-                                        child: Padding(
-                                          padding: EdgeInsets.all(16),
-                                          child: CircularProgressIndicator(),
-                                        ),
-                                      );
-                                    },
-                                errorBuilder: (_, _, _) => Container(
-                                  color: cs.surfaceContainerHighest,
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    'Could not load photo',
-                                    style: ts.bodySmall?.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                    ),
-                                  ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Check photos and notes, then approve or reject in one tap.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: cs.onPrimaryContainer.withValues(
+                                  alpha: .85,
                                 ),
                               ),
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                      ],
-
-                      // NEW: Optional note (future-proofing)
-                      if (hasNote) ...[
-                        Text(
-                          '"${proof.note!.trim()}"',
-                          style: ts.bodySmall?.copyWith(
-                            fontStyle: FontStyle.italic,
-                            color: cs.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: isBusy
-                                  ? null
-                                  : () => _approveAssignment(a),
-                              child: isBusy
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('Approve'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: FilledButton.tonal(
-                              style: FilledButton.styleFrom(
-                                foregroundColor: Colors.white,
-                                backgroundColor: Colors.redAccent,
-                              ),
-                              onPressed: isBusy
-                                  ? null
-                                  : () => _rejectAssignment(a),
-                              child: isBusy
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    )
-                                  : const Text('Reject'),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
-              );
-            },
-          );
-        },
+
+                const SizedBox(height: 12),
+
+                // Gradient panel with the review cards
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [cs.secondary, cs.secondary, cs.primary],
+                        stops: const [0.0, 0.55, 1.0],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
+                        itemCount: items.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) {
+                          final a = items[i];
+                          final chore = _findChore(app, a);
+                          final kid = _findMember(app, a);
+
+                          final icon = chore?.icon ?? '🧩';
+                          final title = chore?.title ?? 'Deleted chore';
+                          final kidName = kid?.displayName ?? 'Unknown kid';
+
+                          final isBusy = _busyIds.contains(a.id);
+
+                          final ts = theme.textTheme;
+
+                          final proof = a.proof;
+                          final hasPhoto =
+                              proof?.photoUrl != null &&
+                              proof!.photoUrl!.trim().isNotEmpty;
+                          final hasNote =
+                              proof?.note != null &&
+                              proof!.note!.trim().isNotEmpty;
+
+                          return Card(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(
+                                color: cs.outlineVariant,
+                                width: 1.5,
+                              ),
+                            ),
+                            elevation: 0,
+                            color: cs.surface,
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                16,
+                                16,
+                                12,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Header row: icon + title + help icon
+                                  Row(
+                                    children: [
+                                      Text(
+                                        icon.isNotEmpty ? icon : '🧩',
+                                        style: const TextStyle(fontSize: 28),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          style: ts.titleMedium?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.help_outline_rounded,
+                                          size: 20,
+                                        ),
+                                        tooltip: 'How review & approval works',
+                                        onPressed: () =>
+                                            _showApproveHelpDialog(context),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Completed by $kidName',
+                                    style: ts.bodyMedium?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  // Photo proof (thumbnail)
+                                  if (hasPhoto) ...[
+                                    Text(
+                                      'Photo proof',
+                                      style: ts.bodySmall?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    GestureDetector(
+                                      onTap: () => _showProofDialog(context, a),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: AspectRatio(
+                                          aspectRatio: 4 / 3,
+                                          child: Image.network(
+                                            proof.photoUrl!,
+                                            fit: BoxFit.cover,
+                                            loadingBuilder:
+                                                (
+                                                  context,
+                                                  child,
+                                                  loadingProgress,
+                                                ) {
+                                                  if (loadingProgress == null) {
+                                                    return child;
+                                                  }
+                                                  return const Center(
+                                                    child: Padding(
+                                                      padding: EdgeInsets.all(
+                                                        16,
+                                                      ),
+                                                      child:
+                                                          CircularProgressIndicator(),
+                                                    ),
+                                                  );
+                                                },
+                                            errorBuilder: (_, _, _) =>
+                                                Container(
+                                                  color: cs
+                                                      .surfaceContainerHighest,
+                                                  alignment: Alignment.center,
+                                                  child: Text(
+                                                    'Could not load photo',
+                                                    style: ts.bodySmall
+                                                        ?.copyWith(
+                                                          color: cs
+                                                              .onSurfaceVariant,
+                                                        ),
+                                                  ),
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
+
+                                  // Optional note
+                                  if (hasNote) ...[
+                                    Text(
+                                      '"${proof.note!.trim()}"',
+                                      style: ts.bodySmall?.copyWith(
+                                        fontStyle: FontStyle.italic,
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                  ],
+
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: FilledButton(
+                                          onPressed: isBusy
+                                              ? null
+                                              : () => _approveAssignment(a),
+                                          child: isBusy
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                )
+                                              : const Text('Approve'),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: FilledButton.tonal(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor: cs.errorContainer,
+                                            foregroundColor:
+                                                cs.onErrorContainer,
+                                          ),
+                                          onPressed: isBusy
+                                              ? null
+                                              : () => _rejectAssignment(a),
+                                          child: isBusy
+                                              ? const SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                        strokeWidth: 2,
+                                                      ),
+                                                )
+                                              : const Text('Reject'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -238,7 +335,6 @@ class _ApproveTabState extends State<ApproveTab> {
     try {
       await app.approveAssignment(a.id, parentMemberId: app.currentMember?.id);
       if (!mounted) return;
-      // reviewQueueVN + kid streams will auto-update via Firestore
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -260,7 +356,6 @@ class _ApproveTabState extends State<ApproveTab> {
   Future<void> _rejectAssignment(Assignment a) async {
     if (_busyIds.contains(a.id)) return;
 
-    // Optional: ask for a reason.
     final reason = await showDialog<String>(
       context: context,
       builder: (ctx) {
@@ -360,7 +455,6 @@ class _ApproveTabState extends State<ApproveTab> {
     );
   }
 
-  // NEW: full-screen-ish viewer for photo proof
   void _showProofDialog(BuildContext context, Assignment a) {
     final proof = a.proof;
     final url = proof?.photoUrl;
@@ -388,7 +482,9 @@ class _ApproveTabState extends State<ApproveTab> {
                     url,
                     fit: BoxFit.cover,
                     loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
+                      if (loadingProgress == null) {
+                        return child;
+                      }
                       return const Center(
                         child: Padding(
                           padding: EdgeInsets.all(16),
@@ -426,6 +522,39 @@ class _ApproveTabState extends State<ApproveTab> {
           ),
         );
       },
+    );
+  }
+}
+
+class _EmptyReview extends StatelessWidget {
+  const _EmptyReview();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('✅', style: ts.displaySmall),
+            const SizedBox(height: 8),
+            const Text(
+              'Nothing to review right now',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Kids\' approved chores will land here when they need your check.',
+              style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

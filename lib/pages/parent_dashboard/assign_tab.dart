@@ -27,7 +27,6 @@ class _AssignTabState extends State<AssignTab> {
   }
 
   Future<void> _confirmDeleteChore(Chore chore) async {
-    // First async gap: showDialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -71,153 +70,351 @@ class _AssignTabState extends State<AssignTab> {
     }
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     final app = context.read<AppState>();
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
     return Scaffold(
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search chores',
-                prefixIcon: Icon(Icons.search_rounded),
+      backgroundColor: cs.secondary,
+      body: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        child: Column(
+          children: [
+            // Small header card with brand color
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              decoration: BoxDecoration(
+                color: cs.secondary,
+                borderRadius: BorderRadius.circular(20),
               ),
-              onChanged: (v) {
-                _deb?.cancel();
-                _deb = Timer(const Duration(milliseconds: 200), () {
-                  if (mounted) setState(() => _q = v);
-                });
-              },
-            ),
-          ),
-          Expanded(
-            child: ValueListenableBuilder<List<Chore>>(
-              valueListenable: app.choresVN,
-              builder: (_, choresList, _) {
-                final chores = choresList
-                    .where((c) => c.active)
-                    .where(
-                      (c) =>
-                          _q.isEmpty ||
-                          c.title.toLowerCase().contains(_q.toLowerCase()),
-                    )
-                    .toList();
-
-                if (chores.isEmpty) {
-                  return const Center(child: Text('No chores yet — add one.'));
-                }
-
-                final app = context.read<AppState>();
-
-                return ValueListenableBuilder<List<Assignment>>(
-                  valueListenable: app.familyAssignedVN,
-                  builder: (_, assignedList, _) {
-                    return ListView.separated(
-                      padding: const EdgeInsets.all(8),
-                      itemCount: chores.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: 8),
-                      itemBuilder: (_, i) {
-                        final c = chores[i];
-
-                        final assignedMembers = app.assignedMembersForChore(
-                          c.id,
-                        );
-
-                        return Card(
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.assignment_turned_in_rounded,
+                    color: cs.onSecondary,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Manage chores',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: cs.onSecondary,
+                            fontWeight: FontWeight.w600,
                           ),
-                          child: ListTile(
-                            leading: Text(
-                              c.icon?.isNotEmpty == true ? c.icon! : '🧩',
-                              style: const TextStyle(fontSize: 30),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Create chores once, then assign them to kids as you go.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.onSecondary.withValues(
+                              alpha: .9,
                             ),
-                            title: Text(c.title),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  '${_difficultyName(c.difficulty)}'
-                                  '${c.recurrence != null ? ' • ${c.recurrence!.type}' : ''}',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Pill search bar
+            Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(999),
+              elevation: 0,
+              child: TextField(
+                decoration: InputDecoration(
+                  isDense: true,
+                  filled: true,
+                  fillColor: cs.surface, // background of the pill
+
+                  hintText: 'Search chores',
+                  hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    color: cs.onSurfaceVariant,
+                  ),
+
+                  // Outline border for normal / enabled state
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: BorderSide(
+                      color: cs.outlineVariant,
+                      width: 1.4,
+                    ),
+                  ),
+                  // Outline when focused
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(999),
+                    borderSide: BorderSide(color: cs.primary, width: 2),
+                  ),
+
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 10,
+                  ),
+                ),
+                onChanged: (v) {
+                  _deb?.cancel();
+                  _deb = Timer(const Duration(milliseconds: 200), () {
+                    if (mounted) setState(() => _q = v);
+                  });
+                },
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            // Main panel with gradient background + cards
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [cs.secondary, cs.secondary, cs.primary],
+                    stops: const [0.0, 0.55, 1.0],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24)
+                  )
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: ValueListenableBuilder<List<Chore>>(
+                    valueListenable: app.choresVN,
+                    builder: (_, choresList, _) {
+                      final chores = choresList
+                          .where((c) => c.active)
+                          .where(
+                            (c) =>
+                                _q.isEmpty ||
+                                c.title.toLowerCase().contains(
+                                  _q.toLowerCase(),
                                 ),
-                                const SizedBox(height: 4),
-                                Wrap(
-                                  spacing: 4,
-                                  runSpacing: 2,
-                                  children: [
-                                    if (assignedMembers.isEmpty)
-                                      const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.person_outline, size: 16),
-                                          SizedBox(width: 4),
-                                          Text('No one assigned yet'),
-                                        ],
-                                      )
-                                    else
-                                      ...assignedMembers.map((m) {
-                                        final name = m.displayName;
-                                        final initial = (name.isNotEmpty)
-                                            ? name.substring(0, 1).toUpperCase()
-                                            : '?';
-                                        return CircleAvatar(
-                                          radius: 12,
-                                          child: Text(
-                                            initial,
-                                            style: const TextStyle(
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        );
-                                      }),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            trailing: Row(
+                          )
+                          .toList();
+
+                      if (chores.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                FilledButton.tonal(
-                                  style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 8,
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
+                                Text(
+                                  '🧹',
+                                  style: theme.textTheme.displaySmall?.copyWith(
+                                    color: Colors.white,
                                   ),
-                                  onPressed: () => _openAssignSheet(context, c),
-                                  child: const Text('Assign'),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit_outlined),
-                                  tooltip: 'Edit',
-                                  onPressed: () =>
-                                      _openEditChoreSheet(context, c),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No chores yet',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete),
-                                  tooltip: 'Delete',
-                                  onPressed: () => _confirmDeleteChore(c),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Tap “New chore” to start your list.',
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white70,
+                                  ),
                                 ),
                               ],
                             ),
-                            onTap: () => _openAssignSheet(context, c),
                           ),
                         );
-                      },
-                    );
-                  },
-                );
-              },
+                      }
+
+                      return ValueListenableBuilder<List<Assignment>>(
+                        valueListenable: app.familyAssignedVN,
+                        builder: (_, assignedList, _) {
+                          final theme = Theme.of(context);
+                          final cs = theme.colorScheme;
+
+                          return ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
+                            itemCount: chores.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (_, i) {
+                              final c = chores[i];
+
+                              final assignedMembers = app
+                                  .assignedMembersForChore(c.id);
+
+                              return Card(
+                                elevation: 0,
+                                color: cs.surface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(18),
+                                  side: BorderSide(
+                                    color: cs.outlineVariant,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                  child: ListTile(
+                                    leading: Container(
+                                      height: 60,
+                                      width: 60,
+                                      decoration: BoxDecoration(
+                                        color: cs.primaryContainer,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Text(
+                                        c.icon?.isNotEmpty == true
+                                            ? c.icon!
+                                            : '🧩',
+                                        style: const TextStyle(fontSize: 35),
+                                      ),
+                                    ),
+                                    title: Text(
+                                      c.title,
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    subtitle: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${_difficultyName(c.difficulty)}'
+                                          '${c.recurrence != null ? ' • ${c.recurrence!.type}' : ''}',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: cs.onSurfaceVariant,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Wrap(
+                                          spacing: 4,
+                                          runSpacing: 2,
+                                          children: [
+                                            if (assignedMembers.isEmpty)
+                                              Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.person_outline,
+                                                    size: 16,
+                                                    color: cs.onSurfaceVariant,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    'No one assigned yet',
+                                                    style: theme
+                                                        .textTheme
+                                                        .bodySmall
+                                                        ?.copyWith(
+                                                          color: cs
+                                                              .onSurfaceVariant,
+                                                        ),
+                                                  ),
+                                                ],
+                                              )
+                                            else
+                                              ...assignedMembers.map((m) {
+                                                final name = m.displayName;
+                                                final initial =
+                                                    (name.isNotEmpty)
+                                                    ? name
+                                                          .substring(0, 1)
+                                                          .toUpperCase()
+                                                    : '?';
+                                                return CircleAvatar(
+                                                  radius: 12,
+                                                  backgroundColor:
+                                                      cs.primaryContainer,
+                                                  child: Text(
+                                                    initial,
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                );
+                                              }),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        FilledButton.tonal(
+                                          style: FilledButton.styleFrom(
+                                            backgroundColor:
+                                                cs.primaryContainer,
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 8,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                            ),
+                                          ),
+                                          onPressed: () =>
+                                              _openAssignSheet(context, c),
+                                          child: const Text('Assign'),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.edit_outlined),
+                                          tooltip: 'Edit',
+                                          onPressed: () =>
+                                              _openEditChoreSheet(context, c),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.delete_outline_rounded,
+                                          ),
+                                          tooltip: 'Delete',
+                                          onPressed: () =>
+                                              _confirmDeleteChore(c),
+                                        ),
+                                      ],
+                                    ),
+                                    onTap: () => _openAssignSheet(context, c),
+                                  ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openNewChoreSheet(context),
@@ -226,6 +423,7 @@ class _AssignTabState extends State<AssignTab> {
       ),
     );
   }
+
 
   String _difficultyName(int d) {
     switch (d) {
@@ -284,6 +482,7 @@ class _AssignTabState extends State<AssignTab> {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // New chore sheet: emoji picker + readable difficulty names
+// (UNCHANGED BELOW THIS LINE EXCEPT FOR STYLE TWEAKS WHERE NEEDED)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ChoreEditorSheet extends StatefulWidget {
@@ -367,11 +566,13 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
                   ],
                 ),
                 const SizedBox(height: 12),
-
                 TextField(
                   controller: _title,
                   maxLength: kMaxChoreTitleLength,
-                  decoration: const InputDecoration(labelText: 'Title', helperText: 'max 40 characters'),
+                  decoration: const InputDecoration(
+                    labelText: 'Title',
+                    helperText: 'max 40 characters',
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -381,7 +582,6 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
                   ),
                 ),
                 const SizedBox(height: 8),
-
                 Row(
                   children: [
                     Expanded(
@@ -421,9 +621,7 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
                   alignment: Alignment.centerLeft,
                   child: Text('Worth $_xp XP'),
                 ),
-
                 const SizedBox(height: 12),
-
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Requires parent approval'),
@@ -433,7 +631,6 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
                   value: _requiresApproval,
                   onChanged: (v) => setState(() => _requiresApproval = v),
                 ),
-
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Wrap(
@@ -534,10 +731,9 @@ class _ChoreEditorSheetState extends State<_ChoreEditorSheet> {
   }
 
   Future<void> _save() async {
-      final rawTitle = _title.text.trim();
+    final rawTitle = _title.text.trim();
     if (rawTitle.isEmpty) return;
 
-    // Enforce max length just to be safe
     final title = rawTitle.length > kMaxChoreTitleLength
         ? rawTitle.substring(0, kMaxChoreTitleLength)
         : rawTitle;
@@ -708,7 +904,7 @@ class _EmojiPicker extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Assign sheet
+// Assign sheet (UNCHANGED STRUCTURALLY – just uses existing styles)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _AssignSheet extends StatefulWidget {
@@ -731,7 +927,6 @@ class _AssignSheetState extends State<_AssignSheet> {
   Widget build(BuildContext context) {
     final app = context.read<AppState>();
 
-    // Seed local state once from existing assignments
     if (!_initialized) {
       final existing = app.assignedMemberIdsForChore(widget.chore.id);
       _initialKidIds = Set<String>.from(existing);
@@ -785,7 +980,6 @@ class _AssignSheetState extends State<_AssignSheet> {
                       alignment: Alignment.centerLeft,
                       child: Text(_difficultyName(widget.chore.difficulty)),
                     ),
-
                     const SizedBox(height: 12),
                     Align(
                       alignment: Alignment.centerLeft,
@@ -810,7 +1004,6 @@ class _AssignSheetState extends State<_AssignSheet> {
                         }).toList(),
                       ),
                     ),
-
                     const SizedBox(height: 12),
                     Row(
                       children: [

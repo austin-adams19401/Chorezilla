@@ -7,11 +7,11 @@ import 'package:chorezilla/pages/parent_dashboard/parent_history_tab.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_notifications.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_rewards_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
 
 import 'parent_today_tab.dart';
-
 
 class ParentDashboardPage extends StatefulWidget {
   const ParentDashboardPage({super.key});
@@ -25,117 +25,108 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
   int _index = 0;
 
   @override
-  void initState() {
-    super.initState();
-    // Listen to app lifecycle changes (resumed, paused, etc.)
-    WidgetsBinding.instance.addObserver(this);
-
-    // After the first frame, once we know AppState is ready,
-    // ensure today's assignments exist.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final app = context.read<AppState>();
-      app.ensureAssignmentsForToday();
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // When the app returns to foreground (e.g., phone wakes up),
-      // make sure today's assignments exist.
-      final app = context.read<AppState>();
-      app.ensureAssignmentsForToday();
-    }
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final isReady = context.select((AppState s) => s.isReady);
     if (!isReady) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    final cs = Theme.of(context).colorScheme;
     final navTarget = context.select((AppState s) => s.pendingNavTarget);
 
-    // If a notification asked us to go to the Approve tab, switch bottom nav to "Chores".
     if (navTarget == 'parent_approve' && _index != 1) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         setState(() => _index = 1);
       });
     }
-    // ── Bottom-nav pages ───────────────────────────────────────────────────
-    // 0: Today
-    // 1: Chores (Assign + Review tabs)
-    // 2: Rewards
-    // 3: History
+
     final pages = [
       const ParentTodayTab(),
-      ParentChoresTab(initialTabIndex: navTarget == 'parent_approve' ? 1 : 0),
+      ParentChoresTab(
+        initialTabIndex: navTarget == 'parent_approve' ? 1 : 0,
+      ),
       const ParentRewardsPage(),
-      const ParentHistoryTab(), 
+      const ParentHistoryTab(),
     ];
 
+    final isToday = _index == 0;
+    final Color appBarTextColor = cs.onSecondary;
+
     return Scaffold(
+      extendBodyBehindAppBar: isToday,
       appBar: AppBar(
+        elevation: 0,
+        backgroundColor: cs.secondary,
+        foregroundColor: cs.onSecondary,
         leading: Builder(
           builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
+            icon: Icon(Icons.menu, color: appBarTextColor),
             onPressed: () => Scaffold.of(ctx).openDrawer(),
           ),
         ),
-        title: const Text('Chorezilla'),
+        title: Text(
+          'Chorezilla',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            color: appBarTextColor,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        iconTheme: IconThemeData(color: appBarTextColor),
         actions: [
           TextButton.icon(
+            style: TextButton.styleFrom(foregroundColor: appBarTextColor),
             onPressed: () async {
               final app = context.read<AppState>();
-              // Persist kid mode; AuthGate should react and route to kid flow
               await app.setViewMode(AppViewMode.kid);
             },
             icon: const Icon(Icons.family_restroom_rounded),
-            label: const Text('Kid view'),
+            label: const Text(
+              'Kid view',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
       drawer: const ParentDrawer(),
       body: Column(
         children: [
-          const ParentNotificationRegistrar(), // 🔔 registers tokens for this device
-          Expanded(child: pages[_index]),
-        ],
-      ),
-
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.today_rounded),
-            label: 'Today',
-          ),
-          NavigationDestination(
-            icon: ChoresNavIcon(selected: false),
-            selectedIcon: ChoresNavIcon(selected: true),
-            label: 'Chores',
-          ),
-          NavigationDestination(
-            icon: RewardsNavIcon(selected: false),
-            selectedIcon: RewardsNavIcon(selected: true),
-            label: 'Rewards',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.bar_chart_rounded),
-            label: 'History',
+          const ParentNotificationRegistrar(),
+          Expanded(
+            child: IndexedStack(index: _index, children: pages),
           ),
         ],
       ),
-
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          border: Border(top: BorderSide(
+            color: Colors.grey, width: 2.0 ))
+        ),
+        child: NavigationBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.today_rounded),
+              label: 'Today',
+            ),
+            NavigationDestination(
+              icon: ChoresNavIcon(selected: false),
+              selectedIcon: ChoresNavIcon(selected: true),
+              label: 'Chores',
+            ),
+            NavigationDestination(
+              icon: RewardsNavIcon(selected: false),
+              selectedIcon: RewardsNavIcon(selected: true),
+              label: 'Rewards',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.bar_chart_rounded),
+              label: 'History',
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

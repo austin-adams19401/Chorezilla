@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/models/history.dart';
 
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
@@ -36,86 +37,158 @@ class ProfileHeader extends StatelessWidget {
 
     final Member m = maybe;
 
-    // final cs = Theme.of(context).colorScheme;
-    final ts = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final ts = theme.textTheme;
+    final cs = theme.colorScheme;
+
+    final isChild = m.role == FamilyRole.child;
+    final allowanceConfig = isChild ? app.allowanceForMember(m.id) : null;
+    final hasAllowance =
+        isChild && allowanceConfig != null && allowanceConfig.enabled;
 
     return Material(
       color: Colors.transparent,
       child: Container(
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-        child: Row(
+        child: Column(
           children: [
-            _AvatarCircle(member: m),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Name row
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          m.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: ts.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+            Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        m.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: ts.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-
-                  // Level + XP progress
-                  _LevelProgressBar(member: m),
-
-                  const SizedBox(height: 4),
-
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
+                    ),
+                  ],
+                ),
+                _AvatarCircle(member: m),
+                const SizedBox(width: 12),
+                Column(
+                  children: [
+                    Row(
                       children: [
-                        Text('🪙', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 4),
-                        Text('Coins ${m.coins}',style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600,),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton.icon(
-                          icon: const Text('🎁', style: TextStyle(fontSize: 28)),
-                          label: const Text('Spend', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),),
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => KidRewardsPage(
-                                  memberId: m.id
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 6),
+                    
+                              // Level + XP progress
+                              _LevelProgressBar(member: m),
+                    
+                              const SizedBox(height: 6),
+                    
+                              // Coins + Spend button (slight style refresh)
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: cs.secondaryContainer,
+                                        borderRadius: BorderRadius.circular(999),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Text(
+                                            '🪙',
+                                            style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${m.coins}',
+                                            style: ts.labelLarge?.copyWith(
+                                              color: cs.onPrimaryContainer,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            'coins',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w600,
+                                            )
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    TextButton.icon(
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 15,
+                                          vertical: 3,
+                                        ),
+                                        foregroundColor: Colors.black,
+                                        backgroundColor: cs.secondaryContainer
+                                      ),
+                                      icon: const Text(
+                                        '🎁',
+                                        style: TextStyle(fontSize: 22),
+                                      ),
+                                      label: const Text(
+                                        'Spend',
+                                        style: TextStyle(fontWeight: FontWeight.w600),
+                                      ),
+                                      onPressed: () {
+                                        Navigator.of(context).push(
+                                          MaterialPageRoute(
+                                            builder: (_) => KidRewardsPage(memberId: m.id),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
                                 ),
                               ),
-                            );
-                          },
+                    
+                              // NEW: Allowance summary for kids
+                              if (hasAllowance) ...[
+                                const SizedBox(height: 6),
+                                _AllowanceHeaderSummary(memberId: m.id),
+                              ],
+                            ],
+                          ),
                         ),
+                    
+                        // Actions
+                        if (showSwitchButton)
+                          IconButton(
+                            tooltip: 'Switch member',
+                            onPressed: onSwitchMember,
+                            icon: const Icon(Icons.switch_account_rounded),
+                          ),
+                    
+                        if (showInviteButton && m.role == FamilyRole.parent)
+                          IconButton(
+                            tooltip: 'Invite',
+                            onPressed: () => _handleInvite(context),
+                            icon: const Icon(Icons.person_add_alt_1_rounded),
+                          ),
                       ],
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
-            // Actions
-            if (showSwitchButton)
-              IconButton(
-                tooltip: 'Switch member',
-                onPressed: onSwitchMember,
-                icon: const Icon(Icons.switch_account_rounded),
-              ),
-
-            if (showInviteButton && m.role == FamilyRole.parent)
-              IconButton(
-                tooltip: 'Invite',
-                onPressed: () => _handleInvite(context),
-                icon: const Icon(Icons.person_add_alt_1_rounded),
-              ),
           ],
         ),
       ),
@@ -141,6 +214,80 @@ class ProfileHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Allowance summary (header)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AllowanceHeaderSummary extends StatelessWidget {
+  const _AllowanceHeaderSummary({required this.memberId});
+  final String memberId;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final theme = Theme.of(context);
+    final ts = theme.textTheme;
+    final cs = theme.colorScheme;
+
+    final config = app.allowanceForMember(memberId);
+    if (!config.enabled || config.fullAmountCents <= 0) {
+      return const SizedBox.shrink();
+    }
+
+    // Current week (Mon-based)
+    final weekStart = weekStartFor(DateTime.now());
+    final histories = app.buildWeeklyHistory(weekStart);
+
+    WeeklyKidHistory? wk;
+    for (final h in histories) {
+      if (h.member.id == memberId) {
+        wk = h;
+        break;
+      }
+    }
+
+    final full = config.fullAmountCents / 100.0;
+    double earned = 0.0;
+    double ratio = 0.0;
+    int effectiveDays = 0;
+    final requiredDays = config.daysRequiredForFull;
+
+    if (wk?.allowanceResult != null) {
+      final r = wk!.allowanceResult!;
+      earned = (r.payoutCents / 100.0);
+      ratio = r.ratio.clamp(0.0, 1.0);
+      effectiveDays = r.effectiveDays;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 6,
+            value: ratio,
+            backgroundColor: cs.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(cs.secondary),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Allowance this week: '
+          '\$${earned.toStringAsFixed(2)} of \$${full.toStringAsFixed(2)}',
+          style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+        ),
+        Text(
+          'Days counted: $effectiveDays/$requiredDays',
+          style: ts.bodySmall?.copyWith(
+            color: cs.onSurfaceVariant.withValues(alpha: .9),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Avatar
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -157,13 +304,13 @@ class _AvatarCircle extends StatelessWidget {
         ? avatar
         : _initials(member.displayName);
 
-    const double radius = 28;
-    final double emojiSize = radius * 0.9;
+    const double radius = 36;
+    final double emojiSize = radius * 0.95;
 
     return CircleAvatar(
       radius: radius,
       backgroundColor: member.role == FamilyRole.child
-          ? cs.tertiaryContainer
+          ? cs.primaryContainer
           : cs.secondaryContainer,
       child: Text(
         display,
@@ -195,7 +342,7 @@ class _LevelProgressBar extends StatelessWidget {
   const _LevelProgressBar({required this.member});
   final Member member;
 
-    @override
+  @override
   Widget build(BuildContext context) {
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;

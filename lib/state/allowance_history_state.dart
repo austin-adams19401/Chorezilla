@@ -219,7 +219,9 @@ extension AppStateHistoryAllowance on AppState {
       return;
     }
 
-    final ws = weekStartFor(weekStart); // Monday-based
+    // 🔹 Ensure we’re working with a normalized, Monday-based date
+    final ws = normalizeDate(weekStartFor(weekStart)); // Monday at 00:00
+
     if (_historyWeekStart != null && _historyWeekStart!.isAtSameMomentAs(ws)) {
       return;
     }
@@ -228,6 +230,7 @@ extension AppStateHistoryAllowance on AppState {
     _historyAssignmentsSub?.cancel();
 
     final end = ws.add(const Duration(days: 7));
+
     _historyAssignmentsSub = repo
         .watchAssignmentsDueRange(famId, start: ws, end: end)
         .listen((list) {
@@ -248,9 +251,16 @@ extension AppStateHistoryAllowance on AppState {
     final famRef = db.collection('families').doc(familyId);
     final overrides = famRef.collection('dayStatusOverrides');
 
+    // 🔹 Normalize so we don’t miss any days due to time-of-day
+    final normalizedStart = normalizeDate(start);
+    final normalizedEnd = normalizeDate(end); // exclusive upper bound
+
     final snap = await overrides
-        .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('date', isLessThan: Timestamp.fromDate(end))
+        .where(
+          'date',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(normalizedStart),
+        )
+        .where('date', isLessThan: Timestamp.fromDate(normalizedEnd))
         .get();
 
     for (final doc in snap.docs) {

@@ -30,6 +30,10 @@ class _AddKidsPageState extends State<AddKidsPage> {
   String? _error;
   String? _editingMemberId;
 
+  //Controllers
+  final pinController = TextEditingController();
+  final pinConfirmController = TextEditingController();
+
   // Repo for Firestore writes (so we get the memberId back)
   final ChorezillaRepo _repo = ChorezillaRepo(
     firebaseDB: FirebaseFirestore.instance,
@@ -39,6 +43,8 @@ class _AddKidsPageState extends State<AddKidsPage> {
   void dispose() {
     _name.dispose();
     _nameNode.dispose();
+    pinController.dispose();
+    pinConfirmController.dispose();
     super.dispose();
   }
 
@@ -172,9 +178,6 @@ void _startEdit(Member m) {
   Future<void> _showPinDialog(Member m) async {
     final app = context.read<AppState>();
     final hasExistingPin = (m.pinHash != null && m.pinHash!.trim().isNotEmpty);
-
-    final pinController = TextEditingController();
-    final pinConfirmController = TextEditingController();
 
     bool pinEnabled = hasExistingPin;
     String? error;
@@ -320,9 +323,8 @@ void _startEdit(Member m) {
         );
       },
     );
-
-    pinController.dispose();
-    pinConfirmController.dispose();
+    pinController.clear();
+    pinConfirmController.clear();
   }
 
   @override
@@ -427,14 +429,14 @@ void _startEdit(Member m) {
                           children: [
                             Expanded(
                               child: DropdownButtonFormField<int>(
-                                value: _age,
+                                initialValue: _age,
                                 isExpanded: true,
                                 decoration: const InputDecoration(
                                   labelText: 'Age (optional)',
                                   border: OutlineInputBorder(),
                                 ),
                                 items:
-                                    List.generate(16, (i) => i + 3) // 3..18
+                                    List.generate(42, (i) => i + 3) // 3..45
                                         .map(
                                           (a) => DropdownMenuItem<int>(
                                             value: a,

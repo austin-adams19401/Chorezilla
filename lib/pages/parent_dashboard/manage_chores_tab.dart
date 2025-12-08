@@ -69,70 +69,129 @@ class _ParentChoresTabState extends State<ParentChoresTab>
 
     return Column(
       children: [
-        // ── Tab strip ──────────────────────────────────────────────────────
+        // ── Header + pill tab strip with gradient ──────────────────────────
         Material(
-          color: cs.surface,
-          elevation: 1,
-          child: SafeArea(
-            bottom: false,
-            child: ValueListenableBuilder<List<Assignment>>(
-              valueListenable: app.reviewQueueVN,
-              builder: (_, queue, _) {
-                final count = queue.length;
-
-                return TabBar(
-                  controller: _tabController,
-                  labelColor: cs.primary,
-                  unselectedLabelColor: cs.onSurfaceVariant,
-                  indicatorColor: cs.primary,
-                  tabs: [
-                    const Tab(
-                      icon: Icon(Icons.assignment_outlined),
-                      text: 'Assign',
-                    ),
-                    Tab(
-                      icon: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          const Icon(Icons.rate_review_outlined),
-                          if (count > 0)
-                            Positioned(
-                              right: -6,
-                              top: -4,
-                              child: Container(
-                                padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  color: cs.error,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                constraints: const BoxConstraints(
-                                  minWidth: 18,
-                                  minHeight: 16,
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    count > 9 ? '9+' : '$count',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
+          color: cs.secondary,
+          elevation: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  cs.secondary, // deep navy
+                  cs.secondary,
+                  cs.secondary, // brand green on the right
+                ],
+                stops: const [0.0, 0.55, 1.0],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text(
+                      'Chores',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
-                      text: 'Review',
                     ),
-                  ],
-                );
-              },
+                  ),
+                  // Subtitle
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Text(
+                      'Set up chores once, then assign and review everything in one place.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ),
+                  // Pill TabBar
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: .14),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      padding: const EdgeInsets.all(4),
+                      child: ValueListenableBuilder<List<Assignment>>(
+                        valueListenable: app.reviewQueueVN,
+                        builder: (_, queue, _) {
+                          final count = queue.length;
+
+                          return TabBar(
+                            controller: _tabController,
+                            indicator: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            labelColor: cs.secondary, // text on selected pill
+                            unselectedLabelColor: Colors.white70,
+                            dividerColor: Colors.transparent,
+                            tabs: [
+                              const Tab(
+                                icon: Icon(Icons.assignment_outlined),
+                                text: 'Assign',
+                              ),
+                              Tab(
+                                icon: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    const Icon(Icons.rate_review_outlined),
+                                    if (count > 0)
+                                      Positioned(
+                                        right: -6,
+                                        top: -4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: BoxDecoration(
+                                            color: cs.error,
+                                            borderRadius: BorderRadius.circular(
+                                              999,
+                                            ),
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 18,
+                                            minHeight: 16,
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              count > 9 ? '9+' : '$count',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                text: 'Review',
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
 
         // ── Tab bodies ─────────────────────────────────────────────────────
+        const SizedBox(height: 4),
         Expanded(
           child: TabBarView(
             controller: _tabController,

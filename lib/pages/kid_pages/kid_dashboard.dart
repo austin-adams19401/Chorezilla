@@ -3,12 +3,12 @@ import 'dart:io';
 
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/profile_header.dart';
+import 'package:chorezilla/components/zilla_level_up_hero.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:confetti/confetti.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import 'package:chorezilla/data/chorezilla_repo.dart';
@@ -229,9 +229,15 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
     final pendingRewards = app.pendingRewardsForKid(member.id);
 
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: Row(children: const [Text('Today\'s Chores')]),
+        backgroundColor: cs.secondary,
+        foregroundColor: cs.onSecondary,
+        elevation: 0,
+        title: const Text("Today's Chores"),
         actions: [
           IconButton(
             icon: const Icon(Icons.history_rounded, size: 28),
@@ -259,21 +265,46 @@ class _KidDashboardPageState extends State<KidDashboardPage>
       ),
       body: Stack(
         children: [
+          // Soft background gradient behind everything
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [cs.secondary, cs.primary],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+          ),
+
           // Main content
           Column(
             children: [
-              ProfileHeader(
-                member: member,
-                showInviteButton: false,
-                showSwitchButton: false,
+              const SizedBox(height: 4),
+
+              // Profile header inside a rounded hero card
+              Container(
+                margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: .08),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: ProfileHeader(
+                  member: member,
+                  showInviteButton: false,
+                  showSwitchButton: false,
+                ),
               ),
 
               if (pendingRewards.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                   child: _PendingRewardsBanner(
                     count: pendingRewards.length,
                     onTap: () {
@@ -290,41 +321,54 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                 ),
 
               const SizedBox(height: 8),
+
+              // Tabs + lists on a rounded “sheet”
               Expanded(
-                child: DefaultTabController(
-                  length: 2,
-                  child: Column(
-                    children: [
-                      const TabBar(
-                        tabs: [
-                          Tab(text: 'To Do'),
-                          Tab(text: 'Submitted'),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: cs.secondaryContainer,
+                      borderRadius: const BorderRadius.all(Radius.circular(24)
+                      ),
+                    ),
+                    child: DefaultTabController(
+                      length: 2,
+                      child: Column(
+                        children: [
+                          const TabBar(
+                            tabs: [
+                              Tab(text: 'To Do'),
+                              Tab(text: 'Submitted'),
+                            ],
+                          ),
+                          Expanded(
+                            child: TabBarView(
+                              children: [
+                                // Tab 1: To Do
+                                if (!choresLoaded)
+                                  const Center(child: CircularProgressIndicator())
+                                else
+                                  _TodoList(
+                                    memberId: member.id,
+                                    items: todos,
+                                    busyIds: _busyIds,
+                                    onComplete: _completeAssignment,
+                                    completedToday: completedToday,
+                                  ),
+                  
+                                // Tab 2: Submitted
+                                if (!choresLoaded)
+                                  const Center(child: CircularProgressIndicator())
+                                else
+                                  _SubmittedList(items: submitted),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                      Expanded(
-                        child: TabBarView(
-                          children: [
-                            // Tab 1: To Do
-                            if (!choresLoaded)
-                              const Center(child: CircularProgressIndicator())
-                            else
-                              _TodoList(
-                                memberId: member.id,
-                                items: todos,
-                                busyIds: _busyIds,
-                                onComplete: _completeAssignment,
-                                completedToday: completedToday,
-                              ),
-
-                            // Tab 2: Submitted
-                            if (!choresLoaded)
-                              const Center(child: CircularProgressIndicator())
-                            else
-                              _SubmittedList(items: submitted),
-                          ],
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -342,7 +386,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                     blastDirectionality: BlastDirectionality.explosive,
                     shouldLoop: false,
                     emissionFrequency: 0.05,
-                    numberOfParticles: 30,
+                    numberOfParticles: 15,
                     gravity: 0.35,
                   ),
                 ),
@@ -350,6 +394,19 @@ class _KidDashboardPageState extends State<KidDashboardPage>
             ),
         ],
       ),
+      // floatingActionButton: kDebugMode
+      //     ? FloatingActionButton(
+      //         onPressed: () {
+      //           final app = context.read<AppState>();
+      //           final current = app.currentMember;
+      //           if (current == null) return;
+
+      //           final info = levelInfoForXp(current.xp);
+      //           _triggerLevelUpCelebration(current, info, simulate: true);
+      //         },
+      //         child: const Icon(Icons.bug_report),
+      //       )
+      //     : null,
     );
   }
 
@@ -508,33 +565,44 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     }
   }
 
-  Future<void> _triggerLevelUpCelebration(Member member, LevelInfo info) async {
+  Future<void> _triggerLevelUpCelebration(
+    Member member,
+    LevelInfo info, {
+    bool simulate = false,
+  }) async {
     if (!mounted) return;
-
     if (_celebrationActive) return;
+
     _celebrationActive = true;
 
+    // 1) START CONFETTI FIRST
     setState(() {
       _showConfetti = true;
     });
     _confettiController.play();
 
-    final app = context.read<AppState>();
-    app.updateMember(member.id, {'level': info.level});
-
     final lvlReward = levelRewardForLevel(info.level);
 
-    if (lvlReward != null) {
-      try {
-        await app.createLevelUpRewardRedemptionForKid(
-          memberId: member.id,
-          level: info.level,
-          rewardTitle: lvlReward.title,
-        );
-      } catch (_) {}
+    if (!simulate) {
+      final app = context.read<AppState>();
+      app.updateMember(member.id, {'level': info.level});
+
+      if (lvlReward != null) {
+        try {
+          await app.createLevelUpRewardRedemptionForKid(
+            memberId: member.id,
+            level: info.level,
+            rewardTitle: lvlReward.title,
+          );
+        } catch (_) {
+          // ignore
+        }
+      }
     }
 
     if (!mounted) return;
+
+    // 2) WHILE CONFETTI IS RUNNING, SHOW THE DIALOG (Zilla animates here)
     await showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -544,12 +612,12 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
         return Center(
           child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.8, end: 1.0),
+            tween: Tween(begin: 0.9, end: 1.0),
             duration: const Duration(milliseconds: 280),
             curve: Curves.easeOutBack,
-            builder: (context, scale, child) {
+            builder: (context, dialogScale, _) {
               return Transform.scale(
-                scale: scale,
+                scale: dialogScale,
                 child: AlertDialog(
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24),
@@ -559,8 +627,6 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                   contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                   title: Row(
                     children: [
-                      const Text('🎉', style: TextStyle(fontSize: 32)),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           'Level up!',
@@ -574,6 +640,10 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      const SizedBox(height: 8),
+                      // Zilla + sparkles animating while confetti runs
+                      ZillaLevelUpHero(size: 96),
+                      const SizedBox(height: 16),
                       Text(
                         '${member.displayName} reached Level ${info.level}!',
                         textAlign: TextAlign.center,
@@ -586,62 +656,10 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                           color: cs.onSurfaceVariant,
                         ),
                       ),
-
-                      if (lvlReward != null) ...[
+                      if (lvlReward != null && !simulate) ...[
                         const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: cs.primaryContainer.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                lvlReward.emoji,
-                                style: const TextStyle(fontSize: 28),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Level reward unlocked!',
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                            color: cs.onPrimaryContainer,
-                                          ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      lvlReward.title,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: cs.onPrimaryContainer,
-                                          ),
-                                    ),
-                                    if (lvlReward.description.isNotEmpty) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        lvlReward.description,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
-                                              color: cs.onPrimaryContainer
-                                                  .withValues(alpha: 0.9),
-                                            ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        // reward card...
                       ],
-
                       const SizedBox(height: 16),
                       Text(
                         'Keep going to earn more coins and unlock rewards!',
@@ -653,7 +671,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: const Text('Awesome!'),
+                      child: Text(simulate ? 'Close' : 'Awesome!'),
                     ),
                   ],
                 ),
@@ -665,6 +683,8 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     );
 
     if (!mounted) return;
+
+    // 3) STOP CONFETTI AFTER DIALOG CLOSES
     setState(() {
       _showConfetti = false;
     });

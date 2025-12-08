@@ -36,8 +36,6 @@ extension AppStatePins on AppState {
     return raw.trim().isNotEmpty;
   }
 
-  bool isKidUnlocked(String memberId) => _unlockedKidIds.contains(memberId);
-
   Future<bool> verifyKidPin({
     required String memberId,
     required String pin,

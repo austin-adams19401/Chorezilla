@@ -9,7 +9,7 @@ import 'package:chorezilla/models/common.dart';
 class KidsHomePage extends StatelessWidget {
   const KidsHomePage({super.key});
 
-  @override
+    @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
 
@@ -30,18 +30,8 @@ class KidsHomePage extends StatelessWidget {
           body: Center(child: Text('No kids found in this family yet.')),
         );
       } else {
+        // NEW: hero + soft canvas layout, similar to parent tabs
         content = Scaffold(
-          appBar: AppBar(
-            automaticallyImplyLeading: false, // no back arrow
-            title: const Text("Who's using Chorezilla?"),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.lock_outline),
-                tooltip: 'Parents',
-                onPressed: () => _showAdultExitDialog(context),
-              ),
-            ],
-          ),
           body: LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;
@@ -59,19 +49,44 @@ class KidsHomePage extends StatelessWidget {
               // Slightly different aspect ratio on bigger screens
               final childAspectRatio = width < 600 ? 3 / 4 : 4 / 5;
 
-              return GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: childAspectRatio,
-                ),
-                itemCount: kids.length,
-                itemBuilder: (context, index) {
-                  final kid = kids[index];
-                  return _KidCard(member: kid);
-                },
+              final theme = Theme.of(context);
+              final cs = theme.colorScheme;
+
+              return Column(
+                children: [
+                  _KidsHero(
+                    kidCount: kids.length,
+                    onTapParents: () => _showAdultExitDialog(context),
+                  ),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                          colors: [cs.secondary, cs.secondary, cs.primary],
+                          stops: const [0.0, 0.65, 1.0],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(16),
+                      child: GridView.builder(
+                        padding: EdgeInsets.zero,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          mainAxisSpacing: 16,
+                          crossAxisSpacing: 16,
+                          childAspectRatio: childAspectRatio,
+                        ),
+                        itemCount: kids.length,
+                        itemBuilder: (context, index) {
+                          final kid = kids[index];
+                          return _KidCard(member: kid);
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               );
             },
           ),
@@ -82,6 +97,110 @@ class KidsHomePage extends StatelessWidget {
     return PopScope(canPop: false, child: content);
   }
 }
+
+class _KidsHero extends StatelessWidget {
+  const _KidsHero({required this.kidCount, required this.onTapParents});
+
+  final int kidCount;
+  final VoidCallback onTapParents;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
+    final media = MediaQuery.of(context);
+    final topInset = media.padding.top;
+
+    final subtitle = kidCount == 1
+        ? 'Tap your name to see today\'s chores.'
+        : 'Tap your name to see your chores and rewards.';
+
+    final countLabel = kidCount == 1
+        ? '1 kid profile'
+        : '$kidCount kid profiles';
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.fromLTRB(20, topInset + 8, 20, 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [cs.secondary, cs.secondary, cs.secondary],
+          stops: const [0.0, 0.55, 1.0],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Who\'s using Chorezilla?',
+                      style: ts.headlineSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: ts.bodyMedium?.copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white.withValues(alpha: .18),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                onPressed: onTapParents,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.lock_outline_rounded, size: 18),
+                    SizedBox(width: 6),
+                    Text('Parents'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: .18),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              countLabel,
+              style: ts.labelMedium?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 
 // ───────────────────────────────────────────────────────────────────────────
 // Parent master PIN to exit kid mode
@@ -240,17 +359,18 @@ class _KidCard extends StatelessWidget {
 
   final Member member;
 
-  Future<void> _handleTap(BuildContext context) async {
+ Future<void> _handleTap(BuildContext context) async {
     final app = context.read<AppState>();
 
     final requiresPin = app.kidRequiresPin(member.id);
-    final unlocked = app.isKidUnlocked(member.id);
 
-    if (!requiresPin || unlocked) {
+    // If no PIN for this kid, just go straight in.
+    if (!requiresPin) {
       _openKidDashboard(context, app);
       return;
     }
 
+    // Otherwise ALWAYS prompt for PIN
     final pin = await _showKidPinDialog(context, member.displayName);
     if (pin == null) return; // cancelled
 
@@ -308,13 +428,13 @@ class _KidCard extends StatelessWidget {
                   children: [
                     CircleAvatar(
                       radius: avatarRadius,
-                      backgroundColor: cs.primaryContainer,
+                      backgroundColor: cs.secondaryContainer,
                       child: avatarKey != null && avatarKey.isNotEmpty
                           ? Text(
                               avatarKey,
                               style: TextStyle(
                                 fontSize: emojiSize,
-                                color: cs.onPrimaryContainer,
+                                color: cs.onSecondaryContainer,
                               ),
                             )
                           : Text(
@@ -348,7 +468,8 @@ class _KidCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: ts.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w400,
+                    color: cs.onSecondary
                   ),
                 ),
               ],
