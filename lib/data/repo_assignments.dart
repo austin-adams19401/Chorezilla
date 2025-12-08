@@ -267,6 +267,85 @@ Future<void> completeAssignment(
     });
   }
 
+Future<void> undoAssignmentCompletion(
+    String familyId,
+    String assignmentId, {
+    String? parentMemberId,
+  }) async {
+    final famRef = familyDoc(firebaseDB, familyId);
+    final asnRef = assignmentsColl(firebaseDB, familyId).doc(assignmentId);
+
+    await firebaseDB.runTransaction((tx) async {
+      // 1) READ: assignment
+      final asnSnap = await tx.get(asnRef);
+      if (!asnSnap.exists) throw Exception('Assignment not found');
+
+      final asn = Assignment.fromDoc(asnSnap);
+
+      // Only completed assignments can be undone
+      if (asn.status != AssignmentStatus.completed) {
+        return;
+      }
+
+      // 2) READ: family (only if we need coinPerPoint)
+      int xpToRevert = asn.xp;
+      int coinsToRevert;
+
+      if (asn.requiresApproval) {
+        final famSnap = await tx.get(famRef);
+        if (!famSnap.exists) throw Exception('Family not found');
+        final family = Family.fromDoc(famSnap);
+        coinsToRevert = (asn.xp * family.settings.coinPerPoint).round();
+      } else {
+        coinsToRevert = asn.coinAward;
+      }
+
+      // 3) READ: member (before any writes)
+      final memberRef = membersColl(firebaseDB, familyId).doc(asn.memberId);
+      final memSnap = await tx.get(memberRef);
+      if (!memSnap.exists) {
+        // If the member was deleted, just bail out
+        return;
+      }
+
+      final memData = memSnap.data() as Map<String, dynamic>;
+      final currentXp = (memData['xp'] as num?)?.toInt() ?? 0;
+      final currentCoins = (memData['coins'] as num?)?.toInt() ?? 0;
+
+      var newXp = currentXp - xpToRevert;
+      var newCoins = currentCoins - coinsToRevert;
+      if (newXp < 0) newXp = 0;
+      if (newCoins < 0) newCoins = 0;
+
+      // 4) WRITES: now that all reads are done
+
+      // Re-open the assignment
+      tx.update(asnRef, {
+        'status': 'assigned',
+        'completedAt': null,
+        'approvedAt': null,
+      });
+
+      // Adjust XP/coins
+      tx.update(memberRef, {'xp': newXp, 'coins': newCoins});
+
+      // Optional: log an event
+      final evRef = eventsColl(firebaseDB, familyId).doc();
+      tx.set(evRef, {
+        'type': 'assignment_undone',
+        'actorMemberId': parentMemberId,
+        'targetMemberId': asn.memberId,
+        'payload': {
+          'assignmentId': asn.id,
+          'xp': xpToRevert,
+          'coins': coinsToRevert,
+        },
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+
   Future<void> rejectAssignment(
     String familyId,
     String assignmentId, {

@@ -114,6 +114,9 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
                   : 'Kid');
           final avatarKey = memberModel?.avatarKey;
 
+          final level = memberModel?.level ?? 1;
+          final coins = memberModel?.coins ?? 0;
+
           int total = list.length;
           int completed = 0;
           int pending = 0;
@@ -148,6 +151,8 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
               rejected: rejected,
               assigned: assigned,
               assignments: list,
+              level: level,
+              coins: coins,
             ),
           );
         });
@@ -269,7 +274,8 @@ class _TodayHero extends StatelessWidget {
     final cs = theme.colorScheme;
 
     final media = MediaQuery.of(context);
-    final double topInset = media.padding.top;// + kToolbarHeight; // status + appbar
+    final double topInset =
+        media.padding.top; // + kToolbarHeight; // status + appbar
 
     final kidsLabel = kidCount == 1 ? '1 kid' : '$kidCount kids';
     final progress = total > 0 ? completed / total : 0.0;
@@ -402,6 +408,8 @@ class _KidTodaySummary {
     required this.rejected,
     required this.assigned,
     required this.assignments,
+    required this.level,
+    required this.coins,
   });
 
   final String memberId;
@@ -413,6 +421,9 @@ class _KidTodaySummary {
   final int rejected;
   final int assigned;
   final List<Assignment> assignments;
+
+  final int level;
+  final int coins;
 }
 
 class _KidTodayCard extends StatelessWidget {
@@ -437,19 +448,14 @@ class _KidTodayCard extends StatelessWidget {
     final avatarRadius = 22.0;
     final emojiSize = avatarRadius * 1.2;
 
-    // Status pill
-    final String statusText =
-        isAllDone ? 'All done' : '$remaining left';
     final Color statusColor = isAllDone
         ? cs.primary.withValues(alpha: 0.14)
         : cs.secondaryContainer.withValues(alpha: 0.35);
-    final Color statusTextColor =
-        isAllDone ? cs.primary : cs.onSecondaryContainer;
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () {
-        _showKidDetailsBottomSheet(context, summary);
+        _showKidDetailsDialog(context, summary);
       },
       child: Card(
         elevation: isAllDone ? 2 : 0,
@@ -482,13 +488,14 @@ class _KidTodayCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header row: avatar + name + status pill
+              // Header row: avatar + name/level/coins + status pill
               Row(
                 children: [
                   CircleAvatar(
                     radius: avatarRadius,
                     backgroundColor: cs.primaryContainer,
-                    child: (summary.avatarKey != null &&
+                    child:
+                        (summary.avatarKey != null &&
                             summary.avatarKey!.isNotEmpty)
                         ? Text(
                             summary.avatarKey!,
@@ -508,13 +515,49 @@ class _KidTodayCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      summary.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: ts.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          summary.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ts.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Text(
+                              'Lvl ${summary.level}',
+                              style: ts.labelMedium?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Row(
+                              children: [
+                                Text('🪙',
+                                  style: ts.labelMedium?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${summary.coins}',
+                                  style: ts.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 4),
@@ -527,26 +570,26 @@ class _KidTodayCard extends StatelessWidget {
                       color: statusColor,
                       borderRadius: BorderRadius.circular(999),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isAllDone
-                              ? Icons.check_circle_rounded
-                              : Icons.list_alt_rounded,
-                          size: 14,
-                          color: statusTextColor,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          statusText,
-                          style: ts.labelSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: statusTextColor,
-                          ),
-                        ),
-                      ],
-                    ),
+                    // child: Row(
+                    //   mainAxisSize: MainAxisSize.min,
+                    //   children: [
+                    //     Icon(
+                    //       isAllDone
+                    //           ? Icons.check_circle_rounded
+                    //           : Icons.list_alt_rounded,
+                    //       size: 14,
+                    //       color: statusTextColor,
+                    //     ),
+                    //     const SizedBox(width: 4),
+                    //     // Text(
+                    //     //   statusText,
+                    //     //   style: ts.labelSmall?.copyWith(
+                    //     //     fontWeight: FontWeight.w600,
+                    //     //     color: statusTextColor,
+                    //     //   ),
+                    //     // ),
+                    //   ],
+                    // ),
                   ),
                 ],
               ),
@@ -563,8 +606,7 @@ class _KidTodayCard extends StatelessWidget {
                         value: progress,
                         minHeight: 6,
                         backgroundColor: cs.surfaceContainerHighest,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(cs.primary),
+                        valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
                       ),
                     ),
                   ),
@@ -647,11 +689,7 @@ class _KidTodayCard extends StatelessWidget {
     );
   }
 
-  void _showKidDetailsBottomSheet(
-    BuildContext context,
-    _KidTodaySummary summary,
-  ) {
-    // (unchanged)
+  void _showKidDetailsDialog(BuildContext context, _KidTodaySummary summary) {
     final assignments = [...summary.assignments];
     assignments.sort(
       (a, b) => (a.due ?? DateTime(2100)).compareTo(b.due ?? DateTime(2100)),
@@ -659,124 +697,177 @@ class _KidTodayCard extends StatelessWidget {
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final maxListHeight = MediaQuery.of(context).size.height * 0.6;
 
-    showModalBottomSheet(
+    showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) {
-        final maxListHeight = MediaQuery.of(ctx).size.height * 0.6;
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+          title: Row(
             children: [
-              // Drag handle
-              Container(
-                width: 44,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
-                decoration: BoxDecoration(
-                  color: cs.outlineVariant,
-                  borderRadius: BorderRadius.circular(999),
+              Expanded(
+                child: Text(
+                  '${summary.name} – today',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
-              // Header row
-              Row(
-                children: [
-                  Text(
-                    '${summary.name} – today',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${summary.completed}/${summary.total} done',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              // Scrollable list, but only up to 60% of screen height.
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: maxListHeight),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: assignments.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 4),
-                  itemBuilder: (ctx, i) {
-                    final a = assignments[i];
-                    final status = a.status;
-                    Color? tileColor;
-                    BorderSide? side;
-
-                    switch (status) {
-                      case AssignmentStatus.assigned:
-                        tileColor = null;
-                        side = null;
-                        break;
-                      case AssignmentStatus.pending:
-                        tileColor =
-                            cs.tertiaryContainer.withValues(alpha: 0.3);
-                        side = BorderSide(color: cs.tertiary, width: 2);
-                        break;
-                      case AssignmentStatus.rejected:
-                        tileColor = cs.error.withValues(alpha: 0.12);
-                        side = BorderSide(color: cs.error, width: 1.5);
-                        break;
-                      case AssignmentStatus.completed:
-                        tileColor =
-                            cs.surfaceContainerHighest.withValues(alpha: 0.2);
-                        side = null;
-                        break;
-                    }
-
-                    final titleStyle = theme.textTheme.titleMedium?.copyWith(
-                      decoration: status == AssignmentStatus.completed
-                          ? TextDecoration.lineThrough
-                          : null,
-                    );
-
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Text(
-                        (a.choreIcon?.isNotEmpty ?? false)
-                            ? a.choreIcon!
-                            : '🧩',
-                        style: const TextStyle(fontSize: 26),
-                      ),
-                      title: Text(
-                        a.choreTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: titleStyle,
-                      ),
-                      subtitle: Text(
-                        a.status.label,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      tileColor: tileColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: side ?? BorderSide.none,
-                      ),
-                    );
-                  },
+              const SizedBox(width: 8),
+              Text(
+                '${summary.completed}/${summary.total} done',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: cs.onSurfaceVariant,
                 ),
               ),
             ],
           ),
+          // 🔧 THIS PART CHANGED
+          content: SizedBox(
+            width: double.maxFinite,
+            height: maxListHeight,
+            child: ListView.separated(
+              // ❌ remove shrinkWrap: true
+              itemCount: assignments.length,
+              separatorBuilder: (_, _) => const SizedBox(height: 4),
+              itemBuilder: (ctx, i) {
+                final a = assignments[i];
+                final status = a.status;
+                Color? tileColor;
+                BorderSide? side;
+
+                switch (status) {
+                  case AssignmentStatus.assigned:
+                    tileColor = null;
+                    side = null;
+                    break;
+                  case AssignmentStatus.pending:
+                    tileColor = cs.tertiaryContainer.withValues(alpha: 0.3);
+                    side = BorderSide(color: cs.tertiary, width: 2);
+                    break;
+                  case AssignmentStatus.rejected:
+                    tileColor = cs.error.withValues(alpha: 0.12);
+                    side = BorderSide(color: cs.error, width: 1.5);
+                    break;
+                  case AssignmentStatus.completed:
+                    tileColor = cs.surfaceContainerHighest.withValues(
+                      alpha: 0.2,
+                    );
+                    side = null;
+                    break;
+                }
+
+                final titleStyle = theme.textTheme.titleMedium?.copyWith(
+                  decoration: status == AssignmentStatus.completed
+                      ? TextDecoration.lineThrough
+                      : null,
+                );
+
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Text(
+                    (a.choreIcon?.isNotEmpty ?? false) ? a.choreIcon! : '🧩',
+                    style: const TextStyle(fontSize: 26),
+                  ),
+                  title: Text(
+                    a.choreTitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
+                  ),
+                  subtitle: Text(
+                    a.status.label,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  tileColor: tileColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: side ?? BorderSide.none,
+                  ),
+                  trailing: status == AssignmentStatus.completed
+                      ? TextButton.icon(
+                          onPressed: () async {
+                            await _onUndoPressed(context, a);
+                          },
+                          icon: const Icon(Icons.undo_rounded, size: 18),
+                          label: const Text('Undo'),
+                        )
+                      : null,
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Close'),
+            ),
+          ],
         );
       },
     );
   }
+
+  Future<void> _onUndoPressed(
+    BuildContext context,
+    Assignment assignment,
+  ) async {
+    // 1) Confirm with the parent first
+    final shouldUndo = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text('Undo this chore?'),
+          content: Text(
+            'This will mark "${assignment.choreTitle}" as not done and '
+            'remove the XP and coins that were awarded.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: const Text('Undo'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // User cancelled or dismissed
+    if (shouldUndo != true) return;
+
+    // 2) Actually perform the undo
+    if(!context.mounted) return;
+    final app = context.read<AppState>();
+    final familyId = app.familyId;
+
+    if (familyId == null) {
+      return;
+    }
+
+    try {
+      await app.repo.undoAssignmentCompletion(familyId, assignment.id);
+
+      // Close the kid-details dialog so they see the updated state on reopen
+      if(!context.mounted) return;
+      Navigator.of(context).pop();
+    } catch (e, st) {
+      debugPrint('undoAssignmentCompletion failed: $e\n$st');
+    }
+  }
+
 
   String _initialsFor(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));
@@ -787,17 +878,6 @@ class _KidTodayCard extends StatelessWidget {
     return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
   }
 }
-
-
-  // String _initialsFor(String name) {
-  //   final parts = name.trim().split(RegExp(r'\s+'));
-  //   if (parts.isEmpty) return '?';
-  //   if (parts.length == 1) {
-  //     return parts.first.substring(0, 1).toUpperCase();
-  //   }
-  //   return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
-  // }
-
 
 class _StatChip extends StatelessWidget {
   const _StatChip({

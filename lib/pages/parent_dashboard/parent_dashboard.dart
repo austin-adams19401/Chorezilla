@@ -7,7 +7,6 @@ import 'package:chorezilla/pages/parent_dashboard/parent_history_tab.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_notifications.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_rewards_page.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
 
