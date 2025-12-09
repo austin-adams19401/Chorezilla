@@ -424,68 +424,87 @@ void _startEdit(Member m) {
                         ),
                         const SizedBox(height: 12),
 
-                        // Age + Avatar row
-                        Row(
-                          children: [
-                            Expanded(
-                              child: DropdownButtonFormField<int>(
-                                initialValue: _age,
-                                isExpanded: true,
-                                decoration: const InputDecoration(
-                                  labelText: 'Age (optional)',
-                                  border: OutlineInputBorder(),
-                                ),
-                                items:
-                                    List.generate(42, (i) => i + 3) // 3..45
-                                        .map(
-                                          (a) => DropdownMenuItem<int>(
-                                            value: a,
-                                            child: Text(a.toString()),
-                                          ),
-                                        )
-                                        .toList(),
-                                onChanged: _busy
-                                    ? null
-                                    : (v) => setState(() => _age = v),
+                        // Age + Avatar row (responsive)
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            // Tweak this threshold if you want
+                            final isNarrow = constraints.maxWidth < 480;
+
+                            final ageField = DropdownButtonFormField<int>(
+                              initialValue: _age,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Age (optional)',
+                                border: OutlineInputBorder(),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: InputDecorator(
-                                decoration: const InputDecoration(
-                                  labelText: 'Avatar',
-                                  border: OutlineInputBorder(),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Text(
-                                      (_avatarKey == null ||
-                                              _avatarKey!.trim().isEmpty)
-                                          ? '🙂'
-                                          : _avatarKey!,
-                                      style: const TextStyle(fontSize: 24),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Choose emoji avatar',
-                                        style: ts.bodyMedium?.copyWith(
-                                          color: cs.onSurfaceVariant,
+                              items:
+                                  List.generate(42, (i) => i + 3) // 3..45
+                                      .map(
+                                        (a) => DropdownMenuItem<int>(
+                                          value: a,
+                                          child: Text(a.toString()),
                                         ),
-                                      ),
-                                    ),
-                                    FilledButton.tonalIcon(
-                                      onPressed: _busy ? null : _pickAvatar,
-                                      icon: const Icon(
-                                        Icons.emoji_emotions_outlined,
-                                      ),
-                                      label: const Text('Pick'),
-                                    ),
-                                  ],
-                                ),
+                                      )
+                                      .toList(),
+                              onChanged: _busy
+                                  ? null
+                                  : (v) => setState(() => _age = v),
+                            );
+
+                            final avatarField = InputDecorator(
+                              decoration: const InputDecoration(
+                                labelText: 'Avatar',
+                                border: OutlineInputBorder(),
                               ),
-                            ),
-                          ],
+                              child: Row(
+                                children: [
+                                  Text(
+                                    (_avatarKey == null ||
+                                            _avatarKey!.trim().isEmpty)
+                                        ? '🙂'
+                                        : _avatarKey!,
+                                    style: const TextStyle(fontSize: 24),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Choose emoji avatar',
+                                      style: ts.bodyMedium?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                  FilledButton.tonalIcon(
+                                    onPressed: _busy ? null : _pickAvatar,
+                                    icon: const Icon(
+                                      Icons.emoji_emotions_outlined,
+                                    ),
+                                    label: const Text('Pick'),
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            if (isNarrow) {
+                              // Phone: stack vertically so the avatar field gets full width
+                              return Column(
+                                children: [
+                                  ageField,
+                                  const SizedBox(height: 12),
+                                  avatarField,
+                                ],
+                              );
+                            } else {
+                              // Tablet / wide: keep them side by side
+                              return Row(
+                                children: [
+                                  Expanded(child: ageField),
+                                  const SizedBox(width: 12),
+                                  Expanded(child: avatarField),
+                                ],
+                              );
+                            }
+                          },
                         ),
 
                         const SizedBox(height: 16),
