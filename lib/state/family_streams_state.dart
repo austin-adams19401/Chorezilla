@@ -35,8 +35,7 @@ extension AppStateFamilyStreams on AppState {
       }
       _notifyStateChanged();
 
-      // Safe: ensureAssignmentsForToday is idempotent
-      ensureAssignmentsForToday();
+      refreshAssignmentsForToday(); 
     });
 
     _membersSub?.cancel();
@@ -61,7 +60,7 @@ extension AppStateFamilyStreams on AppState {
       _notifyStateChanged();
 
       // Safe & cheap; will no-op until family + chores are ready
-      ensureAssignmentsForToday();
+      refreshAssignmentsForToday(); 
     });
 
     // Chores (hot list)
@@ -72,7 +71,7 @@ extension AppStateFamilyStreams on AppState {
 
       _notifyStateChanged();
 
-      ensureAssignmentsForToday();      
+      refreshAssignmentsForToday();   
     });
 
     // Rewards (store catalog)
@@ -176,7 +175,7 @@ extension AppStateFamilyStreams on AppState {
     final today = DateTime(now.year, now.month, now.day);
     final dayKey = _dateKey(
       today,
-    ); // same helper used in ensureAssignmentsForToday
+    ); 
 
     Query q = db
         .collection('families')

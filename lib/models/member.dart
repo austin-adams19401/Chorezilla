@@ -27,6 +27,13 @@ class Member {
 
   final bool notificationsEnabled;
 
+  final int currentStreak;
+  final int longestStreak;
+
+  final List<String> ownedCosmetics;
+  final String? equippedBackgroundId;
+  final String? equippedAvatarId;
+
   const Member({
     required this.id,
     required this.displayName,
@@ -46,6 +53,11 @@ class Member {
     this.allowanceDaysRequired = 7,
     this.allowancePayDay = DateTime.sunday,
     this.notificationsEnabled = true,
+    this.currentStreak = 0,
+    this.longestStreak = 0,
+    this.ownedCosmetics = const [],
+    this.equippedBackgroundId,
+    this.equippedAvatarId,
   });
 
   Member copyWith({
@@ -65,6 +77,11 @@ class Member {
     int? allowanceFullAmountCents,
     int? allowanceDaysRequired,
     int? allowancePayDay,
+    int? currentStreak,
+    int? longestStreak,
+    List<String>? ownedCosmetics,
+    String? equippedBackgroundId,
+    String? equippedAvatarId,
   }) => Member(
     id: id,
     displayName: displayName ?? this.displayName,
@@ -81,10 +98,15 @@ class Member {
     active: active ?? this.active,
     allowanceEnabled: allowanceEnabled ?? this.allowanceEnabled,
     allowanceFullAmountCents:
-        allowanceFullAmountCents ?? this.allowanceFullAmountCents,
+    allowanceFullAmountCents ?? this.allowanceFullAmountCents,
     allowanceDaysRequired: allowanceDaysRequired ?? this.allowanceDaysRequired,
     allowancePayDay: allowancePayDay ?? this.allowancePayDay,
-    notificationsEnabled: notificationsEnabled,
+    notificationsEnabled: notificationsEnabled,    
+    currentStreak: currentStreak ?? this.currentStreak,
+    longestStreak: longestStreak ?? this.longestStreak,
+    ownedCosmetics: ownedCosmetics ?? this.ownedCosmetics,
+    equippedBackgroundId: equippedBackgroundId ?? this.equippedBackgroundId,
+    equippedAvatarId: equippedAvatarId ?? this.equippedAvatarId,
   );
 
   Map<String, dynamic> toMap() => {
@@ -107,6 +129,12 @@ class Member {
     'allowanceDaysRequired': allowanceDaysRequired,
     'allowancePayDay': allowancePayDay,
     'notificationsEnabled': notificationsEnabled,
+
+    'currentStreak': currentStreak,
+    'longestStreak': longestStreak,
+    'ownedCosmetics': ownedCosmetics,
+    'equippedBackgroundId': equippedBackgroundId,
+    'equippedAvatarId': equippedAvatarId,
   };
 
   factory Member.fromDoc(DocumentSnapshot doc) {
@@ -134,6 +162,11 @@ class Member {
       allowanceDaysRequired: data['allowanceDaysRequired'] as int? ?? 7,
       allowancePayDay: data['allowancePayDay'] as int? ?? DateTime.sunday,
       notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true, 
+      currentStreak: (data['currentStreak'] as num?)?.toInt() ?? 0,
+      longestStreak: (data['longestStreak'] as num?)?.toInt() ?? 0,
+      ownedCosmetics: (data['ownedCosmetics'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      equippedBackgroundId: data['equippedBackgroundId'] as String?,
+      equippedAvatarId: data['equippedAvatarId'] as String?,
     );
   }
 
@@ -157,6 +190,11 @@ class Member {
     'allowanceDaysRequired': allowanceDaysRequired,
     'allowancePayDay': allowancePayDay,
     'notificationsEnabled': notificationsEnabled,
+    'currentStreak': currentStreak,
+    'longestStreak': longestStreak,
+    'ownedCosmetics': ownedCosmetics,
+    'equippedBackgroundId': equippedBackgroundId,
+    'equippedAvatarId': equippedAvatarId,
   };
 
   factory Member.fromCacheMap(Map<String, dynamic> data) {
@@ -184,6 +222,15 @@ class Member {
       allowancePayDay:
           (data['allowancePayDay'] as num?)?.toInt() ?? DateTime.sunday,
       notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true,
+      currentStreak: (data['currentStreak'] as num?)?.toInt() ?? 0,
+      longestStreak: (data['longestStreak'] as num?)?.toInt() ?? 0,
+      ownedCosmetics:
+          (data['ownedCosmetics'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      equippedBackgroundId: data['equippedBackgroundId'] as String?,
+      equippedAvatarId: data['equippedAvatarId'] as String?,
     );
   }
 }

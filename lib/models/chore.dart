@@ -1,29 +1,5 @@
+import 'package:chorezilla/models/recurrance.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-class Recurrence {
-  final String type; // once | daily | weekly | custom
-  final List<int>? daysOfWeek; // 1..7 Mon..Sun
-  final String? timeOfDay; // HH:mm
-
-  const Recurrence({required this.type, this.daysOfWeek, this.timeOfDay});
-
-  Map<String, dynamic> toMap() => {
-    'type': type,
-    'daysOfWeek': daysOfWeek,
-    'timeOfDay': timeOfDay,
-  };
-
-  factory Recurrence.fromMap(Map<String, dynamic>? data) {
-    if (data == null) return const Recurrence(type: 'daily');
-    return Recurrence(
-      type: data['type'] as String? ?? 'daily',
-      daysOfWeek: (data['daysOfWeek'] as List?)
-          ?.map((e) => (e as num).toInt())
-          .toList(),
-      timeOfDay: data['timeOfDay'] as String?,
-    );
-  }
-}
 
 // chore.dart
 class Chore {
@@ -35,12 +11,9 @@ class Chore {
   final int points;
   final bool active;
   final Recurrence? recurrence;
-
-  // Existing
   final List<String> defaultAssignees;
-
-  // NEW: does this chore type require parent approval?
   final bool requiresApproval;
+  final bool bonusOnly;
 
   const Chore({
     required this.id,
@@ -53,6 +26,7 @@ class Chore {
     this.recurrence,
     this.defaultAssignees = const [],
     this.requiresApproval = false, 
+    this.bonusOnly = false,
   });
 
   factory Chore.fromDoc(DocumentSnapshot d) {
@@ -72,6 +46,7 @@ class Chore {
           (m['defaultAssignees'] as List?)?.map((e) => e.toString()).toList() ??
           const [],
       requiresApproval: (m['requiresApproval'] as bool?) ?? false,
+      bonusOnly: (m['bonusOnly'] as bool?) ?? false,
     );
   }
 
@@ -85,6 +60,7 @@ class Chore {
     if (recurrence != null) 'recurrence': recurrence!.toMap(),
     'defaultAssignees': defaultAssignees,
     'requiresApproval': requiresApproval,
+    'bonusOnly': bonusOnly,
   };
 
     // --- Local cache mapping ---
@@ -99,6 +75,7 @@ class Chore {
     'recurrence': recurrence?.toMap(),
     'defaultAssignees': defaultAssignees,
     'requiresApproval': requiresApproval,
+    'bonusOnly': bonusOnly,
   };
 
   factory Chore.fromCacheMap(Map<String, dynamic> m) {
@@ -117,6 +94,7 @@ class Chore {
           (m['defaultAssignees'] as List?)?.map((e) => e.toString()).toList() ??
           const [],
       requiresApproval: (m['requiresApproval'] as bool?) ?? false,
+      bonusOnly: (m['bonusOnly'] as bool?) ?? false,
     );
   }
 

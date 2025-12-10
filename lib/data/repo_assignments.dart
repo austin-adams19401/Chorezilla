@@ -69,7 +69,14 @@ extension AssignmentRepo on ChorezillaRepo {
     });
   }
 
-
+  Stream<List<ChoreMemberSchedule>> watchAllChoreMemberSchedules(
+    String familyId,
+  ) {
+    return choreMemberSchedulesColl(firebaseDB, familyId)
+        .where('active', isEqualTo: true)
+        .snapshots()
+        .map((s) => s.docs.map(ChoreMemberSchedule.fromDoc).toList());
+  }
 
   Stream<List<Assignment>> watchReviewQueue(String familyId) {
     final pending = statusToString(AssignmentStatus.pending);
@@ -373,6 +380,7 @@ Future<void> undoAssignmentCompletion(
     });
   }
 }
+
 
 // Local date helpers (library-private)
 DateTime _startOfLocalDayWithHour(int hour) {

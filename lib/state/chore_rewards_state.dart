@@ -47,6 +47,7 @@ extension AppStateWrites on AppState {
     required int difficulty,
     Recurrence? recurrence,
     bool requiresApproval = true,
+    bool bonusOnly = false,
   }) async {
     final famId = _familyId!;
     final db = FirebaseFirestore.instance;
@@ -69,6 +70,7 @@ extension AppStateWrites on AppState {
       'active': true,
       'recurrence': recurrence?.toMap(),
       'requiresApproval': requiresApproval,
+      'bonusOnly': bonusOnly,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -82,6 +84,7 @@ extension AppStateWrites on AppState {
     required int difficulty,
     Recurrence? recurrence,
     bool requiresApproval = true,
+    bool bonusOnly = false,
   }) async {
     final fam = family!;
     await repo.updateChoreTemplate(
@@ -94,6 +97,7 @@ extension AppStateWrites on AppState {
       settings: fam.settings,
       recurrence: recurrence,
       requiresApproval: requiresApproval,
+      bonusOnly: bonusOnly,
     );
   }
 
@@ -135,6 +139,82 @@ extension AppStateWrites on AppState {
     await choreRef.delete();
     debugPrint('DELETE_CHORE: chore $choreId deleted.');
   }
+
+    // ───────────────────────────────────────────────────────────────────────────
+  // Per-kid chore schedules (for rotation / weekly patterns)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// Stream schedules for a single chore (all kids).
+  /// Used by the ChoreSchedulePage.
+  Stream<List<ChoreMemberSchedule>> watchChoreSchedulesForChore(
+    String choreId,
+  ) {
+    final famId = _familyId;
+    if (famId == null) {
+      // No family loaded yet → empty stream so the UI has something to listen to
+      return const Stream<List<ChoreMemberSchedule>>.empty();
+    }
+
+    return repo.watchChoreMemberSchedulesForChore(famId, choreId: choreId);
+  }
+
+    Stream<List<ChoreMemberSchedule>> watchAllChoreSchedules() {
+    final famId = _familyId;
+    if (famId == null) {
+      return const Stream.empty();
+    }
+    return repo.watchAllChoreMemberSchedules(famId);
+  }
+
+  /// Create or update a per-kid schedule for a given chore.
+  ///
+  /// If [scheduleId] is null, this creates a new schedule.
+  /// Otherwise it updates the existing row.
+  Future<void> saveChoreMemberSchedule({
+    String? scheduleId,
+    required String choreId,
+    required String memberId,
+    required Recurrence recurrence,
+    bool active = true,
+  }) async {
+    final famId = _familyId;
+    if (famId == null) {
+      throw StateError(
+        'No family selected when calling saveChoreMemberSchedule',
+      );
+    }
+
+    if (scheduleId == null) {
+      await repo.createChoreMemberSchedule(
+        famId,
+        choreId: choreId,
+        memberId: memberId,
+        recurrence: recurrence,
+        active: active,
+      );
+    } else {
+      await repo.updateChoreMemberSchedule(
+        famId,
+        scheduleId: scheduleId,
+        recurrence: recurrence,
+        active: active,
+      );
+    }
+  }
+
+  /// Hard-delete a schedule row (used by the “Remove” button
+  /// in the kid schedule editor sheet).
+  Future<void> deleteChoreMemberSchedule(String scheduleId) async {
+    final famId = _familyId;
+    if (famId == null) {
+      throw StateError(
+        'No family selected when calling deleteChoreMemberSchedule',
+      );
+    }
+
+    await repo.deleteChoreMemberSchedule(famId, scheduleId: scheduleId);
+  }
+
 
   /// This uses the `defaultAssignees` list stored on the Chore template,
   /// not the per-day Assignment docs. That way avatars stay stable even
@@ -210,6 +290,38 @@ extension AppStateWrites on AppState {
       debugPrint('unassignChore: failed to update defaultAssignees: $e');
     }
   }
+
+  Future<void> claimBonusChore({
+    required Chore chore,
+    required Member kid,
+    DateTime? due,
+  }) async {
+    final fam = _family;
+    final famId = _familyId;
+
+    if (fam == null || famId == null) {
+      throw StateError('No family selected when calling claimBonusChore');
+    }
+
+    // Default due date = today
+    final when = due ?? DateTime.now();
+
+    // Only use this for bonus chores (safety check)
+    if (!chore.bonusOnly) {
+      debugPrint(
+        'claimBonusChore called on non-bonus chore ${chore.id} – proceeding anyway, but you may want to guard this in UI.',
+      );
+    }
+
+    await repo.assignChoreToMembers(
+      famId,
+      chore: chore,
+      members: [kid],
+      due: when,
+      settings: fam.settings,
+    );
+  }
+
 
   Future<void> assignChore({
     required String choreId,
@@ -469,6 +581,13 @@ extension AppStateWrites on AppState {
     }
   }
 
+  Future<void> refreshAssignmentsForToday() async {
+    debugPrint('refreshAssignmentsForToday: start');
+    await ensureAssignmentsForToday();
+    await ensureAssignmentsForTodayFromSchedules();
+    debugPrint('refreshAssignmentsForToday: done');
+  }
+
   Future<void> ensureAssignmentsForToday() async {
     final famId = _familyId;
     final fam = _family;
@@ -528,6 +647,7 @@ extension AppStateWrites on AppState {
 
     for (final chore in chores) {
       if (!chore.active) continue;
+      if (chore.bonusOnly) continue;
       if (!_choreOccursOnDate(chore, today)) continue;
       if (chore.defaultAssignees.isEmpty) continue;
 
@@ -600,5 +720,183 @@ extension AppStateWrites on AppState {
     debugPrint(
       'ensureAssignmentsForToday: created $createdCount new assignments for $today (dayKey=$dayKey).',
     );
+  }
+
+  Future<void> ensureAssignmentsForTodayFromSchedules() async {
+    final famId = _familyId;
+    final fam = _family;
+
+    if (famId == null || fam == null) {
+      debugPrint(
+        'ensureAssignmentsForTodayFromSchedules: no family loaded (famId=$famId fam=$fam), skipping.',
+      );
+      return;
+    }
+
+    final db = FirebaseFirestore.instance;
+    final famRef = db.collection('families').doc(famId);
+    final assignmentsRef = famRef.collection('assignments');
+    final schedulesRef = famRef.collection('choreMemberSchedules');
+
+    // Normalize today
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dayKey = _dateKey(today);
+
+    debugPrint(
+      'ensureAssignmentsForTodayFromSchedules: famId=$famId dayKey=$dayKey',
+    );
+
+    // 1) Existing assignments for today (for dedupe)
+    final existingSnap = await assignmentsRef
+        .where('dayKey', isEqualTo: dayKey)
+        .get();
+
+    final existingByChoreMember = <String, bool>{};
+    for (final doc in existingSnap.docs) {
+      final data = doc.data();
+      final choreId = data['choreId'] as String? ?? '';
+      final memberId = data['memberId'] as String? ?? '';
+      if (choreId.isEmpty || memberId.isEmpty) continue;
+      final key = '$choreId|$memberId';
+      existingByChoreMember[key] = true;
+    }
+
+    debugPrint(
+      'ensureAssignmentsForTodayFromSchedules: existing assignments today = ${existingByChoreMember.length}',
+    );
+
+    // 2) Active schedules
+    final schedSnap = await schedulesRef.where('active', isEqualTo: true).get();
+    debugPrint(
+      'ensureAssignmentsForTodayFromSchedules: active schedules = ${schedSnap.docs.length}',
+    );
+
+    if (schedSnap.docs.isEmpty) return;
+
+    // We already have an in-memory list of chores; use that
+    final choreById = {for (final c in chores) c.id: c};
+
+    final batch = db.batch();
+    var createdCount = 0;
+
+    for (final sDoc in schedSnap.docs) {
+      final schedule = ChoreMemberSchedule.fromDoc(sDoc);
+
+      final chore = choreById[schedule.choreId];
+      if (chore == null) {
+        debugPrint(
+          'schedule ${schedule.id}: chore not found (choreId=${schedule.choreId}), skipping.',
+        );
+        continue;
+      }
+      if (!chore.active) {
+        debugPrint(
+          'schedule ${schedule.id}: chore ${chore.id} inactive, skipping.',
+        );
+        continue;
+      }
+      if (chore.bonusOnly) {
+        debugPrint(
+          'schedule ${schedule.id}: chore ${chore.id} is bonusOnly, skipping auto-assign.',
+        );
+        continue;
+      }
+
+      final occurs = _scheduleOccursOnDate(schedule.recurrence, today);
+      debugPrint(
+        'schedule ${schedule.id}: member=${schedule.memberId} type=${schedule.recurrence.type} occursToday=$occurs',
+      );
+
+      if (!occurs) continue;
+
+      final key = '${schedule.choreId}|${schedule.memberId}';
+      if (existingByChoreMember.containsKey(key)) {
+        debugPrint(
+          'schedule ${schedule.id}: assignment already exists for today, skipping.',
+        );
+        continue;
+      }
+
+      final member = _findMemberById(schedule.memberId);
+      if (member == null) {
+        debugPrint(
+          'schedule ${schedule.id}: member ${schedule.memberId} not found, skipping.',
+        );
+        continue;
+      }
+
+      final award = calcAwards(
+        difficulty: chore.difficulty,
+        settings: fam.settings,
+      );
+
+      final asgId = 'asg_${chore.id}_${member.id}_$dayKey';
+      final asgRef = assignmentsRef.doc(asgId);
+
+      debugPrint(
+        'schedule ${schedule.id}: creating assignment $asgId for member=${member.displayName} chore=${chore.title}',
+      );
+
+      batch.set(asgRef, {
+        'familyId': famId,
+        'choreId': chore.id,
+        'choreTitle': chore.title,
+        'choreIcon': chore.icon,
+        'memberId': member.id,
+        'memberName': member.displayName,
+        'difficulty': chore.difficulty,
+        'xp': award.xp,
+        'coinAward': award.coins,
+        'requiresApproval': chore.requiresApproval,
+        'status': 'assigned',
+        'due': Timestamp.fromDate(today),
+        'dayKey': dayKey,
+        'assignedAt': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      createdCount++;
+    }
+
+    if (createdCount > 0) {
+      await batch.commit();
+      debugPrint(
+        'ensureAssignmentsForTodayFromSchedules: created $createdCount assignments for $dayKey',
+      );
+    } else {
+      debugPrint(
+        'ensureAssignmentsForTodayFromSchedules: no new assignments needed for $dayKey',
+      );
+    }
+  }
+
+  bool _scheduleOccursOnDate(Recurrence r, DateTime date) {
+    switch (r.type) {
+      case 'daily':
+        return true;
+
+      case 'weekly':
+        final days = r.daysOfWeek ?? const [];
+        return days.contains(date.weekday);
+
+      case 'custom':
+        final start = r.startDate ?? date;
+        final n = r.intervalDays ?? 1;
+        final startDay = DateTime(start.year, start.month, start.day);
+        final thisDay = DateTime(date.year, date.month, date.day);
+        final diff = thisDay.difference(startDay).inDays;
+        return diff >= 0 && diff % n == 0;
+
+      case 'once':
+        final start = r.startDate;
+        if (start == null) return false;
+        final startDay = DateTime(start.year, start.month, start.day);
+        final thisDay = DateTime(date.year, date.month, date.day);
+        return startDay == thisDay;
+
+      default:
+        return false;
+    }
   }
 }

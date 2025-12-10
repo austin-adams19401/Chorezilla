@@ -1,5 +1,6 @@
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/pages/parent_dashboard/parent_weekly_overview_page.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -176,6 +177,13 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
               kidCount: summaries.length,
               completed: completedAssignments,
               total: totalAssignments,
+              onWeeklyOverviewPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const ParentWeeklyOverviewPage(),
+                  ),
+                );
+              },
             ),
 
             Expanded(
@@ -262,11 +270,13 @@ class _TodayHero extends StatelessWidget {
     required this.kidCount,
     required this.completed,
     required this.total,
+    this.onWeeklyOverviewPressed,
   });
 
   final int kidCount;
   final int completed;
   final int total;
+  final VoidCallback? onWeeklyOverviewPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -283,8 +293,6 @@ class _TodayHero extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(20, topInset, 20, 24),
-      // 👆 padding includes the app bar height, so the gradient starts
-      // at the very top, but the text sits just below the AppBar.
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -305,12 +313,44 @@ class _TodayHero extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Today at a glance',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Today at a glance',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    if (onWeeklyOverviewPressed != null)
+                      TextButton.icon(
+                        onPressed: onWeeklyOverviewPressed,
+                        
+                        icon: const Icon(
+                          Icons.calendar_view_week_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                        label: Text(
+                          'Weekly View',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: BorderSide(color: Colors.white, width: 1.4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(height: 4),
                 Text(

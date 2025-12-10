@@ -298,6 +298,7 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'parent-reward-fab',
         onPressed: () => _openNewRewardSheet(context),
         icon: const Icon(Icons.add),
         label: const Text('New reward'),

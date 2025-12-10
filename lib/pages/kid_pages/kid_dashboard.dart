@@ -394,19 +394,6 @@ class _KidDashboardPageState extends State<KidDashboardPage>
             ),
         ],
       ),
-      // floatingActionButton: kDebugMode
-      //     ? FloatingActionButton(
-      //         onPressed: () {
-      //           final app = context.read<AppState>();
-      //           final current = app.currentMember;
-      //           if (current == null) return;
-
-      //           final info = levelInfoForXp(current.xp);
-      //           _triggerLevelUpCelebration(current, info, simulate: true);
-      //         },
-      //         child: const Icon(Icons.bug_report),
-      //       )
-      //     : null,
     );
   }
 

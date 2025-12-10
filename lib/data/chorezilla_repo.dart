@@ -1,6 +1,8 @@
 
 library;
 
+import 'package:chorezilla/models/chore_member_schedule.dart';
+import 'package:chorezilla/models/recurrance.dart';
 import 'package:chorezilla/models/reward_redemption.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -34,6 +36,8 @@ CollectionReference assignmentsColl(FirebaseFirestore db, String familyId) => db
 CollectionReference rewardsColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/rewards');
 CollectionReference devicesColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/devices');
 CollectionReference eventsColl(FirebaseFirestore db, String familyId) => db.collection('families/$familyId/events');
+CollectionReference choreMemberSchedulesColl(FirebaseFirestore db, String familyId) => db.collection('families').doc(familyId).collection('choreMemberSchedules');
+
 CollectionReference<Map<String, dynamic>> rewardRedemptionsColl(FirebaseFirestore db, String familyId) => db.collection('families').doc(familyId).collection('rewardRedemptions');
 
 
