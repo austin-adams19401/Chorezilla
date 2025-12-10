@@ -25,6 +25,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   String? _timeOfDay;
   bool _busy = false;
   bool _requiresApproval = false;
+  bool _bonusOnly = false;
 
   @override
   void initState() {
@@ -41,6 +42,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
         ..addAll(c.recurrence?.daysOfWeek ?? const []);
       _timeOfDay = c.recurrence?.timeOfDay;
       _requiresApproval = c.requiresApproval;
+      _bonusOnly = c.bonusOnly;
     }
   }
 
@@ -150,6 +152,15 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
                   ),
                   value: _requiresApproval,
                   onChanged: (v) => setState(() => _requiresApproval = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Bonus / extra chore'),
+                  subtitle: const Text(
+                    'Kids can pick this up for extra XP and coins. Turn this on to let them see it.',
+                  ),
+                  value: _bonusOnly,
+                  onChanged: (v) => setState(() => _bonusOnly = v),
                 ),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -276,6 +287,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
           difficulty: _difficulty,
           recurrence: rec,
           requiresApproval: _requiresApproval,
+          bonusOnly: _bonusOnly
         );
       } else {
         await app.updateChore(
@@ -286,6 +298,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
           difficulty: _difficulty,
           recurrence: rec,
           requiresApproval: _requiresApproval,
+          bonusOnly: _bonusOnly,
         );
       }
       if (!mounted) return;
