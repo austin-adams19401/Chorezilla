@@ -36,6 +36,7 @@ class Assignment {
   final DateTime? completedAt;
   final DateTime? approvedAt;
   final Proof? proof;
+  final bool bonus;
 
   const Assignment({
     required this.id,
@@ -56,6 +57,7 @@ class Assignment {
     this.completedAt,
     this.approvedAt,
     this.proof,
+    this.bonus = false,
   });
 
   /// Convenience: does this assignment *currently* need parent review?
@@ -83,6 +85,7 @@ class Assignment {
         : Timestamp.fromDate(completedAt!),
     'approvedAt': approvedAt == null ? null : Timestamp.fromDate(approvedAt!),
     'proof': proof?.toMap(),
+    'bonus': bonus,
   };
 
   factory Assignment.fromDoc(DocumentSnapshot doc) {
@@ -108,6 +111,7 @@ class Assignment {
       proof: data['proof'] == null
           ? null
           : Proof.fromMap(data['proof'] as Map<String, dynamic>),
+      bonus: (data['bonus'] as bool?) ?? false,
     );
   }
 
@@ -131,6 +135,7 @@ class Assignment {
     'completedAt': completedAt?.toIso8601String(),
     'approvedAt': approvedAt?.toIso8601String(),
     'proof': proof?.toMap(),
+    'bonus': bonus,
   };
 
   factory Assignment.fromCacheMap(Map<String, dynamic> data) {
@@ -155,7 +160,7 @@ class Assignment {
       proof: data['proof'] == null
           ? null
           : Proof.fromMap(data['proof'] as Map<String, dynamic>),
+      bonus: (data['bonus'] as bool?) ?? false,
     );
   }
-
 }

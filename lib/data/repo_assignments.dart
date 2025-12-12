@@ -129,6 +129,7 @@ Future<List<String>> assignChoreToMembers(
         'due': Timestamp.fromDate(normalizedDue),
         'dayKey': dayKey,
         'proof': null,
+        'bonus': false,
       });
     }
 
@@ -161,6 +162,128 @@ Future<List<String>> assignChoreToMembers(
       'status': 'done',
       'completedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+  }
+
+  Future<String?> createBonusAssignment(
+    String familyId, {
+    required Chore chore,
+    required Member member,
+    required FamilySettings settings,
+  }) async {
+    final db = firebaseDB;
+    final assignmentsRef = assignmentsColl(db, familyId);
+
+    // Normalize "today"
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dayKey = _dayKeyFor(today);
+
+    // Load *all* bonus assignments for this chore + day
+    final existingSnap = await assignmentsRef
+        .where('choreId', isEqualTo: chore.id)
+        .where('dayKey', isEqualTo: dayKey)
+        .where('bonus', isEqualTo: true)
+        .get();
+
+    // 1) If any assignment is already pending/completed → this bonus
+    //    chore is "taken" for the family today.
+    for (final doc in existingSnap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final status = (data['status'] as String?) ?? 'assigned';
+      if (status == 'pending' || status == 'completed') {
+        debugPrint(
+          'createBonusAssignment: chore=${chore.id} already completed/pending '
+          'for dayKey=$dayKey, skipping.',
+        );
+        return null;
+      }
+    }
+
+    // 2) If this kid already has a bonus assignment for this chore today,
+    //    don't create a duplicate.
+    final alreadyForKid = existingSnap.docs.any((doc) {
+      final data = doc.data() as Map<String, dynamic>;
+      final memberId = data['memberId'] as String? ?? '';
+      return memberId == member.id;
+    });
+
+    if (alreadyForKid) {
+      debugPrint(
+        'createBonusAssignment: kid=${member.id} already has bonus '
+        'assignment for chore=${chore.id} dayKey=$dayKey, skipping.',
+      );
+      return null;
+    }
+
+    // 3) Otherwise, create the new bonus assignment.
+    final awards = calcAwards(difficulty: chore.difficulty, settings: settings);
+
+    final docId = 'bonus_${chore.id}_${member.id}_$dayKey';
+    final ref = assignmentsRef.doc(docId);
+
+    await ref.set({
+      'familyId': familyId,
+      'memberId': member.id,
+      'memberName': member.displayName,
+      'choreId': chore.id,
+      'choreTitle': chore.title,
+      'choreIcon': chore.icon,
+      'difficulty': chore.difficulty,
+      'xp': awards.xp,
+      'coinAward': awards.coins,
+      'requiresApproval': chore.requiresApproval,
+      'status': 'assigned',
+      'assignedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+      'due': Timestamp.fromDate(today),
+      'dayKey': dayKey,
+      'bonus': true,
+    }, SetOptions(merge: true));
+
+    return ref.id;
+  }
+
+    /// When a bonus assignment for a chore is completed (or marked pending),
+  /// we auto-reject other kids' bonus assignments for the same chore + day.
+  Future<void> expireSiblingBonusAssignments({
+    required String familyId,
+    required String choreId,
+    required DateTime? due,
+    required String winningAssignmentId,
+  }) async {
+    final db = firebaseDB;
+    final assignmentsRef = assignmentsColl(db, familyId);
+
+    // If due is missing for some reason, we still do a best-effort shrink
+    // by just choreId + bonus + status.
+    Query q = assignmentsRef
+        .where('choreId', isEqualTo: choreId)
+        .where('bonus', isEqualTo: true)
+        .where('status', whereIn: ['assigned', 'pending']);
+
+    if (due != null) {
+      // Normalize to date (midnight) to match how you write `due`.
+      final normalized = DateTime(due.year, due.month, due.day);
+      q = q.where('due', isEqualTo: Timestamp.fromDate(normalized));
+    }
+
+    final snap = await q.get();
+    if (snap.docs.isEmpty) return;
+
+    final batch = db.batch();
+    final now = FieldValue.serverTimestamp();
+
+    for (final doc in snap.docs) {
+      if (doc.id == winningAssignmentId) continue; // keep the winner
+
+      batch.update(doc.reference, {
+        'status': 'rejected',
+        'rejectedReason': 'bonus_taken_by_other_kid',
+        'updatedAt': now,
+      });
+    }
+
+    await batch.commit();
   }
 
 Future<void> completeAssignment(

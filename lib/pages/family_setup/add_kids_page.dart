@@ -24,6 +24,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
   final _nameNode = FocusNode();
   int? _age; // optional
   String? _avatarKey; // emoji from picker
+  bool _allowBonusChores = true;
 
   // Busy/error & editing
   bool _busy = false;
@@ -85,9 +86,14 @@ class _AddKidsPageState extends State<AddKidsPage> {
           pinHash: null,
         );
 
-        // Optionally set age
-        if (_age != null) {
-          await _repo.updateMember(familyId, newId, {'age': _age});
+        // 🔹 Age + bonus chores flag in one patch
+        final patch = <String, dynamic>{
+          if (_age != null) 'age': _age,
+          'allowBonusChores': _allowBonusChores,
+        };
+
+        if (patch.isNotEmpty) {
+          await _repo.updateMember(familyId, newId, patch);
         }
 
         _clearFormAndRefocus();
@@ -103,6 +109,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
           'displayName': _name.text.trim(),
           if (_avatarKey != null) 'avatarKey': _avatarKey,
           if (_age != null) 'age': _age,
+          'allowBonusChores': _allowBonusChores,
         };
 
         await _repo.updateMember(familyId, memberId, patch);
@@ -152,6 +159,7 @@ void _startEdit(Member m) {
           ? m.avatarKey
           : null;
       _age = m.age; // ✅ pre-populate from stored age, if any
+      _allowBonusChores = m.allowBonusChores;
     });
     _nameNode.requestFocus();
   }
@@ -165,6 +173,7 @@ void _startEdit(Member m) {
     _age = null;
     _avatarKey = null;
     _nameNode.requestFocus();
+    _allowBonusChores = true;
   });
 
   void _clearFormAndRefocus() {
@@ -172,6 +181,7 @@ void _startEdit(Member m) {
     _name.clear();
     _age = null;
     _avatarKey = null;
+    _allowBonusChores = true;
     FocusScope.of(context).requestFocus(_nameNode);
   }
 
@@ -505,6 +515,19 @@ void _startEdit(Member m) {
                               );
                             }
                           },
+                        ),
+                        const SizedBox(height: 12),
+
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          value: _allowBonusChores,
+                          onChanged: _busy
+                              ? null
+                              : (v) => setState(() => _allowBonusChores = v),
+                          title: const Text('Show bonus chores'),
+                          subtitle: const Text(
+                            'When on, this kid can see optional extra chores for extra coins and XP.',
+                          ),
                         ),
 
                         const SizedBox(height: 16),

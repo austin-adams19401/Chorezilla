@@ -26,6 +26,7 @@ class Member {
   final int allowancePayDay;
 
   final bool notificationsEnabled;
+  final bool allowBonusChores;
 
   final int currentStreak;
   final int longestStreak;
@@ -58,6 +59,7 @@ class Member {
     this.ownedCosmetics = const [],
     this.equippedBackgroundId,
     this.equippedAvatarId,
+    this.allowBonusChores = true,
   });
 
   Member copyWith({
@@ -82,6 +84,7 @@ class Member {
     List<String>? ownedCosmetics,
     String? equippedBackgroundId,
     String? equippedAvatarId,
+    bool? allowBonusChores,
   }) => Member(
     id: id,
     displayName: displayName ?? this.displayName,
@@ -107,6 +110,7 @@ class Member {
     ownedCosmetics: ownedCosmetics ?? this.ownedCosmetics,
     equippedBackgroundId: equippedBackgroundId ?? this.equippedBackgroundId,
     equippedAvatarId: equippedAvatarId ?? this.equippedAvatarId,
+    allowBonusChores: allowBonusChores ?? this.allowBonusChores,
   );
 
   Map<String, dynamic> toMap() => {
@@ -135,6 +139,7 @@ class Member {
     'ownedCosmetics': ownedCosmetics,
     'equippedBackgroundId': equippedBackgroundId,
     'equippedAvatarId': equippedAvatarId,
+    'allowBonusChores': allowBonusChores,
   };
 
   factory Member.fromDoc(DocumentSnapshot doc) {
@@ -167,6 +172,7 @@ class Member {
       ownedCosmetics: (data['ownedCosmetics'] as List?)?.map((e) => e.toString()).toList() ?? const [],
       equippedBackgroundId: data['equippedBackgroundId'] as String?,
       equippedAvatarId: data['equippedAvatarId'] as String?,
+      allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
     );
   }
 
@@ -195,6 +201,7 @@ class Member {
     'ownedCosmetics': ownedCosmetics,
     'equippedBackgroundId': equippedBackgroundId,
     'equippedAvatarId': equippedAvatarId,
+    'allowBonusChores': allowBonusChores,
   };
 
   factory Member.fromCacheMap(Map<String, dynamic> data) {
@@ -231,6 +238,7 @@ class Member {
           const [],
       equippedBackgroundId: data['equippedBackgroundId'] as String?,
       equippedAvatarId: data['equippedAvatarId'] as String?,
+      allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
     );
   }
 }

@@ -105,7 +105,7 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
           byMember.putIfAbsent(id, () => <Assignment>[]).add(a);
         }
 
-        final summaries = <_KidTodaySummary>[];
+final summaries = <_KidTodaySummary>[];
         byMember.forEach((memberId, list) {
           final memberModel = membersById[memberId];
           final name =
@@ -118,13 +118,21 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
           final level = memberModel?.level ?? 1;
           final coins = memberModel?.coins ?? 0;
 
-          int total = list.length;
+          // Treat null as "not bonus"
+          final requiredAssignments = list
+              .where((a) => a.bonus != true)
+              .toList();
+
+          // Count only explicit bonus=true
+          final bonusCount = list.where((a) => a.bonus == true).length;
+
+          int total = requiredAssignments.length;
           int completed = 0;
           int pending = 0;
           int rejected = 0;
           int assigned = 0;
 
-          for (final a in list) {
+          for (final a in requiredAssignments) {
             switch (a.status) {
               case AssignmentStatus.completed:
                 completed++;
@@ -151,12 +159,14 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
               pending: pending,
               rejected: rejected,
               assigned: assigned,
-              assignments: list,
+              assignments: list, 
               level: level,
               coins: coins,
+              bonusCount: bonusCount, 
             ),
           );
         });
+
 
         summaries.sort((a, b) => a.name.compareTo(b.name));
 
@@ -450,6 +460,7 @@ class _KidTodaySummary {
     required this.assignments,
     required this.level,
     required this.coins,
+    required this.bonusCount,
   });
 
   final String memberId;
@@ -464,6 +475,7 @@ class _KidTodaySummary {
 
   final int level;
   final int coins;
+  final int bonusCount;
 }
 
 class _KidTodayCard extends StatelessWidget {
@@ -697,6 +709,14 @@ class _KidTodayCard extends StatelessWidget {
                         ? cs.onErrorContainer
                         : cs.onSurfaceVariant,
                   ),
+                  if (summary.bonusCount > 0)
+                    _StatChip(
+                      icon: Icons.bolt_rounded,
+                      label: 'Bonus',
+                      value: summary.bonusCount,
+                      color: cs.primaryContainer.withValues(alpha: 0.7),
+                      textColor: cs.onPrimaryContainer,
+                    ),
                 ],
               ),
 

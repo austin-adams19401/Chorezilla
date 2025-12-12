@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/profile_header.dart';
 import 'package:chorezilla/components/zilla_level_up_hero.dart';
+import 'package:chorezilla/models/chore.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:confetti/confetti.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -189,6 +190,8 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
     _handleLevelChange(member);
 
+    final allowBonusChores = (member.allowBonusChores); 
+
     final choresLoaded = _todayAssignmentsBootstrapped;
 
     // "Today" window (local time)
@@ -203,13 +206,27 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
     final allForKid = _todayAssignmentsForKid;
 
-    final todos =
-        allForKid.where((a) => a.status == AssignmentStatus.assigned).toList()
+    final requiredTodos =
+        allForKid
+            .where(
+              (a) => a.bonus != true && a.status == AssignmentStatus.assigned,
+            )
+            .toList()
           ..sort(_byDueThenTitle);
+
+    final bonusTodos =
+        allForKid
+            .where(
+              (a) => a.bonus == true && a.status == AssignmentStatus.assigned,
+            )
+            .toList()
+          ..sort(_byDueThenTitle);
+
 
     final submitted =
         allForKid.where((a) => a.status == AssignmentStatus.pending).toList()
           ..sort(_byDueThenTitle);
+
 
     final completedToday =
         allForKid
@@ -221,9 +238,28 @@ class _KidDashboardPageState extends State<KidDashboardPage>
             .toList()
           ..sort(_byCompletedAtDescThenTitle);
 
+      // 🔹 BONUS CHORES: which bonus chores are still available for this kid today?
+      final allChores = app.chores;
+      final allBonusChores = allChores.where(
+    (c) => c.active && (c.bonusOnly == true),
+  );
+
+  // Chores this kid already has today (any status)
+  final takenChoreIds = allForKid
+    .map((a) => a.choreId)
+    .where((id) => id.isNotEmpty)
+    .toSet();
+
+  // If this kid is not allowed, there are *no* available bonus chores to pick.
+  final availableBonusChores = allowBonusChores
+      ? (allBonusChores.where((c) => !takenChoreIds.contains(c.id)).toList()
+          ..sort((a, b) => a.title.compareTo(b.title)))
+      : <Chore>[];
+
+
     debugPrint(
       'ChildDashboardPage: kid=${member.displayName} '
-      'todos=${todos.length} submitted=${submitted.length} '
+      'todos=${requiredTodos.length} submitted=${submitted.length} '
       'completedToday=${completedToday.length} (loaded=$choresLoaded)',
     );
 
@@ -231,6 +267,8 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+
+    final dayComplete = app.isDayCompleteForKid(member.id);
 
     return Scaffold(
       appBar: AppBar(
@@ -320,6 +358,38 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                   ),
                 ),
 
+              // NEW: “day complete” banner – this only considers required chores,
+              // bonus chores are always optional.
+              if (dayComplete)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        const Text('🎉', style: TextStyle(fontSize: 24)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'You finished all your main chores for today! Bonus chores are extra if you want more coins and XP.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               const SizedBox(height: 8),
 
               // Tabs + lists on a rounded “sheet”
@@ -348,19 +418,43 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                               children: [
                                 // Tab 1: To Do
                                 if (!choresLoaded)
-                                  const Center(child: CircularProgressIndicator())
+                                  const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
                                 else
-                                  _TodoList(
-                                    memberId: member.id,
-                                    items: todos,
-                                    busyIds: _busyIds,
-                                    onComplete: _completeAssignment,
-                                    completedToday: completedToday,
+                                  Column(
+                                    children: [
+                                      if (availableBonusChores.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            12,
+                                            12,
+                                            12,
+                                            4,
+                                          ),
+                                          child: _BonusChoresSection(
+                                            kid: member,
+                                            chores: availableBonusChores,
+                                          ),
+                                        ),
+                                      Expanded(
+                                        child: _TodoList(
+                                          memberId: member.id,
+                                          items: requiredTodos,
+                                          bonusItems: bonusTodos,
+                                          busyIds: _busyIds,
+                                          onComplete: _completeAssignment,
+                                          completedToday: completedToday,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                  
+
                                 // Tab 2: Submitted
                                 if (!choresLoaded)
-                                  const Center(child: CircularProgressIndicator())
+                                  const Center(
+                                    child: CircularProgressIndicator(),
+                                  )
                                 else
                                   _SubmittedList(items: submitted),
                               ],
@@ -723,6 +817,7 @@ class _TodoList extends StatelessWidget {
   const _TodoList({
     required this.memberId,
     required this.items,
+    required this.bonusItems, 
     required this.completedToday,
     required this.busyIds,
     required this.onComplete,
@@ -730,6 +825,7 @@ class _TodoList extends StatelessWidget {
 
   final String memberId;
   final List<Assignment> items;
+  final List<Assignment> bonusItems;
   final Set<String> busyIds;
   final Future<void> Function(Assignment) onComplete;
   final List<Assignment> completedToday;
@@ -738,14 +834,16 @@ class _TodoList extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasTodos = items.isNotEmpty;
     final hasCompleted = completedToday.isNotEmpty;
+    final hasBonus = bonusItems.isNotEmpty;
 
-    if (!hasTodos && !hasCompleted) {
+    if (!hasTodos && !hasCompleted && !hasBonus) {
       return const _EmptyState(
         emoji: '🎉',
         title: 'All caught up!',
         subtitle: 'No chores to do right now.',
       );
     }
+
 
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
@@ -816,6 +914,55 @@ class _TodoList extends StatelessWidget {
                 ),
               ),
             ],
+
+            if (hasBonus) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Text(
+                    'Bonus chores (extra coins!)',
+                    style: ts.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                sliver: SliverGrid(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    crossAxisSpacing: gridSpacing,
+                    mainAxisSpacing: gridSpacing,
+                    mainAxisExtent: tileHeight,
+                  ),
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final a = bonusItems[index];
+                    final busy = busyIds.contains(a.id);
+
+                    return _AssignmentTile(
+                      assignment: a,
+                      completed: false,
+                      rejected: false,
+                      trailing: FilledButton(
+                        onPressed: busy ? null : () => onComplete(a),
+                        child: busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text('Do this'),
+                      ),
+                    );
+                  }, childCount: bonusItems.length),
+                ),
+              ),
+            ],
+
             if (hasCompleted) ...[
               SliverToBoxAdapter(
                 child: Padding(
@@ -1092,6 +1239,133 @@ class _PendingRewardsBanner extends StatelessWidget {
               ),
             ),
             const Icon(Icons.chevron_right_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BonusChoresSection extends StatelessWidget {
+  const _BonusChoresSection({required this.kid, required this.chores});
+
+  final Member kid;
+  final List<Chore> chores;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final app = context.read<AppState>();
+    final family = app.family;
+
+    return Card(
+      color: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.bolt_rounded, color: cs.primary),
+                const SizedBox(width: 6),
+                Text(
+                  'Bonus chores',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Want extra coins and XP? Pick one!',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Column(
+              children: chores.map((chore) {
+                final xp =
+                    family?.settings.difficultyToXP[chore.difficulty] ??
+                    (chore.difficulty.clamp(1, 5) * 10);
+                final coins = family != null
+                    ? (xp * family.settings.coinPerPoint).round()
+                    : 0;
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: cs.primaryContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          chore.icon?.isNotEmpty == true ? chore.icon! : '🧩',
+                          style: const TextStyle(fontSize: 20),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              chore.title,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$xp XP · $coins coins',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.tonal(
+                        onPressed: () async {
+                          try {
+                            await app.pickupBonusChore(
+                              memberId: kid.id,
+                              choreId: chore.id,
+                            );
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '"${chore.title}" was added to your list for today!',
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Could not add chore: $e'),
+                              ),
+                            );
+                          }
+                        },
+                        child: const Text('Do this'),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
           ],
         ),
       ),

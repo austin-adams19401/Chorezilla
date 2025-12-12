@@ -291,10 +291,56 @@ extension AppStateWrites on AppState {
     }
   }
 
-  Future<void> claimBonusChore({
+    Future<void> pickupBonusChore({
+    required String memberId,
+    required String choreId,
+  }) async {
+    final famId = _familyId;
+    final fam = _family;
+
+    if (famId == null || fam == null) {
+      debugPrint('pickupBonusChore: no family loaded, skipping');
+      return;
+    }
+
+    // Find the chore + kid models
+    final chore = chores.firstWhere(
+      (c) => c.id == choreId,
+      orElse: () {
+        throw StateError(
+          'pickupBonusChore: chore $choreId not found in app.chores',
+        );
+      },
+    );
+
+    final member = members.firstWhere(
+      (m) => m.id == memberId,
+      orElse: () {
+        throw StateError(
+          'pickupBonusChore: member $memberId not found in app.members',
+        );
+      },
+    );
+
+    // Bonus chores should usually be marked bonusOnly in the template,
+    // but we don't strictly require it here.
+    await repo.createBonusAssignment(
+      famId,
+      chore: chore,
+      member: member,
+      settings: fam.settings,
+    );
+
+    debugPrint(
+      'pickupBonusChore: created bonus assignment for '
+      '${member.displayName} → ${chore.title}',
+    );
+  }
+
+    Future<void> claimBonusChore({
     required Chore chore,
     required Member kid,
-    DateTime? due,
+    DateTime? due, // currently unused with the new helper
   }) async {
     final fam = _family;
     final famId = _familyId;
@@ -303,9 +349,6 @@ extension AppStateWrites on AppState {
       throw StateError('No family selected when calling claimBonusChore');
     }
 
-    // Default due date = today
-    final when = due ?? DateTime.now();
-
     // Only use this for bonus chores (safety check)
     if (!chore.bonusOnly) {
       debugPrint(
@@ -313,11 +356,10 @@ extension AppStateWrites on AppState {
       );
     }
 
-    await repo.assignChoreToMembers(
+    await repo.createBonusAssignment(
       famId,
       chore: chore,
-      members: [kid],
-      due: when,
+      member: kid,
       settings: fam.settings,
     );
   }
@@ -463,7 +505,7 @@ extension AppStateWrites on AppState {
     // Optional: refresh caches if you keep a local chores list
   }
 
-  Future<void> completeAssignment(String assignmentId) async {
+    Future<void> completeAssignment(String assignmentId) async {
     final famId = _familyId;
     if (famId == null) {
       throw StateError('No family selected when calling completeAssignment');
@@ -481,8 +523,19 @@ extension AppStateWrites on AppState {
 
     final assignment = Assignment.fromDoc(snap);
 
-    // 2) Let the repo handle status + XP/coins
+    // 2) Let the repo handle status + XP/coins (and pending vs completed)
     await repo.completeAssignment(famId, assignmentId);
+
+    // 3) If this is a bonus assignment, expire other kids' bonus assignments
+    //    for the same chore + day.
+    if (assignment.bonus) {
+      await repo.expireSiblingBonusAssignments(
+        familyId: famId,
+        choreId: assignment.choreId,
+        due: assignment.due,
+        winningAssignmentId: assignment.id,
+      );
+    }
 
     // 4) Optimistically update local kid cache so the To Do list updates immediately
     final memberId = assignment.memberId;
@@ -496,6 +549,7 @@ extension AppStateWrites on AppState {
 
     _notifyStateChanged();
   }
+
 
   Future<void> approveAssignment(
     String assignmentId, {
@@ -703,6 +757,7 @@ extension AppStateWrites on AppState {
           'dayKey': dayKey, // logical calendar day, used for idempotence
           'assignedAt': FieldValue.serverTimestamp(),
           'createdAt': FieldValue.serverTimestamp(),
+          'bonus': chore.bonusOnly,
         }, SetOptions(merge: true)); // merge for safety
 
         createdCount++;
@@ -854,6 +909,7 @@ extension AppStateWrites on AppState {
         'dayKey': dayKey,
         'assignedAt': FieldValue.serverTimestamp(),
         'createdAt': FieldValue.serverTimestamp(),
+        'bonus': chore.bonusOnly,
       }, SetOptions(merge: true));
 
       createdCount++;
@@ -869,6 +925,30 @@ extension AppStateWrites on AppState {
         'ensureAssignmentsForTodayFromSchedules: no new assignments needed for $dayKey',
       );
     }
+  }
+
+  bool isDayCompleteForKid(String memberId) {
+    final todaysAssignments = _kidAssigned[memberId] ?? const <Assignment>[];
+
+    // Only required chores count for "day complete"
+    final required = todaysAssignments.where((a) => !a.bonus).toList();
+    if (required.isEmpty) {
+      // No required chores today ⇒ we treat as not complete
+      // (you can change this to true if you want "no chores" to show as done).
+      return false;
+    }
+
+    bool isDone(Assignment a) {
+      if (a.requiresApproval) {
+        // Kid has done their part once it's pending or completed
+        return a.status == AssignmentStatus.pending ||
+            a.status == AssignmentStatus.completed;
+      } else {
+        return a.status == AssignmentStatus.completed;
+      }
+    }
+
+    return required.every(isDone);
   }
 
   bool _scheduleOccursOnDate(Recurrence r, DateTime date) {
