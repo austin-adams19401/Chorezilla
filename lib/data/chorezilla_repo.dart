@@ -25,6 +25,7 @@ part 'package:chorezilla/data/repo_members.dart';
 part 'package:chorezilla/data/repo_profiles.dart';
 part 'package:chorezilla/data/repo_rewards.dart';
 part 'package:chorezilla/data/repo_transactions.dart';
+part 'package:chorezilla/data/repo_cosmetics.dart';
 
 
 // Firestore path helpers

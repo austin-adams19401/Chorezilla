@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:chorezilla/components/badge_unlock_dialog.dart';
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/profile_header.dart';
 import 'package:chorezilla/components/zilla_level_up_hero.dart';
+import 'package:chorezilla/models/badge.dart';
 import 'package:chorezilla/models/chore.dart';
+import 'package:chorezilla/pages/kid_pages/kid_badges_page.dart';
+import 'package:chorezilla/pages/kid_pages/kid_edit_profile_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:confetti/confetti.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -18,6 +22,7 @@ import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/assignment.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/models/cosmetics.dart';
 
 import 'package:chorezilla/pages/kid_pages/kid_rewards_page.dart';
 import 'package:chorezilla/pages/kid_pages/kid_activity_page.dart';
@@ -161,6 +166,19 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     return app.currentMember ?? app.members.firstOrNull;
   }
 
+  Future<void> _showBadgeUnlockDialogs(List<BadgeDefinition> badges) async {
+    for (final badge in badges) {
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => BadgeUnlockDialog(badge: badge),
+      );
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -180,7 +198,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
       );
     }
 
-    // If currentMember changed under us (via profile switcher), re-bind streams.
+        // If currentMember changed under us (via profile switcher), re-bind streams.
     if (_watchingMemberId != member.id) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
@@ -190,12 +208,21 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
     _handleLevelChange(member);
 
-    final allowBonusChores = (member.allowBonusChores); 
+    final allowBonusChores = (member.allowBonusChores);
 
     final choresLoaded = _todayAssignmentsBootstrapped;
 
+    // Kid background cosmetic
+    final backgroundId = member.equippedBackgroundId ?? 'bg_default';
+    final backgroundItem = CosmeticCatalog.byId(backgroundId);
+    final String? backgroundAsset =
+        backgroundItem.type == CosmeticType.background
+        ? backgroundItem.assetKey
+        : null;
+
     // "Today" window (local time)
     final now = DateTime.now();
+
     final todayStart = DateTime(now.year, now.month, now.day);
     final tomorrowStart = todayStart.add(const Duration(days: 1));
 
@@ -289,6 +316,18 @@ class _KidDashboardPageState extends State<KidDashboardPage>
             },
           ),
           IconButton(
+            icon: const Icon(Icons.emoji_events_rounded, size: 28),
+            tooltip: 'Badges',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => KidBadgesPage(memberId: member.id),
+                ),
+              );
+            },
+          ),
+
+          IconButton(
             icon: const Icon(Icons.card_giftcard, size: 28),
             tooltip: 'Rewards',
             onPressed: () {
@@ -301,44 +340,65 @@ class _KidDashboardPageState extends State<KidDashboardPage>
           ),
         ],
       ),
-      body: Stack(
+            body: Stack(
         children: [
-          // Soft background gradient behind everything
+          // Background layer: either equipped image or fallback gradient
           Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [cs.secondary, cs.primary],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
+            decoration: backgroundAsset != null
+                ? BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(backgroundAsset),
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [cs.secondary, cs.primary],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
           ),
+
 
           // Main content
           Column(
             children: [
               const SizedBox(height: 4),
 
-              // Profile header inside a rounded hero card
+                            // Profile header inside a tappable rounded hero card
               Container(
                 margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                decoration: BoxDecoration(
-                  color: cs.surface,
+                child: InkWell(
                   borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: .08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => KidEditProfilePage(memberId: member.id),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: .08),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: ProfileHeader(
-                  member: member,
-                  showInviteButton: false,
-                  showSwitchButton: false,
+                    child: ProfileHeader(
+                      member: member,
+                      showInviteButton: false,
+                      showSwitchButton: false,
+                    ),
+                  ),
                 ),
               ),
+
 
               if (pendingRewards.isNotEmpty)
                 Padding(
@@ -358,8 +418,6 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                   ),
                 ),
 
-              // NEW: “day complete” banner – this only considers required chores,
-              // bonus chores are always optional.
               if (dayComplete)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
@@ -586,11 +644,16 @@ class _KidDashboardPageState extends State<KidDashboardPage>
           );
         }
       }
-
-      // Existing completion logic (status, XP, coins, streaks, etc.)
+            // Existing completion logic (status, XP, coins, streaks, etc.)
       await app.completeAssignment(a.id);
 
+            final newBadges = await app.checkAndAwardStreakBadgesForKid(a.memberId);
+
       if (!mounted) return;
+
+      if (newBadges.isNotEmpty) {
+        await _showBadgeUnlockDialogs(newBadges);
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(

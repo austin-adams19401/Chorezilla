@@ -7,6 +7,7 @@ enum AssignmentStatus { assigned, completed, pending, rejected }
 enum AuthStatus { unknown, signedOut, needsFamilySetup, ready }
 enum AppViewMode { parent, kid }
 enum ProofChoice { camera, gallery, skip }
+enum CosmeticType { background, zillaSkin }
 
 String roleToString(FamilyRole role) {
   switch (role) {

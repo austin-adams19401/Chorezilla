@@ -1,4 +1,6 @@
-enum CosmeticType { background, zillaSkin }
+// lib/models/cosmetics.dart
+
+import 'package:chorezilla/models/common.dart';
 
 class CosmeticItem {
   final String id; // e.g. 'bg_blue_sky'
@@ -22,6 +24,7 @@ class CosmeticItem {
 
 class CosmeticCatalog {
   static const items = <CosmeticItem>[
+    // BACKGROUNDS
     CosmeticItem(
       id: 'bg_default',
       type: CosmeticType.background,
@@ -39,6 +42,8 @@ class CosmeticCatalog {
       costCoins: 50,
       assetKey: 'assets/backgrounds/sunset.png',
     ),
+
+    // ZILLA SKINS
     CosmeticItem(
       id: 'zilla_green_basic',
       type: CosmeticType.zillaSkin,
@@ -58,6 +63,20 @@ class CosmeticCatalog {
     ),
   ];
 
-  static CosmeticItem? byId(String id) =>
-      items.firstWhere((c) => c.id == id, orElse: () => items.first);
+  /// Returns the cosmetic for [id], or a default cosmetic if unknown.
+  static CosmeticItem byId(String id) {
+    final exact = items.where((c) => c.id == id);
+    if (exact.isNotEmpty) return exact.first;
+
+    final defaults = items.where((c) => c.isDefault);
+    if (defaults.isNotEmpty) return defaults.first;
+
+    return items.first;
+  }
+
+  static Iterable<CosmeticItem> backgrounds() =>
+      items.where((c) => c.type == CosmeticType.background);
+
+  static Iterable<CosmeticItem> zillaSkins() =>
+      items.where((c) => c.type == CosmeticType.zillaSkin);
 }

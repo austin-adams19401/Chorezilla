@@ -8,6 +8,7 @@ import 'package:chorezilla/models/chore_member_schedule.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/models/history.dart';
 import 'package:chorezilla/models/recurrance.dart';
+import 'package:chorezilla/models/badge.dart';
 import 'package:chorezilla/services/local_cache.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -33,7 +34,8 @@ part 'family_streams_state.dart';
 part 'pin_state.dart';
 part 'ui_state.dart';
 part 'auth_state.dart';
-
+part 'cosmetic_state.dart';
+part 'badges_state.dart';
 
 const String _viewModeKey = 'viewMode';
 

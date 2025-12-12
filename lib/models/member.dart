@@ -30,10 +30,12 @@ class Member {
 
   final int currentStreak;
   final int longestStreak;
+  final DateTime? lastActiveDate;
 
   final List<String> ownedCosmetics;
   final String? equippedBackgroundId;
   final String? equippedAvatarId;
+  final String? equippedZillaSkinId;
 
   const Member({
     required this.id,
@@ -56,9 +58,11 @@ class Member {
     this.notificationsEnabled = true,
     this.currentStreak = 0,
     this.longestStreak = 0,
+    this.lastActiveDate,
     this.ownedCosmetics = const [],
     this.equippedBackgroundId,
     this.equippedAvatarId,
+    this.equippedZillaSkinId, 
     this.allowBonusChores = true,
   });
 
@@ -79,11 +83,14 @@ class Member {
     int? allowanceFullAmountCents,
     int? allowanceDaysRequired,
     int? allowancePayDay,
+    bool? notificationsEnabled, 
     int? currentStreak,
     int? longestStreak,
+    DateTime? lastActiveDate,
     List<String>? ownedCosmetics,
     String? equippedBackgroundId,
     String? equippedAvatarId,
+    String? equippedZillaSkinId,
     bool? allowBonusChores,
   }) => Member(
     id: id,
@@ -101,19 +108,23 @@ class Member {
     active: active ?? this.active,
     allowanceEnabled: allowanceEnabled ?? this.allowanceEnabled,
     allowanceFullAmountCents:
-    allowanceFullAmountCents ?? this.allowanceFullAmountCents,
+        allowanceFullAmountCents ?? this.allowanceFullAmountCents,
     allowanceDaysRequired: allowanceDaysRequired ?? this.allowanceDaysRequired,
     allowancePayDay: allowancePayDay ?? this.allowancePayDay,
-    notificationsEnabled: notificationsEnabled,    
+    notificationsEnabled:
+        notificationsEnabled ?? this.notificationsEnabled, 
     currentStreak: currentStreak ?? this.currentStreak,
     longestStreak: longestStreak ?? this.longestStreak,
+    lastActiveDate: lastActiveDate ?? this.lastActiveDate, 
     ownedCosmetics: ownedCosmetics ?? this.ownedCosmetics,
     equippedBackgroundId: equippedBackgroundId ?? this.equippedBackgroundId,
     equippedAvatarId: equippedAvatarId ?? this.equippedAvatarId,
+    equippedZillaSkinId:
+        equippedZillaSkinId ?? this.equippedZillaSkinId,
     allowBonusChores: allowBonusChores ?? this.allowBonusChores,
   );
 
-  Map<String, dynamic> toMap() => {
+    Map<String, dynamic> toMap() => {
     'displayName': displayName,
     'role': roleToString(role),
     'userUid': userUid,
@@ -136,9 +147,14 @@ class Member {
 
     'currentStreak': currentStreak,
     'longestStreak': longestStreak,
+    'lastActiveDate': lastActiveDate == null
+        ? null
+        : Timestamp.fromDate(lastActiveDate!), 
+
     'ownedCosmetics': ownedCosmetics,
     'equippedBackgroundId': equippedBackgroundId,
     'equippedAvatarId': equippedAvatarId,
+    'equippedZillaSkinId': equippedZillaSkinId, 
     'allowBonusChores': allowBonusChores,
   };
 
@@ -166,18 +182,24 @@ class Member {
       allowanceFullAmountCents: data['allowanceFullAmountCents'] as int? ?? 0,
       allowanceDaysRequired: data['allowanceDaysRequired'] as int? ?? 7,
       allowancePayDay: data['allowancePayDay'] as int? ?? DateTime.sunday,
-      notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true, 
+      notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true,
       currentStreak: (data['currentStreak'] as num?)?.toInt() ?? 0,
       longestStreak: (data['longestStreak'] as num?)?.toInt() ?? 0,
-      ownedCosmetics: (data['ownedCosmetics'] as List?)?.map((e) => e.toString()).toList() ?? const [],
+      lastActiveDate: tsAsDate(data['lastActiveDate']), // 👈 NEW
+      ownedCosmetics:
+          (data['ownedCosmetics'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       equippedBackgroundId: data['equippedBackgroundId'] as String?,
       equippedAvatarId: data['equippedAvatarId'] as String?,
+      equippedZillaSkinId: data['equippedZillaSkinId'] as String?, // 👈 NEW
       allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
     );
   }
 
     // --- Local cache mapping (no Firestore Timestamp) ---
-  Map<String, dynamic> toCacheMap() => {
+    Map<String, dynamic> toCacheMap() => {
     'id': id,
     'displayName': displayName,
     'role': roleToString(role),
@@ -198,13 +220,16 @@ class Member {
     'notificationsEnabled': notificationsEnabled,
     'currentStreak': currentStreak,
     'longestStreak': longestStreak,
+    'lastActiveDate': lastActiveDate?.toIso8601String(), // 👈 NEW
     'ownedCosmetics': ownedCosmetics,
     'equippedBackgroundId': equippedBackgroundId,
     'equippedAvatarId': equippedAvatarId,
+    'equippedZillaSkinId': equippedZillaSkinId, // 👈 NEW
     'allowBonusChores': allowBonusChores,
   };
 
-  factory Member.fromCacheMap(Map<String, dynamic> data) {
+
+    factory Member.fromCacheMap(Map<String, dynamic> data) {
     return Member(
       id: data['id'] as String? ?? '',
       displayName: data['displayName'] as String? ?? 'Member',
@@ -231,6 +256,7 @@ class Member {
       notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true,
       currentStreak: (data['currentStreak'] as num?)?.toInt() ?? 0,
       longestStreak: (data['longestStreak'] as num?)?.toInt() ?? 0,
+      lastActiveDate: parseIsoDateTimeOrNull(data['lastActiveDate']), // 👈 NEW
       ownedCosmetics:
           (data['ownedCosmetics'] as List?)
               ?.map((e) => e.toString())
@@ -238,7 +264,13 @@ class Member {
           const [],
       equippedBackgroundId: data['equippedBackgroundId'] as String?,
       equippedAvatarId: data['equippedAvatarId'] as String?,
+      equippedZillaSkinId: data['equippedZillaSkinId'] as String?, // 👈 NEW
       allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
     );
   }
+
+  bool ownsCosmetic(String cosmeticId) => ownedCosmetics.contains(cosmeticId);
+
+  bool hasBadge(String badgeId) => badges.contains(badgeId);
+
 }
