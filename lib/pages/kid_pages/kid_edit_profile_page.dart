@@ -157,7 +157,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit profile'),
+        title: Text('Edit ${member.displayName}\'s profile'),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
@@ -231,24 +231,6 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
                   ),
                 );
               }).toList(),
-            ),
-
-            const SizedBox(height: 24),
-            Text(
-              'Name',
-              style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 6),
-            TextField(
-              controller: _nameController,
-              maxLength: 20,
-              decoration: const InputDecoration(
-                hintText: 'What should we call you?',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(14)),
-                ),
-                counterText: '',
-              ),
             ),
 
             const SizedBox(height: 24),
@@ -349,10 +331,6 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
             ),
 
             const SizedBox(height: 24),
-            Text(
-              'Changes save for this kid only.',
-              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
           ],
         ),
       ),
