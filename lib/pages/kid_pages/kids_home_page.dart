@@ -366,7 +366,7 @@ class _KidCard extends StatelessWidget {
 
     // If no PIN for this kid, just go straight in.
     if (!requiresPin) {
-      _openKidDashboard(context, app);
+      await _openKidDashboard(context, app);
       return;
     }
 
@@ -384,17 +384,22 @@ class _KidCard extends StatelessWidget {
       return;
     }
 
-    _openKidDashboard(context, app);
+    await _openKidDashboard(context, app);
   }
 
-  void _openKidDashboard(BuildContext context, AppState app) {
+  Future<void> _openKidDashboard(BuildContext context, AppState app) async {
     app.setCurrentMember(member.id);
+
+    await app.ensureAssignmentsForTodayCached();
+
+    if (!context.mounted) return;
+
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => KidDashboardPage(memberId: member.id),
-      ),
+      MaterialPageRoute(builder: (_) => KidDashboardPage(memberId: member.id)),
     );
   }
+
+
 
   @override
   Widget build(BuildContext context) {

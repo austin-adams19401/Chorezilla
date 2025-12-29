@@ -635,6 +635,58 @@ extension AppStateWrites on AppState {
     }
   }
 
+  Future<void> ensureAssignmentsForTodayCached({bool force = false}) async {
+    final famId = _familyId;
+    final fam = _family;
+
+    if (famId == null || fam == null) {
+      debugPrint(
+        'ensureAssignmentsForTodayCached: no family loaded, skipping.',
+      );
+      return;
+    }
+
+    // IMPORTANT: dayKey generator must match repo/watchAssignmentsDueToday
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dayKey = _dateKey(today);
+
+    if (!force && _ensuredAssignmentsDayKey == dayKey) {
+      debugPrint(
+        'ensureAssignmentsForTodayCached: already ensured dayKey=$dayKey',
+      );
+      return;
+    }
+
+    // If another call is already running, await it instead of duplicating work.
+    final inflight = _ensureAssignmentsInFlight;
+    if (inflight != null) {
+      debugPrint(
+        'ensureAssignmentsForTodayCached: awaiting in-flight ensure...',
+      );
+      await inflight;
+      return;
+    }
+
+    final future = refreshAssignmentsForToday().then((_) {
+      _ensuredAssignmentsDayKey = dayKey; // only mark after success
+      debugPrint('ensureAssignmentsForTodayCached: ensured dayKey=$dayKey');
+    });
+
+    _ensureAssignmentsInFlight = future;
+
+    try {
+      await future;
+    } finally {
+      _ensureAssignmentsInFlight = null;
+    }
+  }
+
+  void clearEnsuredAssignmentsCache() {
+    _ensuredAssignmentsDayKey = null;
+  }
+
+
   Future<void> refreshAssignmentsForToday() async {
     debugPrint('refreshAssignmentsForToday: start');
     await ensureAssignmentsForToday();

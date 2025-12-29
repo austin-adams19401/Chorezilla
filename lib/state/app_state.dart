@@ -188,6 +188,9 @@ class AppState extends ChangeNotifier {
   List<Reward> _rewards = const [];
   bool _rewardsBootstrapped = false;
 
+  String? _ensuredAssignmentsDayKey;
+  Future<void>? _ensureAssignmentsInFlight;
+
   List<Reward> get rewards => _rewards;
   bool get rewardsBootstrapped => _rewardsBootstrapped;
 
