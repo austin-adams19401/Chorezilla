@@ -34,8 +34,9 @@ class Member {
 
   final List<String> ownedCosmetics;
   final String? equippedBackgroundId;
-  final String? equippedAvatarId;
+  final String? equippedAvatarFrameId;
   final String? equippedZillaSkinId;
+  final String? equippedTitleId;
 
   const Member({
     required this.id,
@@ -61,8 +62,9 @@ class Member {
     this.lastActiveDate,
     this.ownedCosmetics = const [],
     this.equippedBackgroundId,
-    this.equippedAvatarId,
-    this.equippedZillaSkinId, 
+    this.equippedAvatarFrameId,
+    this.equippedZillaSkinId,
+    this.equippedTitleId,
     this.allowBonusChores = true,
   });
 
@@ -89,8 +91,9 @@ class Member {
     DateTime? lastActiveDate,
     List<String>? ownedCosmetics,
     String? equippedBackgroundId,
-    String? equippedAvatarId,
+    String? equippedAvatarFrameId,
     String? equippedZillaSkinId,
+    String? equippedTitleId,
     bool? allowBonusChores,
   }) => Member(
     id: id,
@@ -118,9 +121,9 @@ class Member {
     lastActiveDate: lastActiveDate ?? this.lastActiveDate, 
     ownedCosmetics: ownedCosmetics ?? this.ownedCosmetics,
     equippedBackgroundId: equippedBackgroundId ?? this.equippedBackgroundId,
-    equippedAvatarId: equippedAvatarId ?? this.equippedAvatarId,
-    equippedZillaSkinId:
-        equippedZillaSkinId ?? this.equippedZillaSkinId,
+    equippedAvatarFrameId: equippedAvatarFrameId ?? this.equippedAvatarFrameId,
+    equippedZillaSkinId: equippedZillaSkinId ?? this.equippedZillaSkinId,
+    equippedTitleId: equippedTitleId ?? this.equippedTitleId,
     allowBonusChores: allowBonusChores ?? this.allowBonusChores,
   );
 
@@ -153,8 +156,9 @@ class Member {
 
     'ownedCosmetics': ownedCosmetics,
     'equippedBackgroundId': equippedBackgroundId,
-    'equippedAvatarId': equippedAvatarId,
-    'equippedZillaSkinId': equippedZillaSkinId, 
+    'equippedAvatarFrameId': equippedAvatarFrameId,
+    'equippedZillaSkinId': equippedZillaSkinId,
+    'equippedTitleId': equippedTitleId,
     'allowBonusChores': allowBonusChores,
   };
 
@@ -192,8 +196,9 @@ class Member {
               .toList() ??
           const [],
       equippedBackgroundId: data['equippedBackgroundId'] as String?,
-      equippedAvatarId: data['equippedAvatarId'] as String?,
-      equippedZillaSkinId: data['equippedZillaSkinId'] as String?, // 👈 NEW
+      equippedAvatarFrameId: data['equippedAvatarFrameId'] as String?,
+      equippedZillaSkinId: data['equippedZillaSkinId'] as String?,
+      equippedTitleId: data['equippedTitleId'] as String?,
       allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
     );
   }
@@ -223,8 +228,9 @@ class Member {
     'lastActiveDate': lastActiveDate?.toIso8601String(), // 👈 NEW
     'ownedCosmetics': ownedCosmetics,
     'equippedBackgroundId': equippedBackgroundId,
-    'equippedAvatarId': equippedAvatarId,
-    'equippedZillaSkinId': equippedZillaSkinId, // 👈 NEW
+    'equippedAvatarFrameId': equippedAvatarFrameId,
+    'equippedZillaSkinId': equippedZillaSkinId,
+    'equippedTitleId': equippedTitleId,
     'allowBonusChores': allowBonusChores,
   };
 
@@ -263,8 +269,9 @@ class Member {
               .toList() ??
           const [],
       equippedBackgroundId: data['equippedBackgroundId'] as String?,
-      equippedAvatarId: data['equippedAvatarId'] as String?,
-      equippedZillaSkinId: data['equippedZillaSkinId'] as String?, // 👈 NEW
+      equippedAvatarFrameId: data['equippedAvatarFrameId'] as String?,
+      equippedZillaSkinId: data['equippedZillaSkinId'] as String?,
+      equippedTitleId: data['equippedTitleId'] as String?,
       allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
     );
   }

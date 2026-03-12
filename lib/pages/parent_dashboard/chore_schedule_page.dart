@@ -31,6 +31,7 @@ class ChoreSchedulePage extends StatelessWidget {
         .toList();
 
     final schedulesStream = app.watchChoreSchedulesForChore(chore.id);
+    final allSchedulesStream = app.watchAllChoreSchedules();
 
     // 🔹 Define the gradient once
     final gradient = LinearGradient(
@@ -54,7 +55,7 @@ class ChoreSchedulePage extends StatelessWidget {
             style: TextStyle(color: cs.onSecondary),
           ),
         ),
-        body: _buildBody(kids, schedulesStream, cs),
+        body: _buildBody(kids, schedulesStream, allSchedulesStream, cs),
       ),
     );
   }
@@ -63,47 +64,56 @@ class ChoreSchedulePage extends StatelessWidget {
   Widget _buildBody(
     List<Member> kids,
     Stream<List<ChoreMemberSchedule>> schedulesStream,
+    Stream<List<ChoreMemberSchedule>> allSchedulesStream,
     ColorScheme cs,
   ) {
     return StreamBuilder<List<ChoreMemberSchedule>>(
-      stream: schedulesStream,
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
+      stream: allSchedulesStream,
+      builder: (context, allSnapshot) {
+        final allSchedules = allSnapshot.data ?? const [];
 
-        final schedules = snapshot.data!;
+        return StreamBuilder<List<ChoreMemberSchedule>>(
+          stream: schedulesStream,
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Card(
-              color: cs.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    KidScheduleList(
-                      chore: chore,
-                      kids: kids,
-                      schedules: schedules,
+            final schedules = snapshot.data!;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Card(
+                  color: cs.surface,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        KidScheduleList(
+                          chore: chore,
+                          kids: kids,
+                          schedules: schedules,
+                          allSchedules: allSchedules,
+                        ),
+                        const Divider(height: 1),
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: WeeklyChoreSummary(
+                            kids: kids,
+                            schedules: schedules,
+                          ),
+                        ),
+                      ],
                     ),
-                    const Divider(height: 1),
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: WeeklyChoreSummary(
-                        kids: kids,
-                        schedules: schedules,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -291,12 +301,14 @@ class KidScheduleList extends StatelessWidget {
   final Chore chore;
   final List<Member> kids;
   final List<ChoreMemberSchedule> schedules;
+  final List<ChoreMemberSchedule> allSchedules;
 
   const KidScheduleList({
     super.key,
     required this.chore,
     required this.kids,
     required this.schedules,
+    required this.allSchedules,
   });
 
   @override

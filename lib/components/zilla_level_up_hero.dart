@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:chorezilla/components/sprite_sheet_animation.dart';
+
 class ZillaLevelUpHero extends StatelessWidget {
   final double size;
 
@@ -75,17 +77,15 @@ class ZillaLevelUpHero extends StatelessWidget {
                 ),
                 // Big obvious sparkles
                 ...sparkles,
-                // Zilla icon
-                SizedBox(
-                  width: size,
-                  height: size,
-                  child: FittedBox(
-                    fit: BoxFit.contain,
-                    child: Image.asset(
-                      'assets/icons/mascot/mascot_no_bg.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
+                // Zilla celebrate sprite
+                SpriteSheetAnimation(
+                  assetPath:
+                      'assets/icons/mascot/sprite-sheets/celebrate.png',
+                  size: size,
+                  columns: 6,
+                  rows: 6,
+                  totalDuration: const Duration(milliseconds: 1800),
+                  loop: false,
                 ),
               ],
             ),

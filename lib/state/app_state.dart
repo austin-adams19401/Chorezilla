@@ -24,6 +24,7 @@ import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/assignment.dart';
 import 'package:chorezilla/models/reward.dart';
 import 'package:chorezilla/models/reward_redemption.dart';
+import 'package:chorezilla/models/cosmetics.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -7,6 +7,8 @@ import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/reward.dart';
 import 'package:chorezilla/models/reward_redemption.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/models/cosmetics.dart';
+import 'package:chorezilla/components/loot_box_open_dialog.dart';
 
 class KidRewardsPage extends StatefulWidget {
   const KidRewardsPage({super.key, this.memberId, this.initialTabIndex = 0 });
@@ -125,8 +127,8 @@ class _KidRewardsPageState extends State<KidRewardsPage>
                       ],
                     ),
                     child: DefaultTabController(
-                      length: 2,
-                      initialIndex: (widget.initialTabIndex == 1) ? 1 : 0,
+                      length: 3,
+                      initialIndex: widget.initialTabIndex.clamp(0, 2),
                       child: Column(
                         children: [
                           TabBar(
@@ -136,6 +138,7 @@ class _KidRewardsPageState extends State<KidRewardsPage>
                             tabs: const [
                               Tab(text: 'Store'),
                               Tab(text: 'My Rewards'),
+                              Tab(text: 'Cosmetics'),
                             ],
                           ),
                           Expanded(
@@ -148,6 +151,7 @@ class _KidRewardsPageState extends State<KidRewardsPage>
                                   onPurchase: _purchaseReward,
                                 ),
                                 _MyRewardsTab(redemptions: myRedemptions),
+                                _CosmeticsTab(member: member),
                               ],
                             ),
                           ),
@@ -611,6 +615,514 @@ class _RedemptionTile extends StatelessWidget {
           subtitleText,
           style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
+      ),
+    );
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cosmetics tab
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _CosmeticsTab extends StatefulWidget {
+  const _CosmeticsTab({required this.member});
+  final Member member;
+
+  @override
+  State<_CosmeticsTab> createState() => _CosmeticsTabState();
+}
+
+class _CosmeticsTabState extends State<_CosmeticsTab> {
+  final Set<String> _busyIds = {};
+
+  Future<void> _openLootBox(LootBoxDefinition box) async {
+    final app = context.read<AppState>();
+
+    if (widget.member.coins < box.costCoins) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not enough coins to open this box.')),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Open ${box.name}?'),
+        content: Text(
+          'This costs ${box.costCoins} coins and cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Open it!'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _busyIds.add(box.id));
+    try {
+      final result = await app.openLootBox(widget.member.id, box);
+      if (!mounted) return;
+      await showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => LootBoxOpenDialog(
+          boxDefinition: box,
+          result: result,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open box: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyIds.remove(box.id));
+    }
+  }
+
+  Future<void> _purchaseCosmetic(CosmeticItem item) async {
+    final app = context.read<AppState>();
+
+    if (widget.member.coins < item.costCoins) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Not enough coins.')),
+      );
+      return;
+    }
+
+    setState(() => _busyIds.add(item.id));
+    try {
+      await app.purchaseCosmetic(widget.member.id, item);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Got "${item.name}"!')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not buy: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyIds.remove(item.id));
+    }
+  }
+
+  Future<void> _equipItem(CosmeticItem item) async {
+    final app = context.read<AppState>();
+    try {
+      await app.equipCosmetic(widget.member.id, item);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Equipped "${item.name}"!')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not equip: $e')),
+      );
+    }
+  }
+
+  String? _equippedIdForType(CosmeticType type) {
+    switch (type) {
+      case CosmeticType.background:
+        return widget.member.equippedBackgroundId;
+      case CosmeticType.zillaSkin:
+        return widget.member.equippedZillaSkinId;
+      case CosmeticType.avatarFrame:
+        return widget.member.equippedAvatarFrameId;
+      case CosmeticType.title:
+        return widget.member.equippedTitleId;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Re-read member from app state so equipped changes reflect immediately
+    final app = context.watch<AppState>();
+    final member = app.members.firstWhere(
+      (m) => m.id == widget.member.id,
+      orElse: () => widget.member,
+    );
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+      children: [
+        // ── Loot Boxes ──────────────────────────────────────────────────────
+        _SectionHeader(title: 'Loot Boxes', emoji: '🎲'),
+        const SizedBox(height: 8),
+        Row(
+          children: LootBoxCatalog.boxes.map((box) {
+            final busy = _busyIds.contains(box.id);
+            final canAfford = member.coins >= box.costCoins;
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: _LootBoxCard(
+                  box: box,
+                  canAfford: canAfford,
+                  busy: busy,
+                  onOpen: () => _openLootBox(box),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Backgrounds ──────────────────────────────────────────────────────
+        _SectionHeader(title: 'Backgrounds', emoji: '🖼️'),
+        const SizedBox(height: 8),
+        _CosmeticGrid(
+          items: CosmeticCatalog.backgrounds().toList(),
+          member: member,
+          busyIds: _busyIds,
+          getEquippedId: () => _equippedIdForType(CosmeticType.background),
+          onBuy: _purchaseCosmetic,
+          onEquip: _equipItem,
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Zilla Skins ───────────────────────────────────────────────────────
+        _SectionHeader(title: 'Zilla Skins', emoji: '🦖'),
+        const SizedBox(height: 8),
+        _CosmeticGrid(
+          items: CosmeticCatalog.zillaSkins().toList(),
+          member: member,
+          busyIds: _busyIds,
+          getEquippedId: () => _equippedIdForType(CosmeticType.zillaSkin),
+          onBuy: _purchaseCosmetic,
+          onEquip: _equipItem,
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Avatar Frames ─────────────────────────────────────────────────────
+        _SectionHeader(title: 'Avatar Frames', emoji: '⭐'),
+        const SizedBox(height: 8),
+        _CosmeticGrid(
+          items: CosmeticCatalog.avatarFrames().toList(),
+          member: member,
+          busyIds: _busyIds,
+          getEquippedId: () => _equippedIdForType(CosmeticType.avatarFrame),
+          onBuy: _purchaseCosmetic,
+          onEquip: _equipItem,
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Titles ────────────────────────────────────────────────────────────
+        _SectionHeader(title: 'Titles', emoji: '🏆'),
+        const SizedBox(height: 8),
+        _CosmeticGrid(
+          items: CosmeticCatalog.titles().toList(),
+          member: member,
+          busyIds: _busyIds,
+          getEquippedId: () => _equippedIdForType(CosmeticType.title),
+          onBuy: _purchaseCosmetic,
+          onEquip: _equipItem,
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.emoji});
+  final String title;
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    final ts = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 18)),
+        const SizedBox(width: 6),
+        Text(
+          title,
+          style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ],
+    );
+  }
+}
+
+class _LootBoxCard extends StatelessWidget {
+  const _LootBoxCard({
+    required this.box,
+    required this.canAfford,
+    required this.busy,
+    required this.onOpen,
+  });
+
+  final LootBoxDefinition box;
+  final bool canAfford;
+  final bool busy;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    return Card(
+      elevation: 0,
+      color: canAfford ? cs.surface : cs.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(box.tierEmoji, style: const TextStyle(fontSize: 36)),
+            const SizedBox(height: 4),
+            Text(
+              box.name,
+              style: ts.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 2),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('🪙', style: TextStyle(fontSize: 12)),
+                const SizedBox(width: 2),
+                Text(
+                  '${box.costCoins}',
+                  style: ts.labelSmall?.copyWith(
+                    color: canAfford ? cs.primary : cs.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: canAfford && !busy ? onOpen : null,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  textStyle: const TextStyle(fontSize: 12),
+                ),
+                child: busy
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Open'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CosmeticGrid extends StatelessWidget {
+  const _CosmeticGrid({
+    required this.items,
+    required this.member,
+    required this.busyIds,
+    required this.getEquippedId,
+    required this.onBuy,
+    required this.onEquip,
+  });
+
+  final List<CosmeticItem> items;
+  final Member member;
+  final Set<String> busyIds;
+  final String? Function() getEquippedId;
+  final Future<void> Function(CosmeticItem) onBuy;
+  final Future<void> Function(CosmeticItem) onEquip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: items.map((item) {
+        final owned = item.isDefault || member.ownsCosmetic(item.id);
+        final equipped = getEquippedId() == item.id ||
+            (item.isDefault && getEquippedId() == null);
+        final busy = busyIds.contains(item.id);
+        final canAfford = member.coins >= item.costCoins;
+
+        return _CosmeticTile(
+          item: item,
+          owned: owned,
+          equipped: equipped,
+          busy: busy,
+          canAfford: canAfford,
+          onBuy: () => onBuy(item),
+          onEquip: () => onEquip(item),
+        );
+      }).toList(),
+    );
+  }
+}
+
+class _CosmeticTile extends StatelessWidget {
+  const _CosmeticTile({
+    required this.item,
+    required this.owned,
+    required this.equipped,
+    required this.busy,
+    required this.canAfford,
+    required this.onBuy,
+    required this.onEquip,
+  });
+
+  final CosmeticItem item;
+  final bool owned;
+  final bool equipped;
+  final bool busy;
+  final bool canAfford;
+  final VoidCallback onBuy;
+  final VoidCallback onEquip;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    final String emoji;
+    switch (item.type) {
+      case CosmeticType.background:
+        emoji = '🖼️';
+        break;
+      case CosmeticType.zillaSkin:
+        emoji = '🦖';
+        break;
+      case CosmeticType.avatarFrame:
+        emoji = '⭐';
+        break;
+      case CosmeticType.title:
+        emoji = '🏷️';
+        break;
+    }
+
+    return Container(
+      width: 130,
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: equipped
+            ? cs.primaryContainer
+            : owned
+            ? cs.secondaryContainer
+            : cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        border: equipped
+            ? Border.all(color: cs.primary, width: 2)
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 20)),
+              const Spacer(),
+              if (equipped)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'On',
+                    style: ts.labelSmall?.copyWith(
+                      color: cs.onPrimary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            item.name,
+            style: ts.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (item.description.isNotEmpty)
+            Text(
+              item.description,
+              style: ts.bodySmall?.copyWith(
+                color: cs.onSurfaceVariant,
+                fontSize: 10,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          const SizedBox(height: 6),
+          if (!owned) ...[
+            Row(
+              children: [
+                const Text('🪙', style: TextStyle(fontSize: 12)),
+                const SizedBox(width: 2),
+                Text(
+                  '${item.costCoins}',
+                  style: ts.labelSmall?.copyWith(
+                    color: canAfford ? cs.primary : cs.error,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: canAfford && !busy ? onBuy : null,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  textStyle: const TextStyle(fontSize: 11),
+                  minimumSize: const Size(0, 28),
+                ),
+                child: busy
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Buy'),
+              ),
+            ),
+          ] else if (!equipped) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: busy ? null : onEquip,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  textStyle: const TextStyle(fontSize: 11),
+                  minimumSize: const Size(0, 28),
+                ),
+                child: const Text('Equip'),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

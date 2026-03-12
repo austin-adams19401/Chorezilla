@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:chorezilla/components/badge_unlock_dialog.dart';
+import 'package:chorezilla/components/sprite_sheet_animation.dart';
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/profile_header.dart';
 import 'package:chorezilla/components/zilla_level_up_hero.dart';
@@ -48,6 +49,8 @@ class _KidDashboardPageState extends State<KidDashboardPage>
   late final ConfettiController _confettiController;
   bool _celebrationActive = false;
   bool _showConfetti = false;
+
+  bool _choreCompletedFlash = false;
 
   // image picker for photo proof
   final ImagePicker _imagePicker = ImagePicker();
@@ -216,9 +219,10 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     final backgroundId = member.equippedBackgroundId ?? 'bg_default';
     final backgroundItem = CosmeticCatalog.byId(backgroundId);
     final String? backgroundAsset =
-        backgroundItem.type == CosmeticType.background
-        ? backgroundItem.assetKey
-        : null;
+        backgroundItem.type == CosmeticType.background &&
+                backgroundItem.assetKey.isNotEmpty
+            ? backgroundItem.assetKey
+            : null;
 
     // "Today" window (local time)
     final now = DateTime.now();
@@ -527,6 +531,24 @@ class _KidDashboardPageState extends State<KidDashboardPage>
             ],
           ),
 
+          // Chore completion celebration flash
+          if (_choreCompletedFlash)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: SpriteSheetAnimation(
+                    assetPath:
+                        'assets/icons/mascot/sprite-sheets/celebrate.png',
+                    size: 200,
+                    columns: 6,
+                    rows: 6,
+                    totalDuration: const Duration(milliseconds: 2000),
+                    loop: false,
+                  ),
+                ),
+              ),
+            ),
+
           // Confetti overlay on top of everything
           if (_showConfetti)
             Positioned.fill(
@@ -653,6 +675,13 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
       if (newBadges.isNotEmpty) {
         await _showBadgeUnlockDialogs(newBadges);
+      }
+
+      if (mounted) {
+        setState(() => _choreCompletedFlash = true);
+        Future.delayed(const Duration(milliseconds: 2500), () {
+          if (mounted) setState(() => _choreCompletedFlash = false);
+        });
       }
     } catch (e) {
       if (!mounted) return;
