@@ -58,9 +58,6 @@ extension AppStateFamilyStreams on AppState {
         _membersLoaded = true;
       }
       _notifyStateChanged();
-
-      // Safe & cheap; will no-op until family + chores are ready
-      refreshAssignmentsForToday(); 
     });
 
     // Chores (hot list)
@@ -70,8 +67,6 @@ extension AppStateFamilyStreams on AppState {
       _cache.saveChores(familyId, list);
 
       _notifyStateChanged();
-
-      refreshAssignmentsForToday();   
     });
 
     // Rewards (store catalog)
@@ -151,25 +146,12 @@ extension AppStateFamilyStreams on AppState {
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());
   }
 
-  String _statusToWire(AssignmentStatus s) {
-    switch (s) {
-      case AssignmentStatus.assigned:
-        return 'assigned';
-      case AssignmentStatus.completed:
-        return 'completed';
-      case AssignmentStatus.pending:
-        return 'pending';
-      case AssignmentStatus.rejected:
-        return 'rejected';
-    }
-  }
-
   Stream<List<Assignment>> _watchAssignmentsForFamily(
     String familyId,
     AssignmentStatus status,
   ) {
     final db = FirebaseFirestore.instance;
-    final statusWire = _statusToWire(status);
+    final statusWire = statusToString(status);
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);

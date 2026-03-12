@@ -25,7 +25,7 @@ extension AppStatePins on AppState {
     }
 
     await repo.updateMember(famId, memberId, {
-      'pinHash': (pin == null || pin.isEmpty) ? null : pin,
+      'pinHash': (pin == null || pin.isEmpty) ? null : _hashPin(pin.trim()),
     });
   }
 
@@ -55,7 +55,19 @@ extension AppStatePins on AppState {
     if (m == null) return false;
 
     final raw = m.pinHash ?? '';
-    final ok = raw.isNotEmpty && raw == trimmed;
+    if (raw.isEmpty) return false;
+
+    final isHashed =
+        raw.length == 64 && RegExp(r'^[0-9a-f]+$').hasMatch(raw);
+    bool ok;
+    if (isHashed) {
+      ok = raw == _hashPin(trimmed);
+    } else {
+      // Legacy plaintext PIN — compare directly and migrate to hash on success
+      ok = raw == trimmed;
+      if (ok) await updateMemberPin(memberId: memberId, pin: trimmed);
+    }
+
     if (ok) {
       _unlockedKidIds.add(memberId);
       _notifyStateChanged();
@@ -69,9 +81,8 @@ extension AppStatePins on AppState {
       throw StateError('No family selected when updating parent PIN');
     }
 
-    final normalized = (pin == null || pin.isEmpty) ? null : pin.trim();
+    final normalized = (pin == null || pin.isEmpty) ? null : _hashPin(pin.trim());
 
-    // For now we store the 4-digit PIN directly; later you can swap to hashing.
     await repo.updateFamily(famId, {'parentPinHash': normalized});
 
     // Keep local state in sync so AuthGate sees the change immediately.
@@ -86,7 +97,19 @@ extension AppStatePins on AppState {
 
     // Prefer the locally-tracked value, fall back to Family if needed.
     final stored = _parentPinHash ?? _family?.parentPinHash ?? '';
-    final ok = stored.isNotEmpty && stored == candidate;
+    if (stored.isEmpty) return false;
+
+    final isHashed =
+        stored.length == 64 && RegExp(r'^[0-9a-f]+$').hasMatch(stored);
+    bool ok;
+    if (isHashed) {
+      ok = stored == _hashPin(candidate);
+    } else {
+      // Legacy plaintext PIN — compare directly and migrate to hash on success
+      ok = stored == candidate;
+      if (ok) await updateParentPin(pin: candidate);
+    }
+
     if (ok && !_parentUnlocked) {
       _parentUnlocked = true;
       _notifyStateChanged();

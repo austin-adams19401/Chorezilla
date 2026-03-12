@@ -54,8 +54,9 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
     super.dispose();
   }
 
-  int get _xp =>
-      widget.family.settings.difficultyToXP[_difficulty] ?? _difficulty * 10;
+  int get _xp => _difficulty == 0
+      ? 0
+      : widget.family.settings.difficultyToXP[_difficulty] ?? _difficulty * 10;
 
   @override
   Widget build(BuildContext context) {
@@ -124,6 +125,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
                       child: DropdownButtonFormField<int>(
                         initialValue: _difficulty,
                         items: const [
+                          DropdownMenuItem(value: 0, child: Text('Reminder')),
                           DropdownMenuItem(value: 1, child: Text('Very easy')),
                           DropdownMenuItem(value: 2, child: Text('Easy')),
                           DropdownMenuItem(value: 3, child: Text('Medium')),
@@ -141,7 +143,9 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
                 const SizedBox(height: 6),
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('Worth $_xp XP'),
+                  child: Text(
+                    _difficulty == 0 ? 'No XP (reminder only)' : 'Worth $_xp XP',
+                  ),
                 ),
                 const SizedBox(height: 12),
                 SwitchListTile(

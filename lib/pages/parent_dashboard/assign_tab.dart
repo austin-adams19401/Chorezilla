@@ -359,23 +359,6 @@ class _AssignTabState extends State<AssignTab> {
                                     trailing: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        FilledButton.tonal(
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor:
-                                                cs.primaryContainer,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 8,
-                                            ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(14),
-                                            ),
-                                          ),
-                                          onPressed: () =>
-                                              _openSchedulePage(context, c),
-                                          child: const Text('Schedule'),
-                                        ),
                                         IconButton(
                                           icon: const Icon(Icons.edit_outlined),
                                           tooltip: 'Edit',
@@ -419,6 +402,8 @@ class _AssignTabState extends State<AssignTab> {
 
   String _difficultyName(int d) {
     switch (d) {
+      case 0:
+        return 'Reminder';
       case 1:
         return 'Very easy';
       case 2:

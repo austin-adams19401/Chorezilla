@@ -1,4 +1,5 @@
 // lib/pages/parent_dashboard/parent_rewards_page.dart
+import 'package:chorezilla/models/common.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
@@ -232,6 +233,8 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                                   final r = visible[i];
                                   return _RewardCard(
                                     reward: r,
+                                    onEdit: () =>
+                                        _openEditRewardSheet(context, r),
                                     onToggleActive: (active) async {
                                       try {
                                         await app.repo.setRewardActive(
@@ -314,6 +317,16 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
       builder: (ctx) => const _RewardEditorSheet(),
     );
   }
+
+  Future<void> _openEditRewardSheet(BuildContext context, Reward reward) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (ctx) => _RewardEditorSheet(existing: reward),
+    );
+  }
+
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -645,6 +658,7 @@ class _EmptyRewards extends StatelessWidget {
 class _RewardCard extends StatelessWidget {
   const _RewardCard({
     required this.reward,
+    required this.onEdit,
     required this.onToggleActive,
     required this.onDelete,
   });
@@ -652,6 +666,7 @@ class _RewardCard extends StatelessWidget {
   final Reward reward;
   final ValueChanged<bool> onToggleActive;
   final VoidCallback onDelete;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -714,14 +729,51 @@ class _RewardCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                IconButton(
-                  onPressed: onDelete,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                  color: cs.outline,
+                PopupMenuButton<RewardMenuAction>(
+                  tooltip: 'Reward options',
+                  icon: Icon(
+                    Icons.more_vert_rounded,
+                    size: 20,
+                    color: cs.outline,
+                  ),
                   padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
                   splashRadius: 18,
+                  onSelected: (action) {
+                    switch (action) {
+                      case RewardMenuAction.edit:
+                        onEdit();
+                        break;
+                      case RewardMenuAction.delete:
+                        onDelete();
+                        break;
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: RewardMenuAction.edit,
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(Icons.edit_rounded),
+                        title: Text('Edit'),
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: RewardMenuAction.delete,
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(
+                          Icons.delete_outline_rounded,
+                          color: cs.error,
+                        ),
+                        title: Text(
+                          'Delete',
+                          style: TextStyle(color: cs.error),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
+
               ],
             ),
 
@@ -813,20 +865,37 @@ class _RewardCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _RewardEditorSheet extends StatefulWidget {
-  const _RewardEditorSheet();
+  const _RewardEditorSheet({this.existing});
+
+  final Reward? existing;
 
   @override
   State<_RewardEditorSheet> createState() => _RewardEditorSheetState();
 }
 
 class _RewardEditorSheetState extends State<_RewardEditorSheet> {
-  final _titleCtrl = TextEditingController();
-  final _descCtrl = TextEditingController();
-  final _coinCtrl = TextEditingController(text: '5');
-  final _iconCtrl = TextEditingController(text: '🎁');
+  var _titleCtrl = TextEditingController();
+  var _descCtrl = TextEditingController();
+  var _coinCtrl = TextEditingController(text: '5');
+  var _iconCtrl = TextEditingController(text: '🎁');
 
   RewardCategory _category = RewardCategory.experience;
   bool _busy = false;
+
+    @override
+  void initState() {
+    super.initState();
+    final r = widget.existing;
+
+    _titleCtrl = TextEditingController(text: r?.title ?? '');
+    _descCtrl = TextEditingController(text: r?.description ?? '');
+    _coinCtrl = TextEditingController(text: (r?.coinCost ?? 5).toString());
+    _iconCtrl = TextEditingController(
+      text: (r?.icon?.trim().isNotEmpty == true) ? r!.icon! : '🎁',
+    );
+
+    _category = r?.category ?? RewardCategory.experience;
+  }
 
   @override
   void dispose() {
@@ -842,6 +911,8 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
     final theme = Theme.of(context);
     final ts = theme.textTheme;
     final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+    final isEditing = widget.existing != null;
+
 
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets),
@@ -858,7 +929,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
                     const Icon(Icons.card_giftcard_rounded),
                     const SizedBox(width: 8),
                     Text(
-                      'New reward',
+                      isEditing ? 'Edit reward' : 'New reward',
                       style: ts.titleLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -937,7 +1008,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Create reward'),
+                        : Text(isEditing ? 'Save changes' : 'Create reward'),
                   ),
                 ),
               ],
@@ -973,16 +1044,30 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
         return;
       }
 
-      await app.repo.createReward(
-        familyId,
-        title: title,
-        description: desc.isEmpty ? null : desc,
-        icon: icon,
-        coinCost: cost,
-        category: _category,
-        isCustom: true,
-        stock: null,
-      );
+      final existing = widget.existing;
+
+      if (existing == null) {
+        await app.repo.createReward(
+          familyId,
+          title: title,
+          description: desc.isEmpty ? null : desc,
+          icon: icon,
+          coinCost: cost,
+          category: _category,
+          isCustom: true,
+          stock: null,
+        );
+      } else {
+        await app.repo.updateReward(
+          familyId,
+          rewardId: existing.id,
+          title: title,
+          description: desc.isEmpty ? null : desc,
+          icon: icon,
+          coinCost: cost,
+          category: _category,
+        );
+      }
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -993,6 +1078,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
       if (mounted) setState(() => _busy = false);
     }
   }
+
 
   void _showSnack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));

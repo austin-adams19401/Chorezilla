@@ -11,6 +11,7 @@ class Award {
 }
 
 Award calcAwards({required int difficulty, required FamilySettings settings}) {
+  if (difficulty == 0) return const Award(xp: 0, coins: 0);
   final safeDifficulty = difficulty.clamp(1, 5);
   final xp =
       settings.difficultyToXP[safeDifficulty] ??

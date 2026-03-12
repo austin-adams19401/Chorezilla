@@ -64,6 +64,33 @@ extension RewardRepo on ChorezillaRepo {
     return ref.id;
   }
 
+  Future<void> updateReward(
+    String familyId, {
+    required String rewardId,
+    required String title,
+    String? description,
+    String? icon,
+    required int coinCost,
+    required RewardCategory category,
+  }) async {
+    final db = FirebaseFirestore.instance;
+    final ref = db
+        .collection('families')
+        .doc(familyId)
+        .collection('rewards')
+        .doc(rewardId);
+
+    await ref.set({
+      'title': title,
+      'description': description, // ok if null
+      'icon': icon, // ok if null
+      'coinCost': coinCost,
+      'category': category.name, // assumes you store as string enum name
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+
   Future<void> deleteReward(String familyId, {required String rewardId}) async {
     final ref = rewardsColl(firebaseDB, familyId).doc(rewardId);
     await ref.delete();
@@ -126,7 +153,7 @@ extension RewardRepo on ChorezillaRepo {
   }) async {
     final ref = rewardRedemptionsColl(firebaseDB, familyId).doc(redemptionId);
     await ref.update({
-      'status': 'given',
+      'status': 'fulfilled',
       'givenAt': FieldValue.serverTimestamp(),
       if (parentMemberId != null) 'parentMemberId': parentMemberId,
     });
@@ -518,29 +545,18 @@ addReward(
         tx.update(rewardRef, {'stock': newStock});
       }
 
-      final evRef = eventsColl(firebaseDB, familyId).doc();
-      tx.set(evRef, {
-        'type': 'reward_purchased',
-        'actorMemberId': memberId,
-        'targetMemberId': memberId,
-        'payload': {
-          'rewardId': reward.id,
-          'name': reward.title,
-          'priceCoins': reward.coinCost,
-        },
-        // Still "pending" until parent marks as given.
+      // Redemption record created inside the transaction so coins can never
+      // be deducted without a corresponding redemption doc existing.
+      final redemptionRef = rewardRedemptionsColl(firebaseDB, familyId).doc();
+      tx.set(redemptionRef, {
+        'memberId': memberId,
+        'rewardId': reward.id,
+        'rewardName': reward.title,
+        'coinCost': reward.coinCost,
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
-
-    await createRewardRedemption(
-      familyId,
-      memberId: memberId,
-      rewardId: reward.id,
-      rewardName: reward.title,
-      coinCost: reward.coinCost,
-    );
   }
 
   /// Create (or no-op if exists) a pending weekly allowance redemption.

@@ -143,27 +143,6 @@ Future<List<String>> assignChoreToMembers(
       '${d.month.toString().padLeft(2, '0')}-'
       '${d.day.toString().padLeft(2, '0')}';
 
-
-  Future<void> markCompleted({
-    required String familyId,
-    required String choreId,
-    required String memberId,
-    required int dayStartHour,
-  }) {
-    final start = _startOfLocalDayWithHour(dayStartHour);
-    final dayKey = _yyyymmdd(start);
-    final id = '${choreId}_${memberId}_$dayKey';
-    final ref = eventsColl(firebaseDB, familyId).doc(id);
-    return ref.set({
-      'familyId': familyId,
-      'choreId': choreId,
-      'memberId': memberId,
-      'dayKey': dayKey,
-      'status': 'done',
-      'completedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-  }
-
   Future<String?> createBonusAssignment(
     String familyId, {
     required Chore chore,
@@ -318,6 +297,10 @@ Future<void> completeAssignment(
         return;
       }
 
+      // Read member before any writes (Firestore transaction rule).
+      final memberRef = membersColl(db, familyId).doc(memberId);
+      final memSnap = await tx.get(memberRef);
+
       final now = FieldValue.serverTimestamp();
       final updates = <String, dynamic>{'completedAt': now};
 
@@ -338,10 +321,14 @@ Future<void> completeAssignment(
       updates['status'] = 'completed';
       tx.update(assignRef, updates);
 
-      final memberRef = membersColl(db, familyId).doc(memberId);
+      final memData =
+          memSnap.exists
+              ? (memSnap.data() as Map<String, dynamic>)
+              : <String, dynamic>{};
       tx.update(memberRef, {
         'xp': FieldValue.increment(xp),
         'coins': FieldValue.increment(coins),
+        ..._streakUpdate(memData, DateTime.now()),
       });
     });
   }
@@ -352,15 +339,12 @@ Future<void> completeAssignment(
     String assignmentId, {
     String? parentMemberId,
   }) async {
-    final famRef = familyDoc(firebaseDB, familyId);
     final asnRef = assignmentsColl(firebaseDB, familyId).doc(assignmentId);
 
     await firebaseDB.runTransaction((tx) async {
-      final famSnap = await tx.get(famRef);
       final asnSnap = await tx.get(asnRef);
       if (!asnSnap.exists) throw Exception('Assignment not found');
 
-      final family = Family.fromDoc(famSnap);
       final asn = Assignment.fromDoc(asnSnap);
 
       debugPrint('APPROVING: chore ${asn.choreTitle} - ${asn.status}');
@@ -374,16 +358,21 @@ Future<void> completeAssignment(
       final memSnap = await tx.get(memberRef);
       if (!memSnap.exists) throw Exception('Member not found');
 
-      final coins = (asn.xp * family.settings.coinPerPoint).round();
+      // Use the coin award stored on the assignment at creation time so the
+      // kid always gets exactly what was shown to them, regardless of any
+      // subsequent changes to family settings.
+      final coins = asn.coinAward;
 
       tx.update(asnRef, {
         'status': 'completed',
         'approvedAt': FieldValue.serverTimestamp(),
       });
 
+      final memData = memSnap.data() as Map<String, dynamic>;
       tx.update(memberRef, {
         'xp': FieldValue.increment(asn.xp),
         'coins': FieldValue.increment(coins),
+        ..._streakUpdate(memData, DateTime.now()),
       });
 
       final evRef = eventsColl(firebaseDB, familyId).doc();
@@ -502,17 +491,44 @@ Future<void> undoAssignmentCompletion(
       });
     });
   }
+
+  /// Returns Firestore field updates for streak progression.
+  /// Pass the member's current Firestore data and today's local date.
+  /// Returns an empty map if a chore was already completed today (idempotent).
+  Map<String, dynamic> _streakUpdate(
+    Map<String, dynamic> memData,
+    DateTime now,
+  ) {
+    final Timestamp? lastTs = memData['lastActiveDate'] as Timestamp?;
+    final DateTime? lastActive = lastTs?.toDate();
+    final int currentStreak = (memData['currentStreak'] as num?)?.toInt() ?? 0;
+    final int longestStreak = (memData['longestStreak'] as num?)?.toInt() ?? 0;
+
+    final today = DateTime(now.year, now.month, now.day);
+
+    int newStreak;
+    if (lastActive != null) {
+      final lastDay = DateTime(
+        lastActive.year,
+        lastActive.month,
+        lastActive.day,
+      );
+      if (lastDay == today) {
+        // Already counted a chore today — don't double-increment.
+        return {};
+      }
+      final yesterday = today.subtract(const Duration(days: 1));
+      newStreak = (lastDay == yesterday) ? currentStreak + 1 : 1;
+    } else {
+      newStreak = 1;
+    }
+
+    return {
+      'currentStreak': newStreak,
+      'longestStreak': newStreak > longestStreak ? newStreak : longestStreak,
+      'lastActiveDate': Timestamp.fromDate(today),
+    };
+  }
 }
 
 
-// Local date helpers (library-private)
-DateTime _startOfLocalDayWithHour(int hour) {
-  final now = DateTime.now();
-  final candidate = DateTime(now.year, now.month, now.day, hour);
-  return now.isBefore(candidate)
-      ? candidate.subtract(const Duration(days: 1))
-      : candidate;
-}
-
-String _yyyymmdd(DateTime d) =>
-    '${d.year.toString().padLeft(4, '0')}${d.month.toString().padLeft(2, '0')}${d.day.toString().padLeft(2, '0')}';

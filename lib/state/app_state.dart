@@ -312,8 +312,6 @@ class AppState extends ChangeNotifier {
     _pendingRewardsByMemberId.clear();
     _kidAssignmentsBootstrapped.clear();
     _unlockedKidIds.clear();
-
-    _unlockedKidIds.clear();
     _parentUnlocked = false;
 
     _historyAssignments = const [];
@@ -327,10 +325,6 @@ class AppState extends ChangeNotifier {
 
     _rewards = const [];
     _rewardsBootstrapped = false;
-
-    await setViewMode(AppViewMode.parent);
-
-    notifyListeners(); 
 
     await setViewMode(AppViewMode.parent);
 

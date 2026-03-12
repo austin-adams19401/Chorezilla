@@ -63,10 +63,25 @@ class CosmeticCatalog {
     ),
   ];
 
-  /// Returns the cosmetic for [id], or a default cosmetic if unknown.
+  /// Returns the cosmetic for [id], or the default cosmetic of the same type
+  /// if unknown. Falls back to the first item if no typed default exists.
   static CosmeticItem byId(String id) {
     final exact = items.where((c) => c.id == id);
     if (exact.isNotEmpty) return exact.first;
+
+    // Infer type from id prefix so we can return the right default.
+    final CosmeticType? inferredType = id.startsWith('zilla_')
+        ? CosmeticType.zillaSkin
+        : id.startsWith('bg_')
+            ? CosmeticType.background
+            : null;
+
+    if (inferredType != null) {
+      final typedDefault = items.where(
+        (c) => c.type == inferredType && c.isDefault,
+      );
+      if (typedDefault.isNotEmpty) return typedDefault.first;
+    }
 
     final defaults = items.where((c) => c.isDefault);
     if (defaults.isNotEmpty) return defaults.first;

@@ -20,32 +20,34 @@ class GoogleSignInButton extends StatelessWidget {
 
     final child = SizedBox(
       height: 48,
-      child: Stack(
-        alignment: Alignment.center,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Left icon
-          Positioned(
-            left: 60,
-            child: isLoading
-                ? const SizedBox(
-                    width: 18, height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Image.asset(
-                    'assets/icons/google_logo.png',
-                    width: 36,
-                    height: 36,
-                    filterQuality: FilterQuality.high,
-                  ),
-          ),
-          // Centered label
-          Text(
-            text,
-            style: const TextStyle(
-              color: textColor,
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              letterSpacing: .2,
+          // Icon / spinner on the left
+          if (isLoading)
+            const SizedBox(
+              width: 24, height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Image.asset(
+              'assets/icons/google_logo.png',
+              width: 24,
+              height: 24,
+              filterQuality: FilterQuality.high,
+            ),
+          const SizedBox(width: 12),
+          // Label — Flexible prevents overflow on narrow screens
+          Flexible(
+            child: Text(
+              text,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: textColor,
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                letterSpacing: .2,
+              ),
             ),
           ),
         ],

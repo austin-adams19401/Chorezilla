@@ -20,37 +20,46 @@ class LevelInfo {
 
 /// XP needed to *reach* a given level (total XP, not “within” level).
 ///
-/// Level 1 → 0 XP (start)
-/// Level 2 → 100 XP
-/// Level 3 → 240 XP
-/// Level 4 → 450 XP
-/// Level 5 → 700 XP
-/// Level 6+ → +300 XP per level (simple tail rule you can tweak)
+/// Pacing at ~100 XP/day (medium chores):
+///   Level 1→5  ≈ 1 week   (quick early rewards to get kids engaged)
+///   Level 5→10 ≈ 6 weeks  (gaps grow each level)
+///   Level 10+  ≈ gap grows ~30% per level (compounding)
+///
+/// Gap per level:
+///   1→2:  100   2→3:  150   3→4:  200   4→5:  250
+///   5→6:  350   6→7:  500   7→8:  700   8→9:  950   9→10: 1250
+///   10→11: ~1625  11→12: ~2110  (×1.3 each level after 10)
 int xpForLevel(int level) {
   if (level <= 1) return 0;
 
-  // Early levels: hand-tuned thresholds
+  // Total XP to *reach* each level (index = level - 1).
   const thresholds = <int>[
-    0, // index 0 → Level 1
-    100, // index 1 → Level 2
-    240, // index 2 → Level 3
-    450, // index 3 → Level 4
-    700, // index 4 → Level 5
+    0,    // Level 1
+    100,  // Level 2  — gap: 100
+    250,  // Level 3  — gap: 150
+    450,  // Level 4  — gap: 200
+    700,  // Level 5  — gap: 250
+    1050, // Level 6  — gap: 350
+    1550, // Level 7  — gap: 500
+    2250, // Level 8  — gap: 700
+    3200, // Level 9  — gap: 950
+    4450, // Level 10 — gap: 1250
   ];
 
   final idx = level - 1;
-
   if (idx < thresholds.length) {
     return thresholds[idx];
   }
 
-  // For higher levels, grow linearly after Level 5.
-  const tailStep = 300; // XP per level after 5 (tweakable)
-  final lastKnownLevel = thresholds.length; // 5
-  final lastKnownXp = thresholds.last; // 700
-
-  final extraLevels = level - lastKnownLevel;
-  return lastKnownXp + extraLevels * tailStep;
+  // Level 11+: compound the gap by 30% each level starting from 1250.
+  var xp = thresholds.last; // 4450
+  var gap = 1250;
+  final extraLevels = level - thresholds.length; // levels above 10
+  for (var i = 0; i < extraLevels; i++) {
+    gap = (gap * 1.3).round();
+    xp += gap;
+  }
+  return xp;
 }
 
 /// Compute level + progress for a given total XP.
@@ -185,7 +194,7 @@ const List<LevelRewardDefinition> kDefaultLevelRewards = [
     level: 15,
     emoji: '🛋',
     title: 'Later Bedtime',
-    description: 'You\'re bedtime is now an hour later.',
+    description: 'Your bedtime is now an hour later.',
   ),
 ];
 

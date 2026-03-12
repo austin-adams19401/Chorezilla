@@ -156,8 +156,13 @@ void dispose() {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Already have an account? ',
-                      style: TextStyle(color: cs.secondary, fontSize: 14)),
+                  Flexible(
+                    child: Text(
+                      'Already have an account? ',
+                      style: TextStyle(color: cs.secondary, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   Text('Sign in!', style: TextStyle(color: cs.secondary, fontWeight: FontWeight.bold, fontSize: 16)),
                 ],
               ),

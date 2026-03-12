@@ -255,39 +255,43 @@ class _WalletHeader extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Avatar + name + coin balance
+                // Name + coin balance
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          member.displayName,
-                          style: ts.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: cs.onPrimaryContainer,
-                          ),
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('🪙', style: TextStyle(fontSize: 22)),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${member.coins} coins to spend',
-                              style: ts.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: cs.onPrimaryContainer,
-                              ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            member.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: ts.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: cs.onPrimaryContainer,
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text('🪙', style: TextStyle(fontSize: 22)),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  '${member.coins} coins to spend',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: ts.headlineSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: cs.onPrimaryContainer,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 12),
                   ],
                 ),
               ],

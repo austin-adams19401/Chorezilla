@@ -33,7 +33,7 @@ class MascotHeader extends StatelessWidget {
             clipBehavior: Clip.antiAlias,
             child: _MascotImage(),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(height: 12),
           Text(
             title,
             textAlign: TextAlign.center,

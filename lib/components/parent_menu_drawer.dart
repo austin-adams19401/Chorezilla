@@ -32,7 +32,13 @@ class ParentDrawer extends StatelessWidget {
           children: [
             // ── Header: account + family info ────────────────────────────────
             UserAccountsDrawerHeader(
-              decoration: BoxDecoration(color: cs.primaryContainer),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [cs.secondary, cs.primary],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
               currentAccountPicture: CircleAvatar(
                 backgroundColor: cs.primary,
                 child: Text(

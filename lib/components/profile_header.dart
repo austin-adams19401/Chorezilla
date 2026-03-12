@@ -71,7 +71,7 @@ class ProfileHeader extends StatelessWidget {
                   ],
                 ),
                 _AvatarCircle(member: m),
-                const SizedBox(width: 12),
+                const SizedBox(height: 12),
                 Column(
                   children: [
                     Row(
@@ -361,9 +361,12 @@ class _LevelProgressBar extends StatelessWidget {
               style: ts.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(width: 8),
-            Text(
-              '${info.xpIntoLevel} / ${info.xpNeededThisLevel} XP',
-              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            Flexible(
+              child: Text(
+                '${info.xpIntoLevel} / ${info.xpNeededThisLevel} XP',
+                style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

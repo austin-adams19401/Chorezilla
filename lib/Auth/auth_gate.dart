@@ -58,24 +58,10 @@ class AuthGate extends StatelessWidget {
       return const ParentSetupPage();
     }
 
-    debugPrint(
-      'AuthGate state: bootLoaded=${app.bootLoaded} '
-      'parentPinLoaded=${app.parentPinLoaded} hasParentPin=${app.hasParentPin} '
-      'family=${family.id} kids=${members.length}',
-    );
-
-
     // 5) Check kids + onboardingComplete + parent PIN
     final hasKids = members.any((m) => m.role == FamilyRole.child && m.active);
     final onboardingComplete = family.onboardingComplete;
     final hasParentPin = app.hasParentPin;
-
-    debugPrint(
-      'AuthGate state: bootLoaded=${app.bootLoaded} '
-      'parentPinLoaded=${app.parentPinLoaded} hasParentPin=${app.hasParentPin} '
-      'family=${family.id} kids=${members.length}',
-    );
-
 
     // If any of these are missing, stay in Parent Setup
     if (!hasKids || !onboardingComplete || !hasParentPin) {

@@ -74,35 +74,28 @@ extension AppStateKidStreams on AppState {
   ) {
     final db = FirebaseFirestore.instance;
 
-    // Define "today" as [todayMidnight, tomorrowMidnight)
+    // Use dayKey (string equality) — consistent with family-level streams and
+    // immune to timezone drift that can affect timestamp-range queries.
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final tomorrow = today.add(const Duration(days: 1));
-    final startTs = Timestamp.fromDate(today);
-    final endTs = Timestamp.fromDate(tomorrow);
+    final dayKey = _dateKey(DateTime(now.year, now.month, now.day));
 
-    // Base query: same for all statuses
     Query base = db
         .collection('families')
         .doc(familyId)
         .collection('assignments')
         .where('memberId', isEqualTo: memberId)
-        .where('due', isGreaterThanOrEqualTo: startTs)
-        .where('due', isLessThan: endTs)
-        .orderBy('due');
+        .where('dayKey', isEqualTo: dayKey);
 
     Query q;
 
     if (status == AssignmentStatus.assigned) {
-      // For the "assigned" stream, include *both* assigned and rejected
-      final assignedWire = _statusToWire(AssignmentStatus.assigned);
-      final rejectedWire = _statusToWire(AssignmentStatus.rejected);
-
-      q = base.where('status', whereIn: [assignedWire, rejectedWire]);
+      // Include both assigned and rejected so the "To Do" tab shows rejections.
+      q = base.where('status', whereIn: [
+        statusToString(AssignmentStatus.assigned),
+        statusToString(AssignmentStatus.rejected),
+      ]);
     } else {
-      // For all other streams (pending, completed, etc.) keep old behaviour
-      final statusWire = _statusToWire(status);
-      q = base.where('status', isEqualTo: statusWire);
+      q = base.where('status', isEqualTo: statusToString(status));
     }
 
     return q.snapshots().map((s) => s.docs.map(Assignment.fromDoc).toList());

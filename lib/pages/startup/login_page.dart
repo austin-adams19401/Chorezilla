@@ -145,19 +145,21 @@ class _LoginPageState extends State<LoginPage> {
                 onPressed: () {
                   Navigator.of(context).pushReplacementNamed('/register');
                 },
-                child: Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text("Don't have an account? ",
-                          style: TextStyle(color: cs.inverseSurface,
-                          fontSize: 16),),
-                      Text("Create one",
-                      style: TextStyle(color: cs.secondary, fontWeight: FontWeight.bold, fontSize: 16)
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        "Don't have an account? ",
+                        style: TextStyle(color: cs.inverseSurface, fontSize: 16),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
+                    ),
+                    Text(
+                      'Create one',
+                      style: TextStyle(color: cs.secondary, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
                 ),
               ),
             ],
