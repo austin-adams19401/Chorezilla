@@ -1,6 +1,8 @@
 // lib/state/app_state_writes.dart
 part of 'app_state.dart';
 
+const _stateKeep = Object();
+
 extension AppStateWrites on AppState {
   // ───────────────────────────────────────────────────────────────────────────
   // Writes
@@ -176,6 +178,9 @@ extension AppStateWrites on AppState {
     required String memberId,
     required Recurrence recurrence,
     bool active = true,
+    // null means "clear the fallback"; omit the named arg to leave unchanged
+    // on updates (create always writes it explicitly).
+    Object? fallbackMemberId = _stateKeep,
   }) async {
     final famId = _familyId;
     if (famId == null) {
@@ -191,6 +196,8 @@ extension AppStateWrites on AppState {
         memberId: memberId,
         recurrence: recurrence,
         active: active,
+        fallbackMemberId:
+            fallbackMemberId == _stateKeep ? null : fallbackMemberId as String?,
       );
     } else {
       await repo.updateChoreMemberSchedule(
@@ -198,6 +205,7 @@ extension AppStateWrites on AppState {
         scheduleId: scheduleId,
         recurrence: recurrence,
         active: active,
+        fallbackMemberId: fallbackMemberId,
       );
     }
   }
@@ -220,12 +228,10 @@ extension AppStateWrites on AppState {
   /// not the per-day Assignment docs. That way avatars stay stable even
   /// when today's instance moves from assigned → pending → approved.
   Set<String> assignedMemberIdsForChore(String choreId) {
-    try {
-      final chore = chores.firstWhere((c) => c.id == choreId);
-      return chore.defaultAssignees.toSet();
-    } catch (_) {
-      return <String>{};
-    }
+    return choreSchedulesVN.value
+        .where((s) => s.choreId == choreId && s.active)
+        .map((s) => s.memberId)
+        .toSet();
   }
 
   /// Return the Member objects corresponding to this chore's default assignees.
@@ -627,6 +633,9 @@ extension AppStateWrites on AppState {
         // DateTime.weekday: 1=Mon .. 7=Sun (Mon=1)
         return days.contains(date.weekday);
 
+      case 'alternating_weeks':
+        return _scheduleOccursOnDate(r, date);
+
       case 'once':
       default:
         // For now we don't auto-generate "once" chores;
@@ -689,7 +698,6 @@ extension AppStateWrites on AppState {
 
   Future<void> refreshAssignmentsForToday() async {
     debugPrint('refreshAssignmentsForToday: start');
-    await ensureAssignmentsForToday();
     await ensureAssignmentsForTodayFromSchedules();
     debugPrint('refreshAssignmentsForToday: done');
   }
@@ -915,7 +923,50 @@ extension AppStateWrites on AppState {
         'schedule ${schedule.id}: member=${schedule.memberId} type=${schedule.recurrence.type} occursToday=$occurs',
       );
 
-      if (!occurs) continue;
+      if (!occurs) {
+        // For alternating_weeks, check whether we should assign to a fallback
+        // sibling during this kid's away week.
+        if (schedule.recurrence.type == 'alternating_weeks' &&
+            schedule.fallbackMemberId != null) {
+          final fallbackId = schedule.fallbackMemberId!;
+          final fallbackKey = '${schedule.choreId}|$fallbackId';
+          if (!existingByChoreMember.containsKey(fallbackKey)) {
+            final fallbackMember = _findMemberById(fallbackId);
+            if (fallbackMember != null) {
+              final award = calcAwards(
+                difficulty: chore.difficulty,
+                settings: fam.settings,
+              );
+              final subId = 'sub_${chore.id}_${fallbackMember.id}_$dayKey';
+              final subRef = assignmentsRef.doc(subId);
+              debugPrint(
+                'schedule ${schedule.id}: away week — creating fallback assignment $subId for ${fallbackMember.displayName}',
+              );
+              batch.set(subRef, {
+                'familyId': famId,
+                'choreId': chore.id,
+                'choreTitle': chore.title,
+                'choreIcon': chore.icon,
+                'memberId': fallbackMember.id,
+                'memberName': fallbackMember.displayName,
+                'difficulty': chore.difficulty,
+                'xp': award.xp,
+                'coinAward': award.coins,
+                'requiresApproval': chore.requiresApproval,
+                'status': 'assigned',
+                'due': Timestamp.fromDate(today),
+                'dayKey': dayKey,
+                'assignedAt': FieldValue.serverTimestamp(),
+                'createdAt': FieldValue.serverTimestamp(),
+                'bonus': false,
+              }, SetOptions(merge: true));
+              existingByChoreMember[fallbackKey] = true;
+              createdCount++;
+            }
+          }
+        }
+        continue;
+      }
 
       final key = '${schedule.choreId}|${schedule.memberId}';
       if (existingByChoreMember.containsKey(key)) {
@@ -1026,6 +1077,29 @@ extension AppStateWrites on AppState {
         final startDay = DateTime(start.year, start.month, start.day);
         final thisDay = DateTime(date.year, date.month, date.day);
         return startDay == thisDay;
+
+      case 'alternating_weeks':
+        final start = r.startDate;
+        if (start == null) return false;
+        // Normalise both dates to Monday of their respective weeks.
+        final startMonday = start.subtract(Duration(days: start.weekday - 1));
+        final thisMonday = date.subtract(Duration(days: date.weekday - 1));
+        final anchorDay = DateTime(
+          startMonday.year,
+          startMonday.month,
+          startMonday.day,
+        );
+        final thisDay = DateTime(
+          thisMonday.year,
+          thisMonday.month,
+          thisMonday.day,
+        );
+        final weeksDiff = thisDay.difference(anchorDay).inDays ~/ 7;
+        final isHomeWeek = weeksDiff >= 0 && weeksDiff % 2 == 0;
+        if (!isHomeWeek) return false;
+        final days = r.daysOfWeek;
+        if (days != null && days.isNotEmpty) return days.contains(date.weekday);
+        return true;
 
       default:
         return false;

@@ -2,6 +2,8 @@ import 'package:chorezilla/models/recurrance.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'common.dart';
 
+const _keep = Object();
+
 class ChoreMemberSchedule {
   final String id;
 
@@ -20,6 +22,10 @@ class ChoreMemberSchedule {
   /// For enabling/disabling a schedule without deleting.
   final bool active;
 
+  /// When [recurrence] is 'alternating_weeks' and it is an away week, this
+  /// member receives the chore instead. Null means no substitution.
+  final String? fallbackMemberId;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -30,6 +36,7 @@ class ChoreMemberSchedule {
     required this.memberId,
     required this.recurrence,
     this.active = true,
+    this.fallbackMemberId,
     this.createdAt,
     this.updatedAt,
   });
@@ -40,6 +47,8 @@ class ChoreMemberSchedule {
     String? memberId,
     Recurrence? recurrence,
     bool? active,
+    // Use a sentinel to distinguish "clear fallback" from "keep existing".
+    Object? fallbackMemberId = _keep,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -50,6 +59,9 @@ class ChoreMemberSchedule {
       memberId: memberId ?? this.memberId,
       recurrence: recurrence ?? this.recurrence,
       active: active ?? this.active,
+      fallbackMemberId: fallbackMemberId == _keep
+          ? this.fallbackMemberId
+          : fallbackMemberId as String?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -61,6 +73,7 @@ class ChoreMemberSchedule {
     'memberId': memberId,
     'recurrence': recurrence.toMap(),
     'active': active,
+    'fallbackMemberId': fallbackMemberId,
     'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
     'updatedAt': updatedAt == null ? null : Timestamp.fromDate(updatedAt!),
   };
@@ -76,6 +89,7 @@ class ChoreMemberSchedule {
         data['recurrence'] as Map<String, dynamic>?,
       ),
       active: (data['active'] as bool?) ?? true,
+      fallbackMemberId: data['fallbackMemberId'] as String?,
       createdAt: tsAsDate(data['createdAt']),
       updatedAt: tsAsDate(data['updatedAt']),
     );
@@ -89,6 +103,7 @@ class ChoreMemberSchedule {
     'memberId': memberId,
     'recurrence': recurrence.toMap(),
     'active': active,
+    'fallbackMemberId': fallbackMemberId,
     'createdAt': createdAt?.toIso8601String(),
     'updatedAt': updatedAt?.toIso8601String(),
   };
@@ -103,6 +118,7 @@ class ChoreMemberSchedule {
         data['recurrence'] as Map<String, dynamic>?,
       ),
       active: (data['active'] as bool?) ?? true,
+      fallbackMemberId: data['fallbackMemberId'] as String?,
       createdAt: parseIsoDateTimeOrNull(data['createdAt']),
       updatedAt: parseIsoDateTimeOrNull(data['updatedAt']),
     );

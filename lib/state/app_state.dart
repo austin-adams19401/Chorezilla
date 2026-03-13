@@ -173,6 +173,10 @@ class AppState extends ChangeNotifier {
   final ValueNotifier<List<Assignment>> familyAssignedVN =
       ValueNotifier<List<Assignment>>(<Assignment>[]);
 
+  // All active ChoreMemberSchedule docs for the family
+  final ValueNotifier<List<ChoreMemberSchedule>> choreSchedulesVN =
+      ValueNotifier<List<ChoreMemberSchedule>>(<ChoreMemberSchedule>[]);
+
   // All rewards available in the family store
   final ValueNotifier<List<Reward>> rewardsVN = ValueNotifier<List<Reward>>(
     <Reward>[],
@@ -226,6 +230,7 @@ class AppState extends ChangeNotifier {
   StreamSubscription<List<Assignment>>? _historyAssignmentsSub;
   StreamSubscription<List<Reward>>? _rewardsSub;
   StreamSubscription<List<RewardRedemption>>? _pendingRewardsSub;
+  StreamSubscription<List<ChoreMemberSchedule>>? _schedulesSub;
 
   final Map<String, StreamSubscription<List<Assignment>>> _kidAssignedSubs = {};
   final Map<String, StreamSubscription<List<Assignment>>> _kidPendingSubs = {};
@@ -284,9 +289,11 @@ class AppState extends ChangeNotifier {
     await _historyAssignmentsSub?.cancel();
     await _rewardsSub?.cancel();
     await _pendingRewardsSub?.cancel();
+    await _schedulesSub?.cancel();
 
     _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub =
-        _missedSub = _historyAssignmentsSub = _pendingRewardsSub = null;
+        _missedSub = _historyAssignmentsSub = _pendingRewardsSub =
+        _schedulesSub = null;
 
     for (final s in _kidAssignedSubs.values) {
       await s.cancel();
@@ -323,6 +330,7 @@ class AppState extends ChangeNotifier {
     reviewQueueVN.value = const [];
     familyAssignedVN.value = const [];
     rewardsVN.value = const [];
+    choreSchedulesVN.value = const [];
 
     _rewards = const [];
     _rewardsBootstrapped = false;
@@ -344,6 +352,7 @@ class AppState extends ChangeNotifier {
     _familyAssignedSub?.cancel();
     _rewardsSub?.cancel();
     _pendingRewardsSub?.cancel();
+    _schedulesSub?.cancel();
 
     for (final s in _kidAssignedSubs.values) {
       s.cancel();
@@ -363,6 +372,7 @@ class AppState extends ChangeNotifier {
     reviewQueueVN.dispose();
     familyAssignedVN.dispose();
     rewardsVN.dispose();
+    choreSchedulesVN.dispose();
 
     super.dispose();
   }

@@ -1,3 +1,4 @@
+import 'package:chorezilla/constants/default_chores.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/recurrance.dart';
@@ -16,6 +17,7 @@ class ChoreEditorSheet extends StatefulWidget {
 
 class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   final _title = TextEditingController();
+  final _titleFocusNode = FocusNode();
   final _desc = TextEditingController();
   final _icon = TextEditingController(text: '🧹');
   final int kMaxChoreTitleLength = 30;
@@ -49,6 +51,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   @override
   void dispose() {
     _title.dispose();
+    _titleFocusNode.dispose();
     _desc.dispose();
     _icon.dispose();
     super.dispose();
@@ -60,197 +63,305 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ts = theme.textTheme;
+    final cs = theme.colorScheme;
     final isEdit = widget.chore != null;
     final viewInsets = MediaQuery.of(context).viewInsets.bottom;
+
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const _DragHandle(),
+          SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.add_task_rounded),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        isEdit ? 'Edit chore' : 'New chore',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.help_outline_rounded),
-                      tooltip: 'How chores work',
-                      onPressed: () => _showChoreHelpDialog(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _title,
-                  maxLength: kMaxChoreTitleLength,
-                  decoration: const InputDecoration(
-                    labelText: 'Title',
-                    helperText: 'max 40 characters',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: _desc,
-                  decoration: const InputDecoration(
-                    labelText: 'Description (optional)',
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _icon,
-                        decoration: InputDecoration(
-                          labelText: 'Icon (emoji)',
-                          suffixIcon: IconButton(
-                            tooltip: 'Pick',
-                            icon: const Icon(Icons.emoji_emotions_rounded),
-                            onPressed: _openEmojiPicker,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonFormField<int>(
-                        initialValue: _difficulty,
-                        items: const [
-                          DropdownMenuItem(value: 0, child: Text('Reminder')),
-                          DropdownMenuItem(value: 1, child: Text('Very easy')),
-                          DropdownMenuItem(value: 2, child: Text('Easy')),
-                          DropdownMenuItem(value: 3, child: Text('Medium')),
-                          DropdownMenuItem(value: 4, child: Text('Hard')),
-                          DropdownMenuItem(value: 5, child: Text('Epic')),
-                        ],
-                        onChanged: (v) => setState(() => _difficulty = v ?? 2),
-                        decoration: const InputDecoration(
-                          labelText: 'Difficulty',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    _difficulty == 0 ? 'No XP (reminder only)' : 'Worth $_xp XP',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Requires parent approval'),
-                  subtitle: const Text(
-                    'Chore will need to be checked by a parent before it\'s marked complete.',
-                  ),
-                  value: _requiresApproval,
-                  onChanged: (v) => setState(() => _requiresApproval = v),
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Bonus / extra chore'),
-                  subtitle: const Text(
-                    'Kids can pick this up for extra XP and coins. Turn this on to let them see it.',
-                  ),
-                  value: _bonusOnly,
-                  onChanged: (v) => setState(() => _bonusOnly = v),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Wrap(
-                    spacing: 6,
-                    children: [
-                      for (final t in const [
-                        'once',
-                        'daily',
-                        'weekly',
-                        'custom',
-                      ])
-                        ChoiceChip(
-                          label: Text(t[0].toUpperCase() + t.substring(1)),
-                          selected: _recType == t,
-                          onSelected: (_) => setState(() => _recType = t),
-                        ),
-                    ],
-                  ),
-                ),
-                if (_recType == 'weekly' || _recType == 'custom') ...[
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Wrap(
-                      spacing: 6,
+                    // ── Header ──────────────────────────────────────────
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        for (var i = 1; i <= 7; i++)
-                          FilterChip(
-                            label: Text(
-                              [
-                                'Mon',
-                                'Tue',
-                                'Wed',
-                                'Thu',
-                                'Fri',
-                                'Sat',
-                                'Sun',
-                              ][i - 1],
-                            ),
-                            selected: _days.contains(i),
-                            onSelected: (sel) => setState(
-                              () => sel ? _days.add(i) : _days.remove(i),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            Icons.add_task_rounded,
+                            color: cs.onPrimaryContainer,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            isEdit ? 'Edit chore' : 'New chore',
+                            style: ts.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.help_outline_rounded),
+                          tooltip: 'How chores work',
+                          onPressed: () => _showChoreHelpDialog(context),
+                        ),
                       ],
                     ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    icon: const Icon(Icons.schedule_rounded),
-                    label: Text(
-                      _timeOfDay == null
-                          ? 'Pick time (optional)'
-                          : 'Time: $_timeOfDay',
+                    const SizedBox(height: 16),
+
+                    // ── Title & Description ──────────────────────────────
+                    RawAutocomplete<DefaultChore>(
+                      textEditingController: _title,
+                      focusNode: _titleFocusNode,
+                      displayStringForOption: (option) => option.title,
+                      optionsBuilder: (textEditingValue) {
+                        final input = textEditingValue.text.toLowerCase();
+                        if (input.length < 2) return const Iterable.empty();
+                        final existingTitles = context
+                            .read<AppState>()
+                            .chores
+                            .map((c) => c.title.toLowerCase())
+                            .toSet();
+                        return kDefaultChores.where(
+                          (c) =>
+                              c.title.toLowerCase().contains(input) &&
+                              !existingTitles.contains(c.title.toLowerCase()),
+                        );
+                      },
+                      onSelected: (DefaultChore chore) {
+                        _title.text = chore.title;
+                        _desc.text = chore.description;
+                        _icon.text = chore.icon;
+                        setState(() {});
+                      },
+                      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                        return TextField(
+                          controller: controller,
+                          focusNode: focusNode,
+                          maxLength: kMaxChoreTitleLength,
+                          decoration: const InputDecoration(
+                            labelText: 'Title',
+                            helperText: 'max 30 characters',
+                          ),
+                          onSubmitted: (_) => onFieldSubmitted(),
+                        );
+                      },
+                      optionsViewBuilder: (context, onSelected, options) {
+                        final cs = Theme.of(context).colorScheme;
+                        final ts = Theme.of(context).textTheme;
+                        return Align(
+                          alignment: Alignment.topLeft,
+                          child: Material(
+                            elevation: 4,
+                            borderRadius: BorderRadius.circular(12),
+                            color: cs.surface,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxHeight: 200),
+                              child: ListView.builder(
+                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                shrinkWrap: true,
+                                itemCount: options.length,
+                                itemBuilder: (context, index) {
+                                  final option = options.elementAt(index);
+                                  return InkWell(
+                                    onTap: () => onSelected(option),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 10,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            option.icon,
+                                            style: const TextStyle(fontSize: 20),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            option.title,
+                                            style: ts.bodyMedium,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    onPressed: () async {
-                      final now = TimeOfDay.now();
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: now,
-                      );
-                      if (picked != null) {
-                        setState(() => _timeOfDay = picked.format(context));
-                      }
-                    },
-                  ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _desc,
+                      decoration: const InputDecoration(
+                        labelText: 'Description (optional)',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // ── Icon + Difficulty ────────────────────────────────
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _openEmojiPicker,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: cs.primaryContainer,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: ValueListenableBuilder<TextEditingValue>(
+                                    valueListenable: _icon,
+                                    builder: (_, val, _) => Text(
+                                      val.text.isEmpty ? '🧹' : val.text,
+                                      style: const TextStyle(fontSize: 32),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Tap to change',
+                                  style: ts.labelSmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              DropdownButtonFormField<int>(
+                                initialValue: _difficulty,
+                                items: const [
+                                  DropdownMenuItem(value: 0, child: Text('Reminder')),
+                                  DropdownMenuItem(value: 1, child: Text('Very easy')),
+                                  DropdownMenuItem(value: 2, child: Text('Easy')),
+                                  DropdownMenuItem(value: 3, child: Text('Medium')),
+                                  DropdownMenuItem(value: 4, child: Text('Hard')),
+                                  DropdownMenuItem(value: 5, child: Text('Epic')),
+                                ],
+                                onChanged: (v) => setState(() => _difficulty = v ?? 2),
+                                decoration: const InputDecoration(
+                                  labelText: 'Difficulty',
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              _XpBadge(xp: _xp, isReminder: _difficulty == 0),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Options section ──────────────────────────────────
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 4, bottom: 6),
+                        child: Text(
+                          'OPTIONS',
+                          style: ts.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            title: const Text('Requires parent approval'),
+                            subtitle: const Text(
+                              'Chore will need to be checked by a parent before it\'s marked complete.',
+                            ),
+                            value: _requiresApproval,
+                            onChanged: (v) =>
+                                setState(() => _requiresApproval = v),
+                          ),
+                          Divider(
+                            height: 1,
+                            indent: 16,
+                            endIndent: 16,
+                            color: cs.outlineVariant,
+                          ),
+                          SwitchListTile(
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                            title: const Text('Bonus / extra chore'),
+                            subtitle: const Text(
+                              'Kids can pick this up for extra XP and coins.',
+                            ),
+                            value: _bonusOnly,
+                            onChanged: (v) => setState(() => _bonusOnly = v),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── Save / Cancel ────────────────────────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: FilledButton(
+                        onPressed: _busy ? null : _save,
+                        child: _busy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(isEdit ? 'Update chore' : 'Create chore'),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Center(
+                      child: TextButton(
+                        onPressed:
+                            _busy ? null : () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _busy ? null : _save,
-                  child: _busy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Text(isEdit ? 'Update chore' : 'Create chore'),
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -291,7 +402,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
           difficulty: _difficulty,
           recurrence: rec,
           requiresApproval: _requiresApproval,
-          bonusOnly: _bonusOnly
+          bonusOnly: _bonusOnly,
         );
       } else {
         await app.updateChore(
@@ -372,69 +483,140 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   }
 }
 
+class _DragHandle extends StatelessWidget {
+  const _DragHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Container(
+          width: 36,
+          height: 4,
+          decoration: BoxDecoration(
+            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _XpBadge extends StatelessWidget {
+  const _XpBadge({required this.xp, required this.isReminder});
+  final int xp;
+  final bool isReminder;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: cs.tertiaryContainer,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isReminder ? Icons.notifications_outlined : Icons.bolt_rounded,
+            size: 14,
+            color: cs.onTertiaryContainer,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isReminder ? 'No XP (reminder)' : '$xp XP',
+            style: ts.labelMedium?.copyWith(
+              color: cs.onTertiaryContainer,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EmojiPicker extends StatelessWidget {
   const _EmojiPicker();
 
   static const _emojis = [
-    '🧹',
-    '🧼',
-    '🧽',
-    '🧺',
-    '🪣',
-    '🧻',
-    '🧯',
-    '🪥',
-    '🪠',
-    '🛏️',
-    '🪑',
-    '🧊',
-    '🍽️',
-    '🍳',
-    '🍞',
-    '🧃',
-    '🐶',
-    '🐱',
-    '🌿',
-    '📚',
-    '🧠',
-    '🧩',
-    '🎒',
-    '👟',
-    '🧤',
-    '🧢',
-    '🧦',
-    '🧴',
+    // Cleaning
+    '🧹', '🧽', '🧼', '🫧', '🪣', '🧻', '🪥', '🪠',
+    // Laundry
+    '🧺', '👕', '🧦', '🧴',
+    // Bathroom
+    '🚿', '🛁', '🚽',
+    // Kitchen
+    '🍽️', '🍳', '🥄', '🍴', '🥘', '🫙', '🧊', '🧃', '🗑️', '♻️',
+    // Bedroom & home
+    '🛏️', '🪑', '🛋️', '🪴', '🪞', '🪟', '🚪', '🏠',
+    // Yard & garden
+    '🌿', '🌱', '🌾', '🍂', '🌻', '🌲',
+    // Pets
+    '🐶', '🐱', '🐠', '🐹',
+    // School & learning
+    '📚', '🎒', '✏️', '📝',
+    // Getting ready
+    '🪮', '🧤', '🧢', '👟',
+    // Errands & misc
+    '🚗', '🛒', '📦', '🔧', '💡', '⭐', '🏆', '🧩',
   ];
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
     return SafeArea(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        height: 280,
-        child: GridView.builder(
-          itemCount: _emojis.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 6,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-          ),
-          itemBuilder: (_, i) {
-            final e = _emojis[i];
-            return InkWell(
-              onTap: () => Navigator.of(context).pop(e),
-              child: Container(
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(e, style: const TextStyle(fontSize: 24)),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const _DragHandle(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Choose an icon',
+                style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
-            );
-          },
-        ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+            child: SizedBox(
+              height: 380,
+              child: GridView.builder(
+                itemCount: _emojis.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 5,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                ),
+                itemBuilder: (_, i) {
+                  final e = _emojis[i];
+                  return InkWell(
+                    onTap: () => Navigator.of(context).pop(e),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: cs.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(e, style: const TextStyle(fontSize: 28)),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

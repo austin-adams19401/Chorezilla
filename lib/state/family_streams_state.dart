@@ -96,6 +96,12 @@ extension AppStateFamilyStreams on AppState {
       missedAssignmentsVN.value = list;
     });
 
+    _schedulesSub?.cancel();
+    _schedulesSub = repo.watchAllChoreMemberSchedules(familyId).listen((list) {
+      choreSchedulesVN.value = list;
+      _notifyStateChanged();
+    });
+
     // Pending reward redemptions → grouped by memberId
     _pendingRewardsSub?.cancel();
     _pendingRewardsSub = repo.watchPendingRewardRedemptions(familyId).listen((

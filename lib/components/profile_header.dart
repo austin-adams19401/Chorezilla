@@ -771,7 +771,7 @@ class _InviteDialog extends StatelessWidget {
 
 enum _MascotPhase {
   idle, walking, sweeping, looking, wiping, sitting,
-  poked, sleeping, oneFoot, wave, fallDown,
+  poked, sleeping, wave,
 }
 
 class _CyclingMascot extends StatefulWidget {
@@ -800,9 +800,7 @@ class _CyclingMascotState extends State<_CyclingMascot>
     _MascotPhase.wiping,
     _MascotPhase.sitting,
     _MascotPhase.sleeping,
-    _MascotPhase.oneFoot,
     _MascotPhase.wave,
-    _MascotPhase.fallDown,
   ];
 
   // Sprite loop duration for each phase
@@ -814,9 +812,7 @@ class _CyclingMascotState extends State<_CyclingMascot>
     _MascotPhase.sitting:  Duration(milliseconds: 2000),
     _MascotPhase.poked:    Duration(milliseconds: 1600),
     _MascotPhase.sleeping: Duration(milliseconds: 3200),
-    _MascotPhase.oneFoot:  Duration(milliseconds: 2000),
     _MascotPhase.wave:     Duration(milliseconds: 1800),
-    _MascotPhase.fallDown: Duration(milliseconds: 2000),
     _MascotPhase.walking:  Duration(milliseconds: 2000),
   };
 
@@ -829,9 +825,7 @@ class _CyclingMascotState extends State<_CyclingMascot>
     _MascotPhase.sitting:  3,
     _MascotPhase.poked:    2,
     _MascotPhase.sleeping: 5,
-    _MascotPhase.oneFoot:  3,
     _MascotPhase.wave:     3,
-    _MascotPhase.fallDown: 3,
   };
 
   // Drives sprite frame index (0.0 → 1.0, looping)
@@ -858,9 +852,7 @@ class _CyclingMascotState extends State<_CyclingMascot>
     _MascotPhase.sitting:  'assets/icons/mascot/sprite-sheets/sitting_down.png',
     _MascotPhase.poked:    'assets/icons/mascot/sprite-sheets/poked.png',
     _MascotPhase.sleeping: 'assets/icons/mascot/sprite-sheets/sleeping.png',
-    _MascotPhase.oneFoot:  'assets/icons/mascot/sprite-sheets/one-foot.png',
     _MascotPhase.wave:     'assets/icons/mascot/sprite-sheets/wave.png',
-    _MascotPhase.fallDown: 'assets/icons/mascot/sprite-sheets/fall_down.png',
   };
 
   @override

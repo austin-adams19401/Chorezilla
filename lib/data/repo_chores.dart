@@ -1,6 +1,8 @@
 // lib/data/repo_chores.dart
 part of 'chorezilla_repo.dart';
 
+const _repoKeep = Object();
+
 extension ChoreRepo on ChorezillaRepo {
   // Watchers (chores)
   Stream<List<Chore>> watchChores(String familyId, {bool? activeOnly = true}) {
@@ -92,6 +94,7 @@ extension ChoreRepo on ChorezillaRepo {
     required String memberId,
     required Recurrence recurrence,
     bool active = true,
+    String? fallbackMemberId,
   }) async {
     final coll = choreMemberSchedulesColl(firebaseDB, familyId);
     final ref = coll.doc();
@@ -102,6 +105,7 @@ extension ChoreRepo on ChorezillaRepo {
       'memberId': memberId,
       'recurrence': recurrence.toMap(),
       'active': active,
+      'fallbackMemberId': fallbackMemberId,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -114,6 +118,8 @@ extension ChoreRepo on ChorezillaRepo {
     required String scheduleId,
     Recurrence? recurrence,
     bool? active,
+    // Pass an explicit null to clear, or omit (using sentinel) to leave as-is.
+    Object? fallbackMemberId = _repoKeep,
   }) async {
     final coll = choreMemberSchedulesColl(firebaseDB, familyId);
     final patch = <String, dynamic>{};
@@ -123,6 +129,9 @@ extension ChoreRepo on ChorezillaRepo {
     }
     if (active != null) {
       patch['active'] = active;
+    }
+    if (fallbackMemberId != _repoKeep) {
+      patch['fallbackMemberId'] = fallbackMemberId as String?;
     }
 
     patch['updatedAt'] = FieldValue.serverTimestamp();

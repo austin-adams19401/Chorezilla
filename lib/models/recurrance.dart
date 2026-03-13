@@ -1,11 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Recurrence {
-  /// 'once' | 'daily' | 'weekly' | 'custom'
+  /// 'once' | 'daily' | 'weekly' | 'custom' | 'alternating_weeks'
   ///
-  /// - 'daily'  → every day
-  /// - 'weekly' → use [daysOfWeek] (1 = Mon ... 7 = Sun)
-  /// - 'custom' → use [intervalDays] + [startDate]
+  /// - 'daily'             → every day
+  /// - 'weekly'            → use [daysOfWeek] (1 = Mon ... 7 = Sun)
+  /// - 'custom'            → use [intervalDays] + [startDate]
+  /// - 'alternating_weeks' → every other week; [startDate] anchors the first
+  ///                         "home" week (any day in that week works — it is
+  ///                         internally normalised to Monday). Optionally use
+  ///                         [daysOfWeek] to restrict to specific days within
+  ///                         the home week.
   final String type;
 
   /// 1 = Monday ... 7 = Sunday (same as DateTime.weekday)

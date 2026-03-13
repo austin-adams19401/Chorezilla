@@ -142,27 +142,39 @@ class WeeklyChoreSummary extends StatelessWidget {
     // memberId -> Member
     final memberById = {for (final m in kids) m.id: m};
 
-    // memberId -> set of weekdays (1=Mon..7=Sun)
+    // memberId -> set of weekdays (1=Mon..7=Sun) for regular schedules
     final Map<String, Set<int>> memberToDays = {};
+    // memberId -> summary label for alternating_weeks schedules
+    final Map<String, String> memberToAltWeekLabel = {};
 
     for (final s in schedules.where((s) => s.active)) {
       final member = memberById[s.memberId];
       if (member == null) continue;
 
       final r = s.recurrence;
+
+      if (r.type == "alternating_weeks") {
+        final days = r.daysOfWeek ?? const [];
+        final dayLabel = days.isEmpty
+            ? "Every other week"
+            : "Every other week - ${_formatDaysOfWeek(days)}";
+        memberToAltWeekLabel[member.id] = dayLabel;
+        continue;
+      }
+
       final daysSet = memberToDays.putIfAbsent(member.id, () => <int>{});
 
       switch (r.type) {
-        case 'daily':
+        case "daily":
           for (int d = 1; d <= 7; d++) {
             daysSet.add(d);
           }
           break;
-        case 'weekly':
+        case "weekly":
           final days = r.daysOfWeek ?? const [];
           daysSet.addAll(days);
           break;
-        // For 'once' and 'custom' we’re not projecting into the weekly grid (yet).
+        // For ‘once’ and ‘custom’ we’re not projecting into the weekly grid (yet).
         default:
           break;
       }
@@ -171,8 +183,11 @@ class WeeklyChoreSummary extends StatelessWidget {
     final assignedKids = kids
         .where((m) => (memberToDays[m.id] ?? const <int>{}).isNotEmpty)
         .toList();
+    final altWeekKids = kids
+        .where((m) => memberToAltWeekLabel.containsKey(m.id))
+        .toList();
 
-    if (assignedKids.isEmpty) {
+    if (assignedKids.isEmpty && altWeekKids.isEmpty) {
       return Text(
         'No weekly pattern yet. Assign this chore to a kid to see their week.',
         style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
@@ -227,7 +242,7 @@ class WeeklyChoreSummary extends StatelessWidget {
         ),
         const SizedBox(height: 8),
 
-        // One row per kid
+        // One row per kid (regular weekly/daily schedules)
         for (final kid in assignedKids) ...[
           Row(
             children: [
@@ -280,6 +295,42 @@ class WeeklyChoreSummary extends StatelessWidget {
           ),
           const SizedBox(height: 4),
         ],
+
+        // Alternating-weeks kids shown as a text summary (can't fit in grid)
+        if (altWeekKids.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Every other week',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          for (final kid in altWeekKids)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 12,
+                    child: Text(
+                      _initialsFor(kid.displayName),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '${kid.displayName} - ${memberToAltWeekLabel[kid.id]}',
+                      style: theme.textTheme.bodySmall,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -292,6 +343,26 @@ class WeeklyChoreSummary extends StatelessWidget {
 }
 
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+String _formatDaysOfWeek(List<int> days) {
+  const names = {
+    1: 'Mon',
+    2: 'Tue',
+    3: 'Wed',
+    4: 'Thu',
+    5: 'Fri',
+    6: 'Sat',
+    7: 'Sun',
+  };
+  return days
+      .where((d) => names.containsKey(d))
+      .map((d) => names[d]!)
+      .join(', ');
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Kid list + schedule summaries
@@ -399,27 +470,13 @@ class KidScheduleList extends StatelessWidget {
           return 'Every $n day${n == 1 ? '' : 's'}';
         }
         return 'Custom schedule';
+      case 'alternating_weeks':
+        final days = r.daysOfWeek ?? const [];
+        if (days.isEmpty) return 'Every other week';
+        return 'Every other week - ${_formatDaysOfWeek(days)}';
       default:
         return 'Custom schedule';
     }
-  }
-
-  static String _formatDaysOfWeek(List<int> days) {
-    // 1=Mon..7=Sun
-    const names = {
-      1: 'Mon',
-      2: 'Tue',
-      3: 'Wed',
-      4: 'Thu',
-      5: 'Fri',
-      6: 'Sat',
-      7: 'Sun',
-    };
-    final labels = days
-        .where((d) => names.containsKey(d))
-        .map((d) => names[d]!)
-        .toList();
-    return labels.join(', ');
   }
 }
 
@@ -427,7 +484,7 @@ class KidScheduleList extends StatelessWidget {
 // Schedule editor bottom sheet (per kid)
 // ─────────────────────────────────────────────────────────────────────────────
 
-enum FrequencyOption { once, daily, weekly, custom }
+enum FrequencyOption { once, daily, weekly, custom, alternatingWeeks }
 
 class KidScheduleEditorSheet extends StatefulWidget {
   final Chore chore;
@@ -450,6 +507,7 @@ class _KidScheduleEditorSheetState extends State<KidScheduleEditorSheet> {
   late Set<int> _daysOfWeek; // 1=Mon..7=Sun
   int _intervalDays = 2;
   DateTime _startDate = DateTime.now();
+  String? _fallbackMemberId;
   bool _busy = false;
 
   @override
@@ -474,12 +532,16 @@ class _KidScheduleEditorSheetState extends State<KidScheduleEditorSheet> {
         case 'custom':
           _frequency = FrequencyOption.custom;
           break;
+        case 'alternating_weeks':
+          _frequency = FrequencyOption.alternatingWeeks;
+          break;
         default:
           _frequency = FrequencyOption.daily;
       }
       _daysOfWeek = (r.daysOfWeek ?? const []).toSet();
       _intervalDays = r.intervalDays ?? 2;
       _startDate = r.startDate ?? DateTime.now();
+      _fallbackMemberId = existing.fallbackMemberId;
     }
   }
 
@@ -538,6 +600,12 @@ class _KidScheduleEditorSheetState extends State<KidScheduleEditorSheet> {
                           value: FrequencyOption.custom,
                           selected: _frequency == FrequencyOption.custom,
                         ),
+                        RadioListTile<FrequencyOption>(
+                          title: const Text('Every other week'),
+                          value: FrequencyOption.alternatingWeeks,
+                          selected:
+                              _frequency == FrequencyOption.alternatingWeeks,
+                        ),
                       ],
                     ),
                   ),
@@ -554,6 +622,12 @@ class _KidScheduleEditorSheetState extends State<KidScheduleEditorSheet> {
 
               if (_frequency == FrequencyOption.custom)
                 _buildCustomIntervalPicker(theme),
+
+              if (_frequency == FrequencyOption.alternatingWeeks) ...[
+                _buildAlternatingWeeksPicker(theme),
+                const SizedBox(height: 12),
+                _buildFallbackMemberPicker(theme, context),
+              ],
 
               const SizedBox(height: 16),
 
@@ -717,6 +791,94 @@ class _KidScheduleEditorSheetState extends State<KidScheduleEditorSheet> {
     );
   }
 
+  Widget _buildAlternatingWeeksPicker(ThemeData theme) {
+    const labels = {1: 'M', 2: 'T', 3: 'W', 4: 'T', 5: 'F', 6: 'S', 7: 'S'};
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Days of week (home weeks)', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: labels.entries.map((e) {
+            final selected = _daysOfWeek.contains(e.key);
+            return ChoiceChip(
+              label: Text(e.value),
+              selected: selected,
+              onSelected: (value) {
+                setState(() {
+                  if (value) {
+                    _daysOfWeek.add(e.key);
+                  } else {
+                    _daysOfWeek.remove(e.key);
+                  }
+                });
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        Text('Home weeks start on', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 4),
+        TextButton(
+          onPressed: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: _startDate,
+              firstDate: DateTime.now().subtract(const Duration(days: 365)),
+              lastDate: DateTime.now().add(const Duration(days: 365 * 2)),
+              helpText: 'Pick any day in a home week',
+            );
+            if (picked != null) setState(() => _startDate = picked);
+          },
+          child: Text(
+            '${_startDate.year}-'
+            '${_startDate.month.toString().padLeft(2, '0')}-'
+            '${_startDate.day.toString().padLeft(2, '0')}',
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFallbackMemberPicker(ThemeData theme, BuildContext context) {
+    final app = context.read<AppState>();
+    final otherKids = app.members
+        .where(
+          (m) =>
+              m.role == FamilyRole.child && m.active && m.id != widget.kid.id,
+        )
+        .toList();
+
+    if (otherKids.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('When away, assign to', style: theme.textTheme.titleSmall),
+        const SizedBox(height: 8),
+        DropdownButton<String?>(
+          value: _fallbackMemberId,
+          hint: const Text('Nobody (skip chore)'),
+          isExpanded: true,
+          items: [
+            const DropdownMenuItem<String?>(
+              value: null,
+              child: Text('Nobody (skip chore)'),
+            ),
+            ...otherKids.map(
+              (k) => DropdownMenuItem<String?>(
+                value: k.id,
+                child: Text(k.displayName),
+              ),
+            ),
+          ],
+          onChanged: (value) => setState(() => _fallbackMemberId = value),
+        ),
+      ],
+    );
+  }
+
   Recurrence _buildRecurrence() {
     switch (_frequency) {
       case FrequencyOption.once:
@@ -737,6 +899,17 @@ class _KidScheduleEditorSheetState extends State<KidScheduleEditorSheet> {
           intervalDays: _intervalDays,
           startDate: _startDate,
         );
+
+      case FrequencyOption.alternatingWeeks:
+        // Normalise startDate to Monday of the chosen week so the occurrence
+        // logic has a stable anchor regardless of which day the parent picked.
+        final monday = _startDate
+            .subtract(Duration(days: _startDate.weekday - 1));
+        return Recurrence(
+          type: 'alternating_weeks',
+          daysOfWeek: _daysOfWeek.isEmpty ? null : (_daysOfWeek.toList()..sort()),
+          startDate: DateTime(monday.year, monday.month, monday.day),
+        );
     }
   }
 
@@ -752,6 +925,7 @@ class _KidScheduleEditorSheetState extends State<KidScheduleEditorSheet> {
         choreId: widget.chore.id,
         memberId: widget.kid.id,
         recurrence: recurrence,
+        fallbackMemberId: _fallbackMemberId,
       );
       if (!mounted) return;
       Navigator.of(context).pop();
