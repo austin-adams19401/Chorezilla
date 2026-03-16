@@ -1,5 +1,7 @@
 // lib/pages/parent_dashboard/parent_rewards_page.dart
+import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
@@ -19,7 +21,7 @@ class ParentRewardsPage extends StatefulWidget {
 class _ParentRewardsPageState extends State<ParentRewardsPage> {
   RewardCategory? _categoryFilter; // null = All
   bool _showDisabled = false;
-  bool _pendingExpanded = false;
+  bool _pendingExpanded = true;
 
   @override
   Widget build(BuildContext context) {
@@ -174,7 +176,17 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                               if (rewards.isEmpty) {
                                 return _EmptyRewards(
                                   onSeedStarter: () async {
-                                    await app.repo.seedStarterRewards(familyId);
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    try {
+                                      await app.repo.seedStarterRewards(familyId);
+                                    } catch (_) {
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Could not load starter rewards. Check your connection.'),
+                                        ),
+                                      );
+                                    }
                                   },
                                   onCreateNew: () => _openNewRewardSheet(context),
                                 );
@@ -236,6 +248,7 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                                     onEdit: () =>
                                         _openEditRewardSheet(context, r),
                                     onToggleActive: (active) async {
+                                      final messenger = ScaffoldMessenger.of(context);
                                       try {
                                         await app.repo.setRewardActive(
                                           familyId,
@@ -244,9 +257,15 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                                         );
                                       } catch (_) {
                                         if (!mounted) return;
+                                        messenger.showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Could not update reward. Check your connection.'),
+                                          ),
+                                        );
                                       }
                                     },
                                     onDelete: () async {
+                                      final messenger = ScaffoldMessenger.of(context);
                                       final confirm = await showDialog<bool>(
                                         context: context,
                                         builder: (ctx) => AlertDialog(
@@ -281,8 +300,13 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                                           familyId,
                                           rewardId: r.id,
                                         );
-                                      } catch (e) {
+                                      } catch (_) {
                                         if (!mounted) return;
+                                        messenger.showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Could not delete reward. Check your connection.'),
+                                          ),
+                                        );
                                       }
                                     },
                                   );
@@ -562,6 +586,7 @@ class _RewardsFilters extends StatelessWidget {
                     padding: const EdgeInsets.only(right: 8),
                     child: ChoiceChip(
                       label: Text(_categoryLabel(cat)),
+                      avatar: Icon(_categoryIcon(cat), size: 14),
                       selected: categoryFilter == cat,
                       onSelected: (_) => onCategoryChanged(cat),
                       selectedColor: cs.secondary,
@@ -842,6 +867,20 @@ class _RewardCard extends StatelessWidget {
                           materialTapTargetSize:
                               MaterialTapTargetSize.shrinkWrap,
                         ),
+                      if (reward.stock != null)
+                        Chip(
+                          label: Text('Stock: ${reward.stock}'),
+                          avatar: const Icon(Icons.inventory_2_outlined, size: 14),
+                          backgroundColor: cs.primaryContainer.withValues(
+                            alpha: 0.7,
+                          ),
+                          labelStyle: ts.labelSmall?.copyWith(
+                            color: cs.onPrimaryContainer,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                        ),
                     ],
                   ),
                 ),
@@ -880,6 +919,8 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
   var _iconCtrl = TextEditingController(text: '🎁');
 
   RewardCategory _category = RewardCategory.experience;
+  bool _limitStock = false;
+  var _stockCtrl = TextEditingController(text: '1');
   bool _busy = false;
 
     @override
@@ -893,8 +934,10 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
     _iconCtrl = TextEditingController(
       text: (r?.icon?.trim().isNotEmpty == true) ? r!.icon! : '🎁',
     );
+    _stockCtrl = TextEditingController(text: (r?.stock ?? 1).toString());
 
     _category = r?.category ?? RewardCategory.experience;
+    _limitStock = r?.stock != null;
   }
 
   @override
@@ -903,6 +946,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
     _descCtrl.dispose();
     _coinCtrl.dispose();
     _iconCtrl.dispose();
+    _stockCtrl.dispose();
     super.dispose();
   }
 
@@ -987,7 +1031,13 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
                       .map(
                         (cat) => DropdownMenuItem<RewardCategory>(
                           value: cat,
-                          child: Text(_categoryLabel(cat)),
+                          child: Row(
+                            children: [
+                              Icon(_categoryIcon(cat), size: 18),
+                              const SizedBox(width: 8),
+                              Text(_categoryLabel(cat)),
+                            ],
+                          ),
                         ),
                       )
                       .toList(),
@@ -997,6 +1047,32 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
                   },
                   decoration: const InputDecoration(labelText: 'Category'),
                 ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Limit quantity',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ),
+                    Switch(
+                      value: _limitStock,
+                      onChanged: (v) => setState(() => _limitStock = v),
+                    ),
+                  ],
+                ),
+                if (_limitStock) ...[
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: _stockCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Available quantity',
+                      hintText: '1',
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerRight,
@@ -1034,6 +1110,29 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
       return;
     }
 
+    int? stock;
+    if (_limitStock) {
+      stock = int.tryParse(_stockCtrl.text.trim());
+      if (stock == null || stock <= 0) {
+        _showSnack('Enter a valid quantity (must be at least 1).');
+        return;
+      }
+    }
+
+    // Gate: check custom reward limit for new rewards
+    if (widget.existing == null) {
+      final app = context.read<AppState>();
+      final customRewardCount = app.rewards.where((r) => r.isCustom).length;
+      if (!SubscriptionService.canAddCustomReward(app.family, customRewardCount)) {
+        if (!mounted) return;
+        await showPremiumUpgradeSheet(
+          context,
+          reason: UpgradeReason.customRewards,
+        );
+        return;
+      }
+    }
+
     setState(() => _busy = true);
 
     try {
@@ -1055,7 +1154,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
           coinCost: cost,
           category: _category,
           isCustom: true,
-          stock: null,
+          stock: stock,
         );
       } else {
         await app.repo.updateReward(
@@ -1066,6 +1165,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
           icon: icon,
           coinCost: cost,
           category: _category,
+          stock: stock,
         );
       }
 
@@ -1088,6 +1188,16 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+String _formatRelativeTime(DateTime dt) {
+  final diff = DateTime.now().difference(dt);
+  if (diff.inMinutes < 1) return 'just now';
+  if (diff.inHours < 1) return '${diff.inMinutes}m ago';
+  if (diff.inDays < 1) return '${diff.inHours}h ago';
+  if (diff.inDays == 1) return 'yesterday';
+  if (diff.inDays < 7) return '${diff.inDays}d ago';
+  return '${(diff.inDays / 7).floor()}w ago';
+}
 
 String _categoryLabel(RewardCategory cat) {
   switch (cat) {
@@ -1131,7 +1241,7 @@ IconData _categoryIcon(RewardCategory cat) {
 // Pending rewards card – grouped by kid (restyled)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _PendingRewardsCard extends StatelessWidget {
+class _PendingRewardsCard extends StatefulWidget {
   const _PendingRewardsCard({
     required this.redemptions,
     required this.expanded,
@@ -1141,6 +1251,19 @@ class _PendingRewardsCard extends StatelessWidget {
   final List<RewardRedemption> redemptions;
   final bool expanded;
   final VoidCallback onToggleExpanded;
+
+  @override
+  State<_PendingRewardsCard> createState() => _PendingRewardsCardState();
+}
+
+class _PendingRewardsCardState extends State<_PendingRewardsCard> {
+  final _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1154,7 +1277,7 @@ class _PendingRewardsCard extends StatelessWidget {
 
     // Group by kid
     final Map<String, List<RewardRedemption>> byKid = {};
-    for (final r in redemptions) {
+    for (final r in widget.redemptions) {
       byKid.putIfAbsent(r.memberId, () => []).add(r);
     }
     final entries = byKid.entries.toList()
@@ -1191,7 +1314,7 @@ class _PendingRewardsCard extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  '${redemptions.length} Pending',
+                  '${widget.redemptions.length} Pending',
                   style: ts.labelMedium?.copyWith(
                     color: cs.onSecondary,
                     fontWeight: FontWeight.w600,
@@ -1206,17 +1329,17 @@ class _PendingRewardsCard extends StatelessWidget {
                 ),
                 IconButton(
                   icon: Icon(
-                    expanded
+                    widget.expanded
                         ? Icons.keyboard_arrow_up_rounded
                         : Icons.keyboard_arrow_down_rounded,
                   ),
                   color: cs.onSecondary,
-                  onPressed: onToggleExpanded,
+                  onPressed: widget.onToggleExpanded,
                 ),
               ],
             ),
 
-            if (expanded) ...[
+            if (widget.expanded) ...[
               const SizedBox(height: 4),
               Text(
                 'Kids have already paid for these. Mark them given once you deliver, or refund to return coins.',
@@ -1234,7 +1357,9 @@ class _PendingRewardsCard extends StatelessWidget {
                   thumbVisibility: true,
                   radius: const Radius.circular(999),
                   thickness: 3,
+                  controller: _scrollController,
                   child: SingleChildScrollView(
+                    controller: _scrollController,
                     child: Column(
                       children: [
                         for (var i = 0; i < entries.length; i++) ...[
@@ -1350,6 +1475,38 @@ class _KidGroupRow extends StatelessWidget {
                 ),
               ),
             ),
+            if (rewards.length > 1) ...[
+              const SizedBox(width: 6),
+              TextButton(
+                onPressed: () async {
+                  final app = context.read<AppState>();
+                  final familyId = app.familyId;
+                  if (familyId == null) return;
+                  final messenger = ScaffoldMessenger.of(context);
+                  for (final r in rewards) {
+                    try {
+                      await app.repo.markRewardGiven(
+                        familyId,
+                        redemptionId: r.id,
+                        parentMemberId: app.currentMember?.id,
+                      );
+                    } catch (_) {}
+                  }
+                  if (!context.mounted) return;
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('All rewards marked as given for $kidName.'),
+                    ),
+                  );
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: cs.onSecondary,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  minimumSize: const Size(0, 28),
+                ),
+                child: const Text('Give all'),
+              ),
+            ],
           ],
         ),
         const SizedBox(height: 6),
@@ -1423,6 +1580,13 @@ class _PendingRewardTile extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
+          if (redemption.createdAt != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              _formatRelativeTime(redemption.createdAt!),
+              style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -1432,23 +1596,34 @@ class _PendingRewardTile extends StatelessWidget {
                   final familyId = app.familyId;
                   if (familyId == null) return;
 
+                  // Show snackbar first — only write to Firestore if not undone.
+                  final messenger = ScaffoldMessenger.of(context);
+                  var undone = false;
+                  final ctrl = messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        '"${redemption.rewardName}" marked as given to $kidName.',
+                      ),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () => undone = true,
+                      ),
+                      duration: const Duration(seconds: 4),
+                    ),
+                  );
+
+                  await ctrl.closed;
+                  if (undone) return;
+
                   try {
                     await app.repo.markRewardGiven(
                       familyId,
                       redemptionId: redemption.id,
                       parentMemberId: app.currentMember?.id,
                     );
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Marked "${redemption.rewardName}" as given to $kidName.',
-                        ),
-                      ),
-                    );
                   } catch (e) {
                     if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(content: Text('Error marking reward given: $e')),
                     );
                   }

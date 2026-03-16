@@ -16,6 +16,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:chorezilla/data/chorezilla_repo.dart';
+import 'package:chorezilla/services/purchase_service.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:chorezilla/models/user_profile.dart';
 import 'package:chorezilla/models/family.dart';
@@ -336,6 +337,7 @@ class AppState extends ChangeNotifier {
     _rewardsBootstrapped = false;
 
     await setViewMode(AppViewMode.parent);
+    PurchaseService.logOut().ignore();
 
     notifyListeners();
   }

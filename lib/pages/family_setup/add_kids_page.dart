@@ -1,5 +1,7 @@
 import 'dart:math' as math;
+import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -69,6 +71,19 @@ class _AddKidsPageState extends State<AddKidsPage> {
     if (familyId == null || familyId.isEmpty) {
       setState(() => _error = 'No family selected/loaded yet.');
       return;
+    }
+
+    // Gate: check kid limit for new kids (not edits)
+    if (_editingMemberId == null) {
+      final kidCount = app.members.where((m) => m.role == FamilyRole.child).length;
+      if (!SubscriptionService.canAddKid(app.family, kidCount)) {
+        if (!mounted) return;
+        await showPremiumUpgradeSheet(
+          context,
+          reason: UpgradeReason.addKid,
+        );
+        return;
+      }
     }
 
     setState(() {

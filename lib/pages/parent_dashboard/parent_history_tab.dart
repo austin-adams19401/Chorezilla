@@ -16,17 +16,30 @@ class ParentHistoryTab extends StatefulWidget {
 
 class _ParentHistoryTabState extends State<ParentHistoryTab> {
   late DateTime _weekStart;
+  DateTime? _lastWatchedWeek;
 
   @override
   void initState() {
     super.initState();
     _weekStart = weekStartFor(DateTime.now());
+    // Defer side effects until after the first frame so context is ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _triggerWeekSideEffects());
+  }
+
+  void _triggerWeekSideEffects() {
+    if (!mounted) return;
+    if (_lastWatchedWeek == _weekStart) return;
+    _lastWatchedWeek = _weekStart;
+    final app = context.read<AppState>();
+    app.watchHistoryWeek(_weekStart);
+    app.ensureAllowanceRewardsForWeekIfEligible(_weekStart);
   }
 
   void _shiftWeek(int deltaWeeks) {
     setState(() {
       _weekStart = _weekStart.add(Duration(days: 7 * deltaWeeks));
     });
+    _triggerWeekSideEffects();
   }
 
   @override
@@ -34,16 +47,9 @@ class _ParentHistoryTabState extends State<ParentHistoryTab> {
     final app = context.watch<AppState>();
     final cs = Theme.of(context).colorScheme;
 
-    // Make sure we're streaming assignments for this week
-    app.watchHistoryWeek(_weekStart);
-
     // Build history based on current assignments + overrides
     final histories = app.buildWeeklyHistory(_weekStart);
     final weekEnd = _weekStart.add(const Duration(days: 6));
-
-    // Fire-and-forget: if this is a *past* week and kids earned
-    // allowance, auto-create pending allowance rewards.
-    app.ensureAllowanceRewardsForWeekIfEligible(_weekStart);
 
     // Summary stats for hero
     final kidCount = histories.length;
@@ -68,8 +74,13 @@ class _ParentHistoryTabState extends State<ParentHistoryTab> {
           completedDays: completedDays,
           totalDays: totalDays,
           completionRatio: completionRatio,
+          isCurrentWeek: _weekStart == weekStartFor(DateTime.now()),
           onPrevWeek: () => _shiftWeek(-1),
           onNextWeek: () => _shiftWeek(1),
+          onJumpToCurrentWeek: () {
+            setState(() => _weekStart = weekStartFor(DateTime.now()));
+            _triggerWeekSideEffects();
+          },
         ),
         Expanded(
           child: Padding(
@@ -90,6 +101,7 @@ class _ParentHistoryTabState extends State<ParentHistoryTab> {
                         return _KidHistoryCard(
                           history: history,
                           weekStart: _weekStart,
+                          avatarIndex: index,
                         );
                       },
                     ),
@@ -113,8 +125,10 @@ class _HistoryHero extends StatelessWidget {
     required this.completedDays,
     required this.totalDays,
     required this.completionRatio,
+    required this.isCurrentWeek,
     required this.onPrevWeek,
     required this.onNextWeek,
+    required this.onJumpToCurrentWeek,
   });
 
   final DateTime weekStart;
@@ -123,8 +137,10 @@ class _HistoryHero extends StatelessWidget {
   final int completedDays;
   final int totalDays;
   final double completionRatio;
+  final bool isCurrentWeek;
   final VoidCallback onPrevWeek;
   final VoidCallback onNextWeek;
+  final VoidCallback onJumpToCurrentWeek;
 
   @override
   Widget build(BuildContext context) {
@@ -136,7 +152,9 @@ class _HistoryHero extends StatelessWidget {
     final double topInset = media.padding.top;
 
     final fmt = DateFormat.MMMd();
-    final weekLabel = '${fmt.format(weekStart)} – ${fmt.format(weekEnd)}';
+    final weekLabel = isCurrentWeek
+        ? '${fmt.format(weekStart)} – ${fmt.format(weekEnd)}  ·  This week'
+        : '${fmt.format(weekStart)} – ${fmt.format(weekEnd)}';
     final kidsLabel = kidCount == 0
         ? 'No kids yet'
         : kidCount == 1
@@ -188,11 +206,26 @@ class _HistoryHero extends StatelessWidget {
                       ),
                       Expanded(
                         child: Center(
-                          child: Text(
-                            weekLabel,
-                            style: ts.titleMedium?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
+                          child: GestureDetector(
+                            onTap: isCurrentWeek ? null : onJumpToCurrentWeek,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  weekLabel,
+                                  style: ts.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (!isCurrentWeek)
+                                  Text(
+                                    'Tap to return to this week',
+                                    style: ts.labelSmall?.copyWith(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -200,7 +233,7 @@ class _HistoryHero extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.chevron_right),
                         color: Colors.white,
-                        onPressed: onNextWeek,
+                        onPressed: isCurrentWeek ? null : onNextWeek,
                       ),
                     ],
                   ),
@@ -322,8 +355,13 @@ class _EmptyHistory extends StatelessWidget {
 class _KidHistoryCard extends StatelessWidget {
   final WeeklyKidHistory history;
   final DateTime weekStart;
+  final int avatarIndex;
 
-  const _KidHistoryCard({required this.history, required this.weekStart});
+  const _KidHistoryCard({
+    required this.history,
+    required this.weekStart,
+    required this.avatarIndex,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -337,6 +375,9 @@ class _KidHistoryCard extends StatelessWidget {
 
     final completedDays = history.dayStatuses
         .where((s) => s == DayStatus.completed)
+        .length;
+    final excusedDays = history.dayStatuses
+        .where((s) => s == DayStatus.excused)
         .length;
 
     return Card(
@@ -369,7 +410,7 @@ class _KidHistoryCard extends StatelessWidget {
             // Header: avatar + name + allowance toggle
             Row(
               children: [
-                _MemberAvatar(member: member),
+                _MemberAvatar(member: member, index: avatarIndex),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -383,7 +424,9 @@ class _KidHistoryCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '$completedDays of 7 good days',
+                        excusedDays > 0
+                            ? '$completedDays done · $excusedDays excused'
+                            : '$completedDays of 7 good days',
                         style: ts.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
@@ -420,7 +463,8 @@ class _KidHistoryCard extends StatelessWidget {
 
 class _MemberAvatar extends StatelessWidget {
   final Member member;
-  const _MemberAvatar({required this.member});
+  final int index;
+  const _MemberAvatar({required this.member, required this.index});
 
   @override
   Widget build(BuildContext context) {
@@ -431,13 +475,29 @@ class _MemberAvatar extends StatelessWidget {
         ? member.displayName.characters.first.toUpperCase()
         : '?';
 
+    // Cycle through four distinct container colours.
+    final backgrounds = [
+      cs.primaryContainer,
+      cs.secondaryContainer,
+      cs.tertiaryContainer,
+      cs.errorContainer,
+    ];
+    final foregrounds = [
+      cs.onPrimaryContainer,
+      cs.onSecondaryContainer,
+      cs.onTertiaryContainer,
+      cs.onErrorContainer,
+    ];
+    final bg = backgrounds[index % backgrounds.length];
+    final fg = foregrounds[index % foregrounds.length];
+
     return CircleAvatar(
       radius: 18,
-      backgroundColor: cs.primaryContainer,
+      backgroundColor: bg,
       child: Text(
         initial,
         style: ts.titleMedium?.copyWith(
-          color: cs.onPrimaryContainer,
+          color: fg,
           fontWeight: FontWeight.w700,
         ),
       ),
@@ -456,9 +516,14 @@ class _DayRow extends StatelessWidget {
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
+    final today = DateTime.now();
+    final todayNorm = DateTime(today.year, today.month, today.day);
+
     return Row(
       children: List.generate(7, (i) {
         final date = weekStart.add(Duration(days: i));
+        final dateNorm = DateTime(date.year, date.month, date.day);
+        final isToday = dateNorm == todayNorm;
         final status = history.dayStatuses[i];
 
         return Expanded(
@@ -468,6 +533,7 @@ class _DayRow extends StatelessWidget {
               showModalBottomSheet(
                 context: context,
                 isScrollControlled: true,
+                showDragHandle: true,
                 builder: (ctx) {
                   return _DayDetailSheet(member: history.member, date: date);
                 },
@@ -478,9 +544,21 @@ class _DayRow extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    _weekdayShort(date.weekday),
-                    style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: isToday
+                        ? BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          )
+                        : null,
+                    child: Text(
+                      _weekdayShort(date.weekday),
+                      style: ts.labelSmall?.copyWith(
+                        color: isToday ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                        fontWeight: isToday ? FontWeight.w700 : null,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 4),
                   _DayStatusIcon(status: status),
@@ -571,37 +649,25 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
   void initState() {
     super.initState();
     final app = context.read<AppState>();
-    final current = app.dayStatusFor(widget.member.id, widget.date);
-    // Default to "completed" if there's no status yet.
-    _status = current == DayStatus.noChores ? DayStatus.completed : current;
+    _status = app.dayStatusFor(widget.member.id, widget.date);
   }
 
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat.yMMMEd();
     final ts = Theme.of(context).textTheme;
-    final cs = Theme.of(context).colorScheme;
 
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.only(
           left: 16,
           right: 16,
-          top: 12,
+          top: 4,
           bottom: MediaQuery.of(context).viewInsets.bottom + 12,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 44,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: cs.outlineVariant,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
             Text(
               '${widget.member.displayName} – ${fmt.format(widget.date)}',
               style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w600),
@@ -631,6 +697,11 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
                     value: DayStatus.excused,
                     title: const Text('Excused (doesn\'t count against them)'),
                   ),
+                  RadioListTile<DayStatus>(
+                    value: DayStatus.noChores,
+                    title: const Text('Auto (based on chores completed)'),
+                    subtitle: const Text('Removes any manual override'),
+                  ),
                 ],
               ),
             ),
@@ -641,13 +712,22 @@ class _DayDetailSheetState extends State<_DayDetailSheet> {
               child: FilledButton(
                 onPressed: () async {
                   final app = context.read<AppState>();
-                  await app.setDayStatus(
-                    memberId: widget.member.id,
-                    date: widget.date,
-                    status: _status,
-                  );
-                  if (!context.mounted) return;
-                  Navigator.of(context).pop();
+                  try {
+                    await app.setDayStatus(
+                      memberId: widget.member.id,
+                      date: widget.date,
+                      status: _status,
+                    );
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
+                  } catch (_) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Could not save. Check your connection.'),
+                      ),
+                    );
+                  }
                 },
                 child: const Text('Save'),
               ),
@@ -689,14 +769,23 @@ class _AllowanceToggle extends StatelessWidget {
         // Switch: OFF = disable immediately, ON = open config sheet
         Switch(
           value: enabled,
-          onChanged: (value) {
+          onChanged: (value) async {
             if (!value) {
               // Turning OFF → just disable, no sheet
               final app = context.read<AppState>();
-              app.updateAllowanceForMember(
-                member.id,
-                allowanceConfig.copyWith(enabled: false),
-              );
+              try {
+                await app.updateAllowanceForMember(
+                  member.id,
+                  allowanceConfig.copyWith(enabled: false),
+                );
+              } catch (_) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Could not update allowance. Check your connection.'),
+                  ),
+                );
+              }
             } else {
               // Turning ON → open config sheet
               _showConfigSheet(context);
@@ -860,12 +949,27 @@ class _AllowanceConfigSheetState extends State<_AllowanceConfigSheet> {
 
                     final amountStr = _amountController.text.trim();
                     final parsedAmount = double.tryParse(amountStr);
-                    final amountCents = parsedAmount != null
-                        ? (parsedAmount * 100).round()
-                        : 0;
+                    if (parsedAmount == null || parsedAmount <= 0) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Enter a valid amount greater than \$0.'),
+                        ),
+                      );
+                      return;
+                    }
 
                     final daysRequired =
-                        int.tryParse(_daysRequiredController.text.trim()) ?? 7;
+                        int.tryParse(_daysRequiredController.text.trim());
+                    if (daysRequired == null || daysRequired < 1 || daysRequired > 7) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Days required must be between 1 and 7.'),
+                        ),
+                      );
+                      return;
+                    }
+
+                    final amountCents = (parsedAmount * 100).round();
 
                     // Saving from this sheet always ENABLES allowance.
                     final config = widget.initialConfig.copyWith(

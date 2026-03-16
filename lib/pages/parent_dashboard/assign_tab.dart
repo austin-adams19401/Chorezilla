@@ -19,10 +19,12 @@ class AssignTab extends StatefulWidget {
 class _AssignTabState extends State<AssignTab> {
   String _q = '';
   Timer? _deb;
+  final _searchCtrl = TextEditingController();
 
   @override
   void dispose() {
     _deb?.cancel();
+    _searchCtrl.dispose();
     super.dispose();
   }
 
@@ -131,6 +133,7 @@ class _AssignTabState extends State<AssignTab> {
               borderRadius: BorderRadius.circular(999),
               elevation: 0,
               child: TextField(
+                controller: _searchCtrl,
                 decoration: InputDecoration(
                   isDense: true,
                   filled: true,
@@ -201,7 +204,10 @@ class _AssignTabState extends State<AssignTab> {
                           )
                           .toList();
 
-                      if (chores.isEmpty) {
+                      final hasAnyChores =
+                          choresList.any((c) => c.active);
+
+                      if (!hasAnyChores) {
                         return Center(
                           child: Padding(
                             padding: const EdgeInsets.all(24),
@@ -228,6 +234,38 @@ class _AssignTabState extends State<AssignTab> {
                                   textAlign: TextAlign.center,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      if (chores.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'No results for “$_q”',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 8),
+                                TextButton(
+                                  onPressed: () => setState(() {
+                                    _q = '';
+                                    _searchCtrl.clear();
+                                  }),
+                                  child: const Text(
+                                    'Clear search',
+                                    style: TextStyle(color: Colors.white),
                                   ),
                                 ),
                               ],
@@ -297,12 +335,29 @@ class _AssignTabState extends State<AssignTab> {
                                           MainAxisAlignment.center,
                                       children: [
                                         const SizedBox(height: 2),
-                                        Text(
-                                          _difficultyName(c.difficulty),
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                color: cs.onSurfaceVariant,
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 8,
+                                              height: 8,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: _difficultyColor(
+                                                  c.difficulty,
+                                                  cs,
+                                                ),
                                               ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _difficultyName(c.difficulty),
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                    color: cs.onSurfaceVariant,
+                                                  ),
+                                            ),
+                                          ],
                                         ),
                                         const SizedBox(height: 6),
                                         Wrap(
@@ -352,6 +407,15 @@ class _AssignTabState extends State<AssignTab> {
                                                   ),
                                                 );
                                               }),
+                                            if (c.requiresApproval)
+                                              Tooltip(
+                                                message: 'Requires approval',
+                                                child: Icon(
+                                                  Icons.fact_check_outlined,
+                                                  size: 14,
+                                                  color: cs.primary,
+                                                ),
+                                              ),
                                           ],
                                         ),
                                       ],
@@ -400,6 +464,16 @@ class _AssignTabState extends State<AssignTab> {
     );
   }
 
+  Color _difficultyColor(int d, ColorScheme cs) => switch (d) {
+    0 => cs.outline,
+    1 => Colors.green.shade300,
+    2 => Colors.green,
+    3 => Colors.orange,
+    4 => Colors.deepOrange,
+    5 => cs.error,
+    _ => cs.outline,
+  };
+
   String _difficultyName(int d) {
     switch (d) {
       case 0:
@@ -422,29 +496,25 @@ class _AssignTabState extends State<AssignTab> {
   Future<void> _openNewChoreSheet(BuildContext context) async {
     final app = context.read<AppState>();
     final fam = app.family!;
-    final created = await showModalBottomSheet<bool>(
+    await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (_) => ChoreEditorSheet(family: fam),
     );
-    if (!mounted) return;
-    if (created == true) {
-      setState(() {}); // refresh filters immediately so the new chore appears
-    }
+    // choresVN listener handles list update automatically
   }
 
   Future<void> _openEditChoreSheet(BuildContext context, Chore chore) async {
     final app = context.read<AppState>();
     final fam = app.family!;
-    final saved = await showModalBottomSheet<bool>(
+    await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      showDragHandle: true,
       builder: (_) => ChoreEditorSheet(family: fam, chore: chore),
     );
-    if (!mounted) return;
-    if (saved == true) {
-      setState(() {}); // refresh list
-    }
+    // choresVN listener handles list update automatically
   }
 
   void _openSchedulePage(BuildContext context, Chore chore) {

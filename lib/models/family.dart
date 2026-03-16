@@ -1,6 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'common.dart';
 
+enum SubscriptionTier { free, premium, lifetime }
+
+SubscriptionTier _tierFromString(String? value) {
+  switch (value) {
+    case 'premium':
+      return SubscriptionTier.premium;
+    case 'lifetime':
+      return SubscriptionTier.lifetime;
+    default:
+      return SubscriptionTier.free;
+  }
+}
+
 class FamilySettings {
   final Map<int, int> difficultyToXP; // 1..5 -> points
   final int dayStartHour; // 0-23
@@ -57,6 +70,9 @@ class Family {
   final DateTime? createdAt;
   final bool onboardingComplete;
   final String? parentPinHash;
+  final SubscriptionTier subscriptionTier;
+  final DateTime? subscriptionExpiresAt;
+  final DateTime? trialExpiresAt;
 
   const Family({
     required this.id,
@@ -68,7 +84,22 @@ class Family {
     this.stats = const FamilyStats(),
     this.createdAt,
     this.parentPinHash,
+    this.subscriptionTier = SubscriptionTier.free,
+    this.subscriptionExpiresAt,
+    this.trialExpiresAt,
   });
+
+  bool get isPremium {
+    if (subscriptionTier == SubscriptionTier.lifetime) return true;
+    if (subscriptionTier == SubscriptionTier.premium) {
+      return subscriptionExpiresAt == null ||
+          subscriptionExpiresAt!.isAfter(DateTime.now());
+    }
+    if (trialExpiresAt != null && trialExpiresAt!.isAfter(DateTime.now())) {
+      return true;
+    }
+    return false;
+  }
 
   Map<String, dynamic> toMap() => {
         'name': name,
@@ -79,6 +110,12 @@ class Family {
         'stats': stats.toMap(),
         'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
         'parentPinHash': parentPinHash,
+        'subscriptionTier': subscriptionTier.name,
+        'subscriptionExpiresAt': subscriptionExpiresAt == null
+            ? null
+            : Timestamp.fromDate(subscriptionExpiresAt!),
+        'trialExpiresAt':
+            trialExpiresAt == null ? null : Timestamp.fromDate(trialExpiresAt!),
       };
 
   factory Family.fromDoc(DocumentSnapshot doc) {
@@ -93,6 +130,9 @@ class Family {
       stats: FamilyStats.fromMap(data['stats'] as Map<String, dynamic>?),
       createdAt: tsAsDate(data['createdAt']),
       parentPinHash: data['parentPinHash'] as String?,
+      subscriptionTier: _tierFromString(data['subscriptionTier'] as String?),
+      subscriptionExpiresAt: tsAsDate(data['subscriptionExpiresAt']),
+      trialExpiresAt: tsAsDate(data['trialExpiresAt']),
     );
   }
 
@@ -103,9 +143,12 @@ class Family {
     'ownerUid': ownerUid,
     'onboardingComplete': onboardingComplete,
     'joinCode': joinCode,
-    'settings': settings.toMap(), // already JSON-safe
+    'settings': settings.toMap(),
     'stats': stats.toMap(),
     'createdAt': createdAt?.toIso8601String(),
+    'subscriptionTier': subscriptionTier.name,
+    'subscriptionExpiresAt': subscriptionExpiresAt?.toIso8601String(),
+    'trialExpiresAt': trialExpiresAt?.toIso8601String(),
   };
 
   factory Family.fromCacheMap(Map<String, dynamic> data) {
@@ -120,6 +163,9 @@ class Family {
       ),
       stats: FamilyStats.fromMap(data['stats'] as Map<String, dynamic>?),
       createdAt: parseIsoDateTimeOrNull(data['createdAt']),
+      subscriptionTier: _tierFromString(data['subscriptionTier'] as String?),
+      subscriptionExpiresAt: parseIsoDateTimeOrNull(data['subscriptionExpiresAt']),
+      trialExpiresAt: parseIsoDateTimeOrNull(data['trialExpiresAt']),
     );
   }
 

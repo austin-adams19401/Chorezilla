@@ -53,6 +53,8 @@ dependencies:
   intl: ^0.20.2
   image_picker: ^1.2.1
   firebase_messaging: ^16.0.4
+  purchases_flutter: ^8.7.1
+  purchases_ui_flutter: ^8.7.1
 
 dev_dependencies:
   flutter_launcher_icons: ^0.14.4

@@ -1,7 +1,9 @@
+import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/constants/default_chores.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/models/recurrance.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -28,6 +30,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   bool _busy = false;
   bool _requiresApproval = false;
   bool _bonusOnly = false;
+  bool _isFromTemplate = false;
 
   @override
   void initState() {
@@ -74,10 +77,10 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const _DragHandle(),
           SafeArea(
             top: false,
             child: SingleChildScrollView(
+              primary: false,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
                 child: Column(
@@ -140,7 +143,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
                         _title.text = chore.title;
                         _desc.text = chore.description;
                         _icon.text = chore.icon;
-                        setState(() {});
+                        setState(() => _isFromTemplate = true);
                       },
                       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
                         return TextField(
@@ -367,9 +370,11 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   }
 
   Future<void> _openEmojiPicker() async {
+    final currentIcon = _icon.text;
     final picked = await showModalBottomSheet<String>(
       context: context,
-      builder: (_) => const _EmojiPicker(),
+      showDragHandle: true,
+      builder: (_) => _EmojiPicker(selected: currentIcon),
     );
     if (picked != null && mounted) {
       setState(() => _icon.text = picked);
@@ -378,11 +383,34 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
 
   Future<void> _save() async {
     final rawTitle = _title.text.trim();
-    if (rawTitle.isEmpty) return;
+    if (rawTitle.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a chore title.')),
+      );
+      return;
+    }
 
     final title = rawTitle.length > kMaxChoreTitleLength
         ? rawTitle.substring(0, kMaxChoreTitleLength)
         : rawTitle;
+
+    // Gate: check custom chore limit for new chores that aren't from a template
+    if (widget.chore == null && !_isFromTemplate) {
+      final app = context.read<AppState>();
+      final customChoreCount =
+          app.chores.where((c) => c.isCustom).length;
+      if (!SubscriptionService.canAddCustomChore(
+        app.family,
+        customChoreCount,
+      )) {
+        if (!mounted) return;
+        await showPremiumUpgradeSheet(
+          context,
+          reason: UpgradeReason.customChores,
+        );
+        return;
+      }
+    }
 
     setState(() => _busy = true);
     try {
@@ -403,6 +431,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
           recurrence: rec,
           requiresApproval: _requiresApproval,
           bonusOnly: _bonusOnly,
+          isCustom: !_isFromTemplate,
         );
       } else {
         await app.updateChore(
@@ -420,9 +449,9 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save chore. Check your connection.')),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -483,28 +512,6 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   }
 }
 
-class _DragHandle extends StatelessWidget {
-  const _DragHandle();
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Container(
-          width: 36,
-          height: 4,
-          decoration: BoxDecoration(
-            color: cs.onSurfaceVariant.withValues(alpha: 0.4),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _XpBadge extends StatelessWidget {
   const _XpBadge({required this.xp, required this.isReminder});
   final int xp;
@@ -543,7 +550,8 @@ class _XpBadge extends StatelessWidget {
 }
 
 class _EmojiPicker extends StatelessWidget {
-  const _EmojiPicker();
+  const _EmojiPicker({this.selected});
+  final String? selected;
 
   static const _emojis = [
     // Cleaning
@@ -576,7 +584,6 @@ class _EmojiPicker extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const _DragHandle(),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Align(
@@ -592,6 +599,7 @@ class _EmojiPicker extends StatelessWidget {
             child: SizedBox(
               height: 380,
               child: GridView.builder(
+                primary: false,
                 itemCount: _emojis.length,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 5,
@@ -600,14 +608,20 @@ class _EmojiPicker extends StatelessWidget {
                 ),
                 itemBuilder: (_, i) {
                   final e = _emojis[i];
+                  final isSelected = e == selected;
                   return InkWell(
                     onTap: () => Navigator.of(context).pop(e),
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: cs.surfaceContainerHighest,
+                        color: isSelected
+                            ? cs.primaryContainer
+                            : cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
+                        border: isSelected
+                            ? Border.all(color: cs.primary, width: 2)
+                            : null,
                       ),
                       child: Text(e, style: const TextStyle(fontSize: 28)),
                     ),

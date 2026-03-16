@@ -25,6 +25,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 //App State
 import 'package:chorezilla/state/app_state.dart';
+import 'package:chorezilla/services/purchase_service.dart';
 
 /// 🔔 FCM background handler
 /// Must be a top-level function.
@@ -40,6 +41,9 @@ Future<void> main() async {
 
   // Register background handler for FCM
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Initialize RevenueCat (anonymous until user signs in)
+  await PurchaseService.init();
 
   final repo = ChorezillaRepo(firebaseDB: FirebaseFirestore.instance);
   final auth = FirebaseAuth.instance;

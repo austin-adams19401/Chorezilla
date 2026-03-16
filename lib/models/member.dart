@@ -37,6 +37,7 @@ class Member {
   final String? equippedAvatarFrameId;
   final String? equippedZillaSkinId;
   final String? equippedTitleId;
+  final List<String> unlockedAnimations;
 
   const Member({
     required this.id,
@@ -65,6 +66,7 @@ class Member {
     this.equippedAvatarFrameId,
     this.equippedZillaSkinId,
     this.equippedTitleId,
+    this.unlockedAnimations = const [],
     this.allowBonusChores = true,
   });
 
@@ -94,6 +96,7 @@ class Member {
     String? equippedAvatarFrameId,
     String? equippedZillaSkinId,
     String? equippedTitleId,
+    List<String>? unlockedAnimations,
     bool? allowBonusChores,
   }) => Member(
     id: id,
@@ -124,6 +127,7 @@ class Member {
     equippedAvatarFrameId: equippedAvatarFrameId ?? this.equippedAvatarFrameId,
     equippedZillaSkinId: equippedZillaSkinId ?? this.equippedZillaSkinId,
     equippedTitleId: equippedTitleId ?? this.equippedTitleId,
+    unlockedAnimations: unlockedAnimations ?? this.unlockedAnimations,
     allowBonusChores: allowBonusChores ?? this.allowBonusChores,
   );
 
@@ -159,6 +163,7 @@ class Member {
     'equippedAvatarFrameId': equippedAvatarFrameId,
     'equippedZillaSkinId': equippedZillaSkinId,
     'equippedTitleId': equippedTitleId,
+    'unlockedAnimations': unlockedAnimations,
     'allowBonusChores': allowBonusChores,
   };
 
@@ -199,6 +204,11 @@ class Member {
       equippedAvatarFrameId: data['equippedAvatarFrameId'] as String?,
       equippedZillaSkinId: data['equippedZillaSkinId'] as String?,
       equippedTitleId: data['equippedTitleId'] as String?,
+      unlockedAnimations:
+          (data['unlockedAnimations'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
     );
   }
@@ -231,6 +241,7 @@ class Member {
     'equippedAvatarFrameId': equippedAvatarFrameId,
     'equippedZillaSkinId': equippedZillaSkinId,
     'equippedTitleId': equippedTitleId,
+    'unlockedAnimations': unlockedAnimations,
     'allowBonusChores': allowBonusChores,
   };
 
@@ -272,6 +283,11 @@ class Member {
       equippedAvatarFrameId: data['equippedAvatarFrameId'] as String?,
       equippedZillaSkinId: data['equippedZillaSkinId'] as String?,
       equippedTitleId: data['equippedTitleId'] as String?,
+      unlockedAnimations:
+          (data['unlockedAnimations'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
     );
   }

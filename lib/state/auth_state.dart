@@ -73,6 +73,7 @@ extension AppStateAuth on AppState {
   Future<void> _getDataForUser(User u) async {
     // 1) Ensure profile exists & fetch it
     debugPrint('_getDataForUser: ${u.email} - ${u.displayName}');
+    PurchaseService.logIn(u.uid).ignore(); // link RevenueCat to Firebase UID
     final profile = await repo.checkForUserProfile(
       u.uid,
       displayName: u.displayName,

@@ -1,3 +1,5 @@
+import 'package:chorezilla/components/premium_upgrade_sheet.dart';
+import 'package:chorezilla/components/zilla_level_up_hero.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_weekly_overview_page.dart';
@@ -194,6 +196,72 @@ final summaries = <_KidTodaySummary>[];
                   ),
                 );
               },
+            ),
+
+            // DEBUG buttons — remove before release
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              child: Row(
+                children: [
+                  const Text(
+                    'DEBUG:',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => showPremiumUpgradeSheet(
+                      context,
+                      reason: UpgradeReason.addKid,
+                    ),
+                    icon: const Icon(Icons.workspace_premium, size: 16),
+                    label: const Text('Paywall'),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      foregroundColor: Colors.deepOrange,
+                      side: const BorderSide(color: Colors.deepOrange),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (dialogCtx) => AlertDialog(
+                        scrollable: false,
+                        title: const Text('Level up!'),
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            SizedBox(height: 8),
+                            ZillaLevelUpHero(size: 96),
+                            SizedBox(height: 16),
+                            Text(
+                              'Debug Kid reached Level 5!',
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(dialogCtx).pop(),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    icon: const Icon(Icons.trending_up, size: 16),
+                    label: const Text('Level Up'),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      foregroundColor: Colors.purple,
+                      side: const BorderSide(color: Colors.purple),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             Expanded(

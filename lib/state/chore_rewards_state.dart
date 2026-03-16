@@ -50,6 +50,7 @@ extension AppStateWrites on AppState {
     Recurrence? recurrence,
     bool requiresApproval = true,
     bool bonusOnly = false,
+    bool isCustom = true,
   }) async {
     final famId = _familyId!;
     final db = FirebaseFirestore.instance;
@@ -73,6 +74,7 @@ extension AppStateWrites on AppState {
       'recurrence': recurrence?.toMap(),
       'requiresApproval': requiresApproval,
       'bonusOnly': bonusOnly,
+      'isCustom': isCustom,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));

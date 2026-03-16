@@ -6,6 +6,63 @@ admin.initializeApp({
 });
 const db = admin.firestore();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared FCM helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Collect FCM tokens for all parents in a family who have notifications on. */
+async function getParentTokens(familyId) {
+    const membersSnap = await db
+        .collection("families")
+        .doc(familyId)
+        .collection("members")
+        .where("role", "in", ["parent"])
+        .get();
+
+    const tokens = [];
+    membersSnap.forEach((doc) => {
+        const data = doc.data();
+        if (data.notificationsEnabled === false) return;
+        const memberTokens = data.fcmTokens;
+        if (Array.isArray(memberTokens)) {
+            memberTokens.forEach((t) => {
+                if (typeof t === "string" && t.length > 0) tokens.push(t);
+            });
+        }
+    });
+    return tokens;
+}
+
+/** Send a multicast FCM message and log results. */
+async function sendMulticast(message) {
+    try {
+        const response = await admin.messaging().sendEachForMulticast(message);
+        console.log(
+            `FCM sendEachForMulticast: success=${response.successCount}, failure=${response.failureCount}`
+        );
+        if (response.failureCount > 0) {
+            const errors = [];
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    errors.push({
+                        token: message.tokens[idx],
+                        code: resp.error && resp.error.code,
+                        message: resp.error && resp.error.message,
+                    });
+                }
+            });
+            console.log("FCM failures:", JSON.stringify(errors, null, 2));
+        }
+    } catch (err) {
+        console.error("Error sending FCM notification:", {
+            message: err.message,
+            code: err.code,
+            stack: err.stack,
+        });
+    }
+    return null;
+}
+
 // Helper: random code like "A7G9JK2Q"
 function randomCode(len = 8) {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -248,40 +305,13 @@ exports.notifyOnAssignmentCompleted = functions
             notifBody = `${kidName} left a note on "${choreTitle}".`;
         }
 
-        const membersSnap = await db
-            .collection("families")
-            .doc(familyId)
-            .collection("members")
-            .where("role", "in", ["parent"])
-            .get();
+        console.log(`Found tokens for family ${familyId}`);
 
-        const tokens = [];
-
-        membersSnap.forEach((doc) => {
-            const data = doc.data();
-
-            // NEW: respect notificationsEnabled (default: true)
-            const enabled = data.notificationsEnabled;
-            const wantsNotifications = enabled !== false; // undefined or true ⇒ ON
-            if (!wantsNotifications) {
-                return; // skip this parent
-            }
-
-            const memberTokens = data.fcmTokens;
-            if (Array.isArray(memberTokens)) {
-                memberTokens.forEach((t) => {
-                    if (typeof t === "string" && t.length > 0) {
-                        tokens.push(t);
-                    }
-                });
-            }
-        });
-
-        console.log(`Found ${tokens.length} parent tokens.`);
+        const tokens = await getParentTokens(familyId);
         if (tokens.length === 0) return null;
 
-        const multicastMessage = {
-            tokens, // array of registration tokens
+        return sendMulticast({
+            tokens,
             notification: {
                 title: notifTitle,
                 body: notifBody,
@@ -291,40 +321,96 @@ exports.notifyOnAssignmentCompleted = functions
                 familyId,
                 assignmentId,
             },
-        };
+        });
+    });
 
-        try {
-            const response = await admin
-                .messaging()
-                .sendEachForMulticast(multicastMessage);
-            console.log(
-                `FCM sendEachForMulticast: success=${response.successCount}, failure=${response.failureCount}`
-            );
+exports.notifyOnRewardPurchased = functions
+    .region("us-central1")
+    .firestore.document("families/{familyId}/rewardRedemptions/{redemptionId}")
+    .onCreate(async (snap, context) => {
+        const data = snap.data() || {};
+        const familyId = context.params.familyId;
+        const redemptionId = context.params.redemptionId;
 
-            if (response.failureCount > 0) {
-                const errors = [];
-                response.responses.forEach((resp, idx) => {
-                    if (!resp.success) {
-                        errors.push({
-                            token: tokens[idx],
-                            code: resp.error?.code,
-                            message: resp.error?.message,
-                            details: resp.error?.details,
-                        });
-                    }
-                });
-                console.log("FCM failures:", JSON.stringify(errors, null, 2));
-            }
-
-        } catch (err) {
-            console.error("Error sending FCM notification:", {
-                message: err.message,
-                code: err.code,
-                stack: err.stack,
-                errorInfo: err.errorInfo,
-                details: err.details,
-            });
+        // Level-up rewards and allowances are handled separately or don't need
+        // a purchase notification.
+        if (data.source === "levelUp" || data.type === "allowance") {
+            return null;
         }
 
-        return null;
+        const memberId = data.memberId;
+        if (!memberId) return null;
+
+        const memberSnap = await db
+            .collection("families")
+            .doc(familyId)
+            .collection("members")
+            .doc(memberId)
+            .get();
+
+        if (!memberSnap.exists) return null;
+        const member = memberSnap.data();
+        const kidName = member.name || "Your kid";
+        const rewardName = data.rewardName || "a reward";
+        const coinCost = (data.coinCost || 0);
+
+        const notifTitle = "🎁 Reward redeemed!";
+        const notifBody = coinCost > 0
+            ? `${kidName} spent ${coinCost} coins on "${rewardName}".`
+            : `${kidName} redeemed "${rewardName}".`;
+
+        console.log("notifyOnRewardPurchased:", { familyId, redemptionId, kidName, rewardName });
+
+        const tokens = await getParentTokens(familyId);
+        if (tokens.length === 0) return null;
+
+        return sendMulticast({
+            tokens,
+            notification: { title: notifTitle, body: notifBody },
+            data: {
+                type: "reward_redeemed",
+                familyId,
+                memberId,
+                redemptionId,
+            },
+        });
+    });
+
+exports.notifyOnMemberLevelUp = functions
+    .region("us-central1")
+    .firestore.document("families/{familyId}/members/{memberId}")
+    .onUpdate(async (change, context) => {
+        const before = change.before.data() || {};
+        const after = change.after.data() || {};
+        const familyId = context.params.familyId;
+        const memberId = context.params.memberId;
+
+        // Only care about kids
+        if (after.role !== "kid") return null;
+
+        const beforeLevel = typeof before.level === "number" ? before.level : 1;
+        const afterLevel = typeof after.level === "number" ? after.level : 1;
+
+        if (afterLevel <= beforeLevel) return null;
+
+        const kidName = after.name || "Your kid";
+
+        console.log("notifyOnMemberLevelUp:", { familyId, memberId, beforeLevel, afterLevel });
+
+        const tokens = await getParentTokens(familyId);
+        if (tokens.length === 0) return null;
+
+        return sendMulticast({
+            tokens,
+            notification: {
+                title: "⭐ Level up!",
+                body: `${kidName} reached Level ${afterLevel}!`,
+            },
+            data: {
+                type: "level_up",
+                familyId,
+                memberId,
+                level: String(afterLevel),
+            },
+        });
     });

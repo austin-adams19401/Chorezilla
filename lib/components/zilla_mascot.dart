@@ -5,10 +5,13 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:chorezilla/components/sprite_sheet_animation.dart';
+import 'package:chorezilla/models/zilla_animations.dart';
 
-/// An animated Zilla mascot widget that plays the walk cycle sprite sheet.
+/// An animated Zilla mascot widget.
+///
+/// Cycles through [availableAnimations] (defaults to the free set if omitted).
 /// Tapping triggers a quick pop/scale animation.
-/// Pass [skinId] to tint the mascot based on equipped Zilla skin.
+/// Pass [skinId] to tint the mascot based on the equipped Zilla skin.
 class ZillaMascot extends StatefulWidget {
   const ZillaMascot({
     super.key,
@@ -16,12 +19,16 @@ class ZillaMascot extends StatefulWidget {
     this.size = 72,
     this.onTap,
     this.animate = true,
+    this.availableAnimations,
   });
 
   final String? skinId;
   final double size;
   final VoidCallback? onTap;
   final bool animate;
+
+  /// The animations this kid has access to. Null = free tier defaults.
+  final List<ZillaAnimationDef>? availableAnimations;
 
   @override
   State<ZillaMascot> createState() => _ZillaMascotState();
@@ -30,6 +37,8 @@ class ZillaMascot extends StatefulWidget {
 class _ZillaMascotState extends State<ZillaMascot>
     with SingleTickerProviderStateMixin {
   late final AnimationController _popController;
+  final _rng = math.Random();
+  int _animIndex = 0;
 
   // Map skin IDs to tint colors. Default (null / classic) = no tint.
   static const _skinTints = <String, Color>{
@@ -39,6 +48,18 @@ class _ZillaMascotState extends State<ZillaMascot>
     'zilla_wizard': Color(0xFF1A237E),
   };
 
+  List<ZillaAnimationDef> get _animations {
+    final provided = widget.availableAnimations;
+    if (provided != null && provided.isNotEmpty) return provided;
+    return ZillaAnimations.freeAnimationIds
+        .map((id) => ZillaAnimations.byId(id))
+        .whereType<ZillaAnimationDef>()
+        .toList();
+  }
+
+  ZillaAnimationDef get _current =>
+      _animations[_animIndex % _animations.length];
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +67,11 @@ class _ZillaMascotState extends State<ZillaMascot>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    // Start on a random animation so multiple mascots on screen feel varied.
+    final anims = _animations;
+    if (anims.length > 1) {
+      _animIndex = _rng.nextInt(anims.length);
+    }
   }
 
   @override
@@ -59,23 +85,33 @@ class _ZillaMascotState extends State<ZillaMascot>
     widget.onTap?.call();
   }
 
+  void _onAnimationComplete() {
+    if (!mounted) return;
+    setState(() {
+      _animIndex = (_animIndex + 1) % _animations.length;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final anim = _current;
     final tintColor = _skinTints[widget.skinId];
 
     Widget sprite = SpriteSheetAnimation(
-      assetPath: 'assets/icons/mascot/sprite-sheets/walking.png',
+      key: ValueKey(anim.id),
+      assetPath: anim.assetPath,
       size: widget.size,
-      columns: 6,
-      rows: 6,
-      totalDuration: const Duration(milliseconds: 1200),
-      loop: widget.animate,
+      columns: anim.columns,
+      rows: anim.rows,
+      totalDuration: anim.duration,
+      loop: false,
+      onComplete: widget.animate ? _onAnimationComplete : null,
     );
 
     if (tintColor != null) {
       sprite = ColorFiltered(
         colorFilter: ColorFilter.mode(
-          tintColor.withOpacity(0.30),
+          tintColor.withValues(alpha: 0.30),
           BlendMode.srcATop,
         ),
         child: sprite,
@@ -87,7 +123,8 @@ class _ZillaMascotState extends State<ZillaMascot>
       child: AnimatedBuilder(
         animation: _popController,
         builder: (context, child) {
-          final popScale = 1.0 + math.sin(_popController.value * math.pi) * 0.25;
+          final popScale =
+              1.0 + math.sin(_popController.value * math.pi) * 0.25;
           return Transform.scale(scale: popScale, child: child);
         },
         child: sprite,

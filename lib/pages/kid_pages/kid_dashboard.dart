@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:chorezilla/components/badge_unlock_dialog.dart';
-import 'package:chorezilla/components/sprite_sheet_animation.dart';
 import 'package:chorezilla/components/leveling.dart';
+import 'package:chorezilla/models/zilla_animations.dart';
 import 'package:chorezilla/components/profile_header.dart';
 import 'package:chorezilla/components/zilla_level_up_hero.dart';
 import 'package:chorezilla/models/badge.dart';
@@ -50,7 +50,8 @@ class _KidDashboardPageState extends State<KidDashboardPage>
   bool _celebrationActive = false;
   bool _showConfetti = false;
 
-  bool _choreCompletedFlash = false;
+  late final ConfettiController _choreConfettiController;
+  bool _showChoreConfetti = false;
 
   // image picker for photo proof
   final ImagePicker _imagePicker = ImagePicker();
@@ -68,6 +69,9 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
     _confettiController = ConfettiController(
       duration: const Duration(seconds: 5),
+    );
+    _choreConfettiController = ConfettiController(
+      duration: const Duration(seconds: 2),
     );
 
     // Bind streams once the widget is in the tree
@@ -102,6 +106,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
       _app.stopKidStreams(_watchingMemberId!);
     }
     _confettiController.dispose();
+    _choreConfettiController.dispose();
     super.dispose();
   }
 
@@ -531,19 +536,19 @@ class _KidDashboardPageState extends State<KidDashboardPage>
             ],
           ),
 
-          // Chore completion celebration flash
-          if (_choreCompletedFlash)
+          // Chore completion confetti
+          if (_showChoreConfetti)
             Positioned.fill(
               child: IgnorePointer(
-                child: Center(
-                  child: SpriteSheetAnimation(
-                    assetPath:
-                        'assets/icons/mascot/sprite-sheets/celebrate.png',
-                    size: 200,
-                    columns: 6,
-                    rows: 6,
-                    totalDuration: const Duration(milliseconds: 2000),
-                    loop: false,
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConfettiWidget(
+                    confettiController: _choreConfettiController,
+                    blastDirectionality: BlastDirectionality.explosive,
+                    shouldLoop: false,
+                    emissionFrequency: 0.08,
+                    numberOfParticles: 20,
+                    gravity: 0.4,
                   ),
                 ),
               ),
@@ -678,9 +683,10 @@ class _KidDashboardPageState extends State<KidDashboardPage>
       }
 
       if (mounted) {
-        setState(() => _choreCompletedFlash = true);
+        setState(() => _showChoreConfetti = true);
+        _choreConfettiController.play();
         Future.delayed(const Duration(milliseconds: 2500), () {
-          if (mounted) setState(() => _choreCompletedFlash = false);
+          if (mounted) setState(() => _showChoreConfetti = false);
         });
       }
     } catch (e) {
@@ -759,6 +765,20 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     if (!simulate) {
       final app = context.read<AppState>();
       app.updateMember(member.id, {'level': info.level});
+
+      // Unlock a Zilla animation for premium families at this level.
+      final animUnlock = ZillaAnimations.unlockForLevel(info.level);
+      if (animUnlock != null &&
+          (app.family?.isPremium ?? false) &&
+          !member.unlockedAnimations.contains(animUnlock)) {
+        try {
+          final updated = List<String>.from(member.unlockedAnimations)
+            ..add(animUnlock);
+          app.updateMember(member.id, {'unlockedAnimations': updated});
+        } catch (_) {
+          // ignore
+        }
+      }
 
       if (lvlReward != null) {
         try {

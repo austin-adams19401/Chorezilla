@@ -14,6 +14,7 @@ class Chore {
   final List<String> defaultAssignees;
   final bool requiresApproval;
   final bool bonusOnly;
+  final bool isCustom;
 
   const Chore({
     required this.id,
@@ -25,8 +26,9 @@ class Chore {
     required this.active,
     this.recurrence,
     this.defaultAssignees = const [],
-    this.requiresApproval = false, 
+    this.requiresApproval = false,
     this.bonusOnly = false,
+    this.isCustom = true,
   });
 
   factory Chore.fromDoc(DocumentSnapshot d) {
@@ -47,6 +49,7 @@ class Chore {
           const [],
       requiresApproval: (m['requiresApproval'] as bool?) ?? false,
       bonusOnly: (m['bonusOnly'] as bool?) ?? false,
+      isCustom: (m['isCustom'] as bool?) ?? true,
     );
   }
 
@@ -61,6 +64,7 @@ class Chore {
     'defaultAssignees': defaultAssignees,
     'requiresApproval': requiresApproval,
     'bonusOnly': bonusOnly,
+    'isCustom': isCustom,
   };
 
     // --- Local cache mapping ---

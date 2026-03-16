@@ -72,6 +72,7 @@ extension RewardRepo on ChorezillaRepo {
     String? icon,
     required int coinCost,
     required RewardCategory category,
+    int? stock,
   }) async {
     final db = FirebaseFirestore.instance;
     final ref = db
@@ -86,6 +87,7 @@ extension RewardRepo on ChorezillaRepo {
       'icon': icon, // ok if null
       'coinCost': coinCost,
       'category': category.name, // assumes you store as string enum name
+      'stock': stock, // null = unlimited
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }

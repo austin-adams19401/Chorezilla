@@ -1,6 +1,7 @@
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
 import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
+import 'package:chorezilla/services/purchase_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -205,6 +206,29 @@ class ParentDrawer extends StatelessWidget {
                 _showRedeemCodeDialog(context);
               },
             ),
+            const Divider(height: 24),
+
+            // ── Subscription ────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Text(
+                'Subscription',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.workspace_premium_rounded),
+              title: const Text('Manage subscription'),
+              subtitle: const Text('View, change, or cancel your plan'),
+              onTap: () async {
+                Navigator.of(context).pop();
+                await PurchaseService.presentCustomerCenter();
+              },
+            ),
+
             const Divider(height: 24),
 
             // ── Sign out ───────────────────────────────────────────────────

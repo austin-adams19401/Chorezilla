@@ -363,7 +363,10 @@ class _KidHeroHeader extends StatelessWidget {
           fit: BoxFit.cover,
         ),
       ),
-      child: _CyclingMascot(skinId: m.equippedZillaSkinId),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: _CyclingMascot(skinId: m.equippedZillaSkinId),
+      ),
     );
   }
 }
@@ -789,6 +792,7 @@ class _CyclingMascotState extends State<_CyclingMascot>
 
   _MascotPhase _phase = _MascotPhase.idle;
   bool _facingRight = true;
+  bool _resumeWalkAfterPoke = false;
 
   // Bag of stationary phases — shuffled and consumed, refilled when empty.
   final _bag = <_MascotPhase>[];
@@ -805,15 +809,15 @@ class _CyclingMascotState extends State<_CyclingMascot>
 
   // Sprite loop duration for each phase
   static const _spriteDuration = <_MascotPhase, Duration>{
-    _MascotPhase.idle:     Duration(milliseconds: 2800),
-    _MascotPhase.sweeping: Duration(milliseconds: 1800),
-    _MascotPhase.looking:  Duration(milliseconds: 2000),
-    _MascotPhase.wiping:   Duration(milliseconds: 1800),
-    _MascotPhase.sitting:  Duration(milliseconds: 2000),
-    _MascotPhase.poked:    Duration(milliseconds: 1600),
-    _MascotPhase.sleeping: Duration(milliseconds: 3200),
-    _MascotPhase.wave:     Duration(milliseconds: 1800),
-    _MascotPhase.walking:  Duration(milliseconds: 2000),
+    _MascotPhase.idle:     Duration(milliseconds: 3500),
+    _MascotPhase.sweeping: Duration(milliseconds: 2250),
+    _MascotPhase.looking:  Duration(milliseconds: 2500),
+    _MascotPhase.wiping:   Duration(milliseconds: 2250),
+    _MascotPhase.sitting:  Duration(milliseconds: 2500),
+    _MascotPhase.poked:    Duration(milliseconds: 2000),
+    _MascotPhase.sleeping: Duration(milliseconds: 4000),
+    _MascotPhase.wave:     Duration(milliseconds: 2250),
+    _MascotPhase.walking:  Duration(milliseconds: 2500),
   };
 
   // How long to hold each stationary phase (seconds)
@@ -885,12 +889,20 @@ class _CyclingMascotState extends State<_CyclingMascot>
 
   void _pokeMascot() {
     if (!mounted) return;
-    // Cancel any in-progress phase and play poked once.
     _phaseTimer?.cancel();
+    // If poked while walking, stop movement and resume walk after poke.
+    _resumeWalkAfterPoke = _phase == _MascotPhase.walking;
+    if (_resumeWalkAfterPoke) _posCtrl.stop();
     setState(() => _phase = _MascotPhase.poked);
     _spriteCtrl.duration = _spriteDuration[_MascotPhase.poked]!;
     _spriteCtrl.forward(from: 0).whenCompleteOrCancel(() {
-      if (mounted) _advanceSequence();
+      if (!mounted) return;
+      if (_resumeWalkAfterPoke) {
+        _resumeWalkAfterPoke = false;
+        _startPhase(_MascotPhase.walking);
+      } else {
+        _advanceSequence();
+      }
     });
   }
 
@@ -956,7 +968,7 @@ class _CyclingMascotState extends State<_CyclingMascot>
       child: LayoutBuilder(
       builder: (context, constraints) {
         final panelWidth = constraints.maxWidth;
-        final spriteSize = constraints.maxHeight; // fill parent height
+        final spriteSize = constraints.maxHeight * 0.5; // half parent height
 
         return AnimatedBuilder(
           animation: Listenable.merge([_spriteCtrl, _posCtrl]),

@@ -19,7 +19,7 @@ class _ApproveTabState extends State<ApproveTab> {
 
   @override
   Widget build(BuildContext context) {
-    final app = context.watch<AppState>();
+    final app = context.read<AppState>();
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
@@ -170,7 +170,9 @@ class _ApproveTabState extends State<ApproveTab> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    'Completed by $kidName',
+                                    chore == null
+                                        ? 'This chore no longer exists.'
+                                        : 'Completed by $kidName',
                                     style: ts.bodyMedium?.copyWith(
                                       color: cs.onSurfaceVariant,
                                     ),
@@ -249,50 +251,71 @@ class _ApproveTabState extends State<ApproveTab> {
                                   ],
 
                                   const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: FilledButton(
-                                          onPressed: isBusy
-                                              ? null
-                                              : () => _approveAssignment(a),
-                                          child: isBusy
-                                              ? const SizedBox(
-                                                  width: 18,
-                                                  height: 18,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                      ),
-                                                )
-                                              : const Text('Approve'),
-                                        ),
+                                  if (chore == null)
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: FilledButton.tonal(
+                                        onPressed: isBusy
+                                            ? null
+                                            : () => _rejectAssignment(a),
+                                        child: isBusy
+                                            ? const SizedBox(
+                                                width: 18,
+                                                height: 18,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                    ),
+                                              )
+                                            : const Text('Dismiss'),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: FilledButton.tonal(
-                                          style: FilledButton.styleFrom(
-                                            backgroundColor: cs.errorContainer,
-                                            foregroundColor:
-                                                cs.onErrorContainer,
+                                    )
+                                  else
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: FilledButton(
+                                            onPressed: isBusy
+                                                ? null
+                                                : () => _approveAssignment(a),
+                                            child: isBusy
+                                                ? const SizedBox(
+                                                    width: 18,
+                                                    height: 18,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : const Text('Approve'),
                                           ),
-                                          onPressed: isBusy
-                                              ? null
-                                              : () => _rejectAssignment(a),
-                                          child: isBusy
-                                              ? const SizedBox(
-                                                  width: 18,
-                                                  height: 18,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                      ),
-                                                )
-                                              : const Text('Reject'),
                                         ),
-                                      ),
-                                    ],
-                                  ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: FilledButton.tonal(
+                                            style: FilledButton.styleFrom(
+                                              backgroundColor:
+                                                  cs.errorContainer,
+                                              foregroundColor:
+                                                  cs.onErrorContainer,
+                                            ),
+                                            onPressed: isBusy
+                                                ? null
+                                                : () => _rejectAssignment(a),
+                                            child: isBusy
+                                                ? const SizedBox(
+                                                    width: 18,
+                                                    height: 18,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : const Text('Reject'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                 ],
                               ),
                             ),
