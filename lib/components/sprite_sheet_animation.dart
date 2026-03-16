@@ -136,7 +136,18 @@ class _SpritePainter extends CustomPainter {
       frameWidth,
       frameHeight,
     );
-    final dst = Rect.fromLTWH(0, 0, size.width, size.height);
+
+    // Maintain the source frame's aspect ratio within the destination square.
+    final frameAspect = frameWidth / frameHeight;
+    final dstAspect = size.width / size.height;
+    final Rect dst;
+    if (frameAspect > dstAspect) {
+      final h = size.width / frameAspect;
+      dst = Rect.fromLTWH(0, (size.height - h) / 2, size.width, h);
+    } else {
+      final w = size.height * frameAspect;
+      dst = Rect.fromLTWH((size.width - w) / 2, 0, w, size.height);
+    }
 
     canvas.drawImageRect(image, src, dst, Paint());
   }

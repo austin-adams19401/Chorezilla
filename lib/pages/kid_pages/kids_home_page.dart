@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/models/badge.dart';
 
 class KidsHomePage extends StatelessWidget {
   const KidsHomePage({super.key});
@@ -47,7 +48,7 @@ class KidsHomePage extends StatelessWidget {
               }
 
               // Slightly different aspect ratio on bigger screens
-              final childAspectRatio = width < 600 ? 3 / 4 : 4 / 5;
+              final childAspectRatio = width < 600 ? 0.65 : 0.72;
 
               final theme = Theme.of(context);
               final cs = theme.colorScheme;
@@ -477,6 +478,14 @@ class _KidCard extends StatelessWidget {
                     color: cs.onSecondary
                   ),
                 ),
+                if (member.currentStreak > 0) ...[
+                  const SizedBox(height: 4),
+                  _StreakChip(streak: member.currentStreak),
+                ],
+                if (member.badges.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  _BadgeRow(badgeIds: member.badges),
+                ],
               ],
             );
           },
@@ -555,4 +564,68 @@ String _initialsFor(String name) {
     return parts.first.substring(0, 1).toUpperCase();
   }
   return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
+}
+
+class _StreakChip extends StatelessWidget {
+  const _StreakChip({required this.streak});
+  final int streak;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .20),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '🔥 $streak',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+// Badge priority: most impressive badge first.
+const _badgePriority = [
+  'streak_30_days',
+  'streak_14_days',
+  'streak_7_days',
+  'streak_3_days',
+  'chores_100',
+  'chores_50',
+  'chores_25',
+  'chores_10',
+  'chores_1',
+];
+
+class _BadgeRow extends StatelessWidget {
+  const _BadgeRow({required this.badgeIds});
+  final List<String> badgeIds;
+
+  @override
+  Widget build(BuildContext context) {
+    final earned = _badgePriority
+        .where((id) => badgeIds.contains(id))
+        .map((id) => BadgeCatalog.byId(id))
+        .whereType<BadgeDefinition>()
+        .take(3)
+        .toList();
+
+    if (earned.isEmpty) return const SizedBox.shrink();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: earned
+          .map((b) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Text(b.icon, style: const TextStyle(fontSize: 16)),
+              ))
+          .toList(),
+    );
+  }
 }

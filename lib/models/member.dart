@@ -31,6 +31,7 @@ class Member {
   final int currentStreak;
   final int longestStreak;
   final DateTime? lastActiveDate;
+  final int totalChoresCompleted;
 
   final List<String> ownedCosmetics;
   final String? equippedBackgroundId;
@@ -61,6 +62,7 @@ class Member {
     this.currentStreak = 0,
     this.longestStreak = 0,
     this.lastActiveDate,
+    this.totalChoresCompleted = 0,
     this.ownedCosmetics = const [],
     this.equippedBackgroundId,
     this.equippedAvatarFrameId,
@@ -91,6 +93,7 @@ class Member {
     int? currentStreak,
     int? longestStreak,
     DateTime? lastActiveDate,
+    int? totalChoresCompleted,
     List<String>? ownedCosmetics,
     String? equippedBackgroundId,
     String? equippedAvatarFrameId,
@@ -121,7 +124,8 @@ class Member {
         notificationsEnabled ?? this.notificationsEnabled, 
     currentStreak: currentStreak ?? this.currentStreak,
     longestStreak: longestStreak ?? this.longestStreak,
-    lastActiveDate: lastActiveDate ?? this.lastActiveDate, 
+    lastActiveDate: lastActiveDate ?? this.lastActiveDate,
+    totalChoresCompleted: totalChoresCompleted ?? this.totalChoresCompleted,
     ownedCosmetics: ownedCosmetics ?? this.ownedCosmetics,
     equippedBackgroundId: equippedBackgroundId ?? this.equippedBackgroundId,
     equippedAvatarFrameId: equippedAvatarFrameId ?? this.equippedAvatarFrameId,
@@ -156,7 +160,8 @@ class Member {
     'longestStreak': longestStreak,
     'lastActiveDate': lastActiveDate == null
         ? null
-        : Timestamp.fromDate(lastActiveDate!), 
+        : Timestamp.fromDate(lastActiveDate!),
+    'totalChoresCompleted': totalChoresCompleted,
 
     'ownedCosmetics': ownedCosmetics,
     'equippedBackgroundId': equippedBackgroundId,
@@ -194,7 +199,8 @@ class Member {
       notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true,
       currentStreak: (data['currentStreak'] as num?)?.toInt() ?? 0,
       longestStreak: (data['longestStreak'] as num?)?.toInt() ?? 0,
-      lastActiveDate: tsAsDate(data['lastActiveDate']), // 👈 NEW
+      lastActiveDate: tsAsDate(data['lastActiveDate']),
+      totalChoresCompleted: (data['totalChoresCompleted'] as num?)?.toInt() ?? 0,
       ownedCosmetics:
           (data['ownedCosmetics'] as List?)
               ?.map((e) => e.toString())
@@ -235,7 +241,8 @@ class Member {
     'notificationsEnabled': notificationsEnabled,
     'currentStreak': currentStreak,
     'longestStreak': longestStreak,
-    'lastActiveDate': lastActiveDate?.toIso8601String(), // 👈 NEW
+    'lastActiveDate': lastActiveDate?.toIso8601String(),
+    'totalChoresCompleted': totalChoresCompleted,
     'ownedCosmetics': ownedCosmetics,
     'equippedBackgroundId': equippedBackgroundId,
     'equippedAvatarFrameId': equippedAvatarFrameId,
@@ -273,7 +280,8 @@ class Member {
       notificationsEnabled: (data['notificationsEnabled'] as bool?) ?? true,
       currentStreak: (data['currentStreak'] as num?)?.toInt() ?? 0,
       longestStreak: (data['longestStreak'] as num?)?.toInt() ?? 0,
-      lastActiveDate: parseIsoDateTimeOrNull(data['lastActiveDate']), // 👈 NEW
+      lastActiveDate: parseIsoDateTimeOrNull(data['lastActiveDate']),
+      totalChoresCompleted: (data['totalChoresCompleted'] as num?)?.toInt() ?? 0,
       ownedCosmetics:
           (data['ownedCosmetics'] as List?)
               ?.map((e) => e.toString())

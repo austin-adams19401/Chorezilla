@@ -229,6 +229,10 @@ class AppState extends ChangeNotifier {
   StreamSubscription<List<Assignment>>? _familyAssignedSub;
   StreamSubscription<List<Assignment>>? _missedSub;
   StreamSubscription<List<Assignment>>? _historyAssignmentsSub;
+  StreamSubscription<List<Assignment>>? _monthRangeAssignmentsSub;
+  List<Assignment> _monthRangeAssignments = const [];
+  DateTime? _monthRangeStart;
+  DateTime? _monthRangeEnd;
   StreamSubscription<List<Reward>>? _rewardsSub;
   StreamSubscription<List<RewardRedemption>>? _pendingRewardsSub;
   StreamSubscription<List<ChoreMemberSchedule>>? _schedulesSub;
@@ -288,13 +292,16 @@ class AppState extends ChangeNotifier {
     await _familyAssignedSub?.cancel();
     await _missedSub?.cancel();
     await _historyAssignmentsSub?.cancel();
+    await _monthRangeAssignmentsSub?.cancel();
     await _rewardsSub?.cancel();
     await _pendingRewardsSub?.cancel();
     await _schedulesSub?.cancel();
 
     _familySub = _membersSub = _choresSub = _reviewSub = _familyAssignedSub =
-        _missedSub = _historyAssignmentsSub = _pendingRewardsSub =
-        _schedulesSub = null;
+        _missedSub = _historyAssignmentsSub = _monthRangeAssignmentsSub =
+        _pendingRewardsSub = _schedulesSub = null;
+    _monthRangeAssignments = const [];
+    _monthRangeStart = _monthRangeEnd = null;
 
     for (final s in _kidAssignedSubs.values) {
       await s.cancel();
@@ -351,6 +358,7 @@ class AppState extends ChangeNotifier {
     _reviewSub?.cancel();
     _missedSub?.cancel();
     _historyAssignmentsSub?.cancel();
+    _monthRangeAssignmentsSub?.cancel();
     _familyAssignedSub?.cancel();
     _rewardsSub?.cancel();
     _pendingRewardsSub?.cancel();

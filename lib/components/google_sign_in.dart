@@ -31,7 +31,7 @@ class GoogleSignInButton extends StatelessWidget {
             )
           else
             Image.asset(
-              'assets/icons/google_logo.png',
+              'assets/icons/logos/google_logo.png',
               width: 24,
               height: 24,
               filterQuality: FilterQuality.high,

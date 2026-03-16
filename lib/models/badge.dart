@@ -55,6 +55,48 @@ class BadgeCatalog {
       icon: '🏆',
       type: BadgeType.streak,
     ),
+
+    // --- Chore count badges ---
+    BadgeDefinition(
+      id: 'chores_1',
+      name: 'First Chore!',
+      description: 'You completed your very first chore!',
+      unlockHint: 'Complete your first chore.',
+      icon: '⭐',
+      type: BadgeType.chores,
+    ),
+    BadgeDefinition(
+      id: 'chores_10',
+      name: '10 Chores Done',
+      description: 'Double digits — you\'re on a roll!',
+      unlockHint: 'Complete 10 chores total.',
+      icon: '🌈',
+      type: BadgeType.chores,
+    ),
+    BadgeDefinition(
+      id: 'chores_25',
+      name: '25 Chores Done',
+      description: 'You\'re a real helper!',
+      unlockHint: 'Complete 25 chores total.',
+      icon: '🦸',
+      type: BadgeType.chores,
+    ),
+    BadgeDefinition(
+      id: 'chores_50',
+      name: '50 Chores Done',
+      description: 'Half a hundred chores — incredible!',
+      unlockHint: 'Complete 50 chores total.',
+      icon: '🚀',
+      type: BadgeType.chores,
+    ),
+    BadgeDefinition(
+      id: 'chores_100',
+      name: 'Chore Champion',
+      description: '100 chores completed — you\'re a legend!',
+      unlockHint: 'Complete 100 chores total.',
+      icon: '👑',
+      type: BadgeType.chores,
+    ),
   ];
 
   static BadgeDefinition? byId(String id) {
@@ -67,4 +109,7 @@ class BadgeCatalog {
 
   static Iterable<BadgeDefinition> streakBadges() =>
       items.where((b) => b.type == BadgeType.streak);
+
+  static Iterable<BadgeDefinition> choresBadges() =>
+      items.where((b) => b.type == BadgeType.chores);
 }

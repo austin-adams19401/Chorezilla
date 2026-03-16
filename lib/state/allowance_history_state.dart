@@ -89,6 +89,114 @@ extension AppStateHistoryAllowance on AppState {
     _notifyStateChanged();
   }
 
+  // ─── Month range watcher ────────────────────────────────────────────────────
+
+  /// Watch assignments and load overrides for the full calendar range that
+  /// covers [firstDayOfMonth].  Called by KidMonthScreen on open/month-change.
+  void watchHistoryMonthRange(DateTime firstDayOfMonth) {
+    final famId = _familyId;
+    if (famId == null) return;
+
+    final monthStart = DateTime(firstDayOfMonth.year, firstDayOfMonth.month, 1);
+    final monthEnd = DateTime(firstDayOfMonth.year, firstDayOfMonth.month + 1, 0);
+
+    // Expand to full weeks (Mon-based) so the grid has complete rows.
+    final rangeStart = normalizeDate(weekStartFor(monthStart));
+    final rangeEnd = normalizeDate(
+      weekStartFor(monthEnd).add(const Duration(days: 7)),
+    );
+
+    // Skip if nothing changed.
+    if (_monthRangeStart != null &&
+        _monthRangeEnd != null &&
+        _monthRangeStart!.isAtSameMomentAs(rangeStart) &&
+        _monthRangeEnd!.isAtSameMomentAs(rangeEnd)) {
+      return;
+    }
+
+    _monthRangeStart = rangeStart;
+    _monthRangeEnd = rangeEnd;
+    _monthRangeAssignmentsSub?.cancel();
+
+    _monthRangeAssignmentsSub = repo
+        .watchAssignmentsDueRange(famId, start: rangeStart, end: rangeEnd)
+        .listen((list) {
+          _monthRangeAssignments = list;
+          _notifyStateChanged();
+        });
+
+    _loadDayOverridesForWeek(famId, rangeStart, rangeEnd);
+  }
+
+  /// Stop watching the month range.  Called when KidMonthScreen is disposed.
+  void stopWatchingMonthRange() {
+    _monthRangeAssignmentsSub?.cancel();
+    _monthRangeAssignmentsSub = null;
+    _monthRangeAssignments = const [];
+    _monthRangeStart = null;
+    _monthRangeEnd = null;
+  }
+
+  /// Like [dayStatusFor] but uses month-range assignment data when available.
+  /// Falls back to the week watcher, then to noChores.
+  DayStatus dayStatusForRange(String memberId, DateTime date) {
+    final key = _dateKey(date);
+
+    // 1) Manual override
+    final manual = _dayStatusByMemberId[memberId]?[key];
+    if (manual != null) return manual;
+
+    // 2) Auto from month range
+    if (_monthRangeStart != null && _monthRangeEnd != null) {
+      final d = normalizeDate(date);
+      if (!d.isBefore(_monthRangeStart!) && d.isBefore(_monthRangeEnd!)) {
+        return _computeDayStatusFromMonthRange(memberId, date);
+      }
+    }
+
+    // 3) Auto from week assignments (fallback)
+    if (_historyWeekStart != null) {
+      final ws = weekStartFor(date);
+      if (ws.isAtSameMomentAs(_historyWeekStart!)) {
+        return _computeDayStatusFromAssignments(memberId, date);
+      }
+    }
+
+    return DayStatus.noChores;
+  }
+
+  DayStatus _computeDayStatusFromMonthRange(String memberId, DateTime date) {
+    if (_monthRangeAssignments.isEmpty) return DayStatus.noChores;
+
+    final day = normalizeDate(date);
+    final targetKey = _dateKey(day);
+
+    var anyAssignments = false;
+    var allDone = true;
+
+    for (final asn in _monthRangeAssignments) {
+      if (asn.memberId != memberId) continue;
+
+      final due = asn.due;
+      if (due == null) continue;
+
+      final dueDay = normalizeDate(due);
+      if (_dateKey(dueDay) != targetKey) continue;
+
+      anyAssignments = true;
+
+      if (asn.status != AssignmentStatus.pending &&
+          asn.status != AssignmentStatus.completed) {
+        allDone = false;
+      }
+    }
+
+    if (!anyAssignments) return DayStatus.noChores;
+    return allDone ? DayStatus.completed : DayStatus.missed;
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+
   /// Get the status for a specific kid + date.
   /// Priority:
   /// 1) Manual override (e.g., parent excused the day).

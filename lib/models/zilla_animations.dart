@@ -39,7 +39,7 @@ class ZillaAnimations {
 
   static const poked = ZillaAnimationDef(
     id: 'poked',
-    assetPath: 'assets/icons/mascot/sprite-sheets/poked.png',
+    assetPath: 'assets/icons/mascot/sprite-sheets/surprised.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 800),
@@ -56,7 +56,7 @@ class ZillaAnimations {
 
   static const looking = ZillaAnimationDef(
     id: 'looking',
-    assetPath: 'assets/icons/mascot/sprite-sheets/looking.png',
+    assetPath: 'assets/icons/mascot/sprite-sheets/idle2.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1400),
@@ -88,7 +88,7 @@ class ZillaAnimations {
 
   static const sleeping = ZillaAnimationDef(
     id: 'sleeping',
-    assetPath: 'assets/icons/mascot/sprite-sheets/sleeping.png',
+    assetPath: 'assets/icons/mascot/sprite-sheets/going-to-sleep.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 2000),
@@ -96,7 +96,7 @@ class ZillaAnimations {
 
   static const sittingDown = ZillaAnimationDef(
     id: 'sitting_down',
-    assetPath: 'assets/icons/mascot/sprite-sheets/sitting_down.png',
+    assetPath: 'assets/icons/mascot/sprite-sheets/wake-up.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1200),

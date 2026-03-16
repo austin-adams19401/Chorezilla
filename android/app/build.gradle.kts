@@ -8,6 +8,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.util.Properties
+
+val keyPropertiesFile = rootProject.file("key.properties")
+val keyProperties = Properties()
+if (keyPropertiesFile.exists()) {
+    keyPropertiesFile.inputStream().use { keyProperties.load(it) }
+}
+
 android {
     namespace = "com.chorezilla.chorezilla"
     compileSdk = flutter.compileSdkVersion
@@ -26,17 +34,16 @@ android {
         applicationId = "com.chorezilla.chorezilla"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 1   
-        versionName = "1.0.0"   
+        versionCode = 1
+        versionName = "1.0.0"
     }
 
-    
     signingConfigs {
         create("release") {
-            storeFile = file("chorezilla-release-key.jks")
-            storePassword = "D0yourhomework!"
-            keyAlias = "chorezilla"
-            keyPassword = "D0yourhomework!"
+            storeFile = file(keyProperties["storeFile"].toString())
+            storePassword = keyProperties["storePassword"].toString()
+            keyAlias = keyProperties["keyAlias"].toString()
+            keyPassword = keyProperties["keyPassword"].toString()
         }
     }
 
@@ -48,8 +55,12 @@ android {
 
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }

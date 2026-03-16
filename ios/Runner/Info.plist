@@ -45,5 +45,11 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Chorezilla uses your camera so kids can take a photo as proof of completing a chore.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Chorezilla accesses your photo library so kids can attach a photo as proof of completing a chore.</string>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>Chorezilla sends you notifications when a kid submits a chore for your approval.</string>
 </dict>
 </plist>

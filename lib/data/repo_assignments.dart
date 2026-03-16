@@ -328,6 +328,7 @@ Future<void> completeAssignment(
       tx.update(memberRef, {
         'xp': FieldValue.increment(xp),
         'coins': FieldValue.increment(coins),
+        'totalChoresCompleted': FieldValue.increment(1),
         ..._streakUpdate(memData, DateTime.now()),
       });
     });
@@ -372,6 +373,7 @@ Future<void> completeAssignment(
       tx.update(memberRef, {
         'xp': FieldValue.increment(asn.xp),
         'coins': FieldValue.increment(coins),
+        'totalChoresCompleted': FieldValue.increment(1),
         ..._streakUpdate(memData, DateTime.now()),
       });
 

@@ -18,15 +18,16 @@ class _LoginPageState extends State<LoginPage> {
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  final _passwordFocus = FocusNode();
   bool _obscure = true;
   bool _busy = false;
-  // ignore: unused_field
   String? _error;
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -48,7 +49,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return AuthScaffold(
       headerTitle: 'Welcome Back',
       headerSubtitle: 'Let\'s get back to it!',
@@ -61,86 +62,90 @@ class _LoginPageState extends State<LoginPage> {
               Text('Sign in',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.black, fontWeight: FontWeight.w700)
               ),
-              const SizedBox(height: 12,),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                textInputAction: TextInputAction.next,
+                onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                 decoration: themedInput(context, 'Email'),
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty){
-                    return 'Email is required';
-                  }
+                  if (v == null || v.trim().isEmpty) return 'Email is required';
                   final ok = RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(v.trim());
                   return ok ? null : 'Enter a valid email';
                 },
-              ),            
-              const SizedBox(height: 12,),
+              ),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _password,
+                focusNode: _passwordFocus,
                 obscureText: _obscure,
+                autofillHints: const [AutofillHints.password],
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _signIn(),
                 decoration: themedInput(context, 'Password',
-                suffix: IconButton(
-                  icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: cs.secondary),
-                  onPressed:() => setState(() { _obscure = !_obscure; })
+                  suffix: IconButton(
+                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: cs.secondary),
+                    onPressed: () => setState(() { _obscure = !_obscure; }),
                   ),
                 ),
                 validator: (v) => (v == null || v.length < 6) ? 'At least 6 characters' : null,
               ),
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(context, 
-                          MaterialPageRoute(builder: (context) {
-                            return ForgotPasswordPage();
-                        }));
-                      },
-                      child: Text('Forgot Password?',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.secondary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16)
-                      ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ForgotPasswordPage()));
+                  },
+                  child: Text('Forgot Password?',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.secondary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
-                  ],
+                  ),
                 ),
               ),
-            const SizedBox(height: 16),
-            FilledButton(
-              onPressed: _busy ? null : _signIn,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-                shape: const StadiumBorder(),
-              ),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 150),
-                child: _busy
-                    ? SizedBox(
-                        key: const ValueKey('spinner'),
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Theme.of(context).colorScheme.onPrimary,
+              const SizedBox(height: 4),
+              FilledButton(
+                onPressed: _busy ? null : _signIn,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: const StadiumBorder(),
+                ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 150),
+                  child: _busy
+                      ? SizedBox(
+                          key: const ValueKey('spinner'),
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                        )
+                      : const Text(
+                          'Sign In',
+                          key: ValueKey('label'),
+                          style: TextStyle(fontSize: 18),
                         ),
-                      )
-                    : const Text(
-                        'Sign In',
-                        key: ValueKey('label'),
-                        style: TextStyle(fontSize: 18),
-                      ),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: GoogleSignInButton(
-                onPressed: () => context.read<AppState>().signInWithGoogle(),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!, style: TextStyle(color: cs.error)),
+              ],
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: GoogleSignInButton(
+                  onPressed: () => context.read<AppState>().signInWithGoogle(),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pushReplacementNamed('/register');
@@ -163,9 +168,9 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
             ],
-          )
+          ),
         ),
-      )     
+      ),
     );
   }
 }

@@ -111,7 +111,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Welcome to Premium! 🎉'),
-            backgroundColor: Color(0xFF2ECC71),
+            backgroundColor: AppTheme.zillaGreen,
           ),
         );
         Navigator.of(context).pop(true);

@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:chorezilla/components/inputs.dart';
 import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/services/subscription_service.dart';
@@ -21,23 +22,19 @@ class AddKidsPage extends StatefulWidget {
 class _AddKidsPageState extends State<AddKidsPage> {
   final _formKey = GlobalKey<FormState>();
 
-  // Inputs
   final _name = TextEditingController();
   final _nameNode = FocusNode();
-  int? _age; // optional
-  String? _avatarKey; // emoji from picker
+  int? _age;
+  String? _avatarKey;
   bool _allowBonusChores = true;
 
-  // Busy/error & editing
   bool _busy = false;
   String? _error;
   String? _editingMemberId;
 
-  //Controllers
   final pinController = TextEditingController();
   final pinConfirmController = TextEditingController();
 
-  // Repo for Firestore writes (so we get the memberId back)
   final ChorezillaRepo _repo = ChorezillaRepo(
     firebaseDB: FirebaseFirestore.instance,
   );
@@ -73,52 +70,37 @@ class _AddKidsPageState extends State<AddKidsPage> {
       return;
     }
 
-    // Gate: check kid limit for new kids (not edits)
     if (_editingMemberId == null) {
-      final kidCount = app.members.where((m) => m.role == FamilyRole.child).length;
+      final kidCount =
+          app.members.where((m) => m.role == FamilyRole.child).length;
       if (!SubscriptionService.canAddKid(app.family, kidCount)) {
         if (!mounted) return;
-        await showPremiumUpgradeSheet(
-          context,
-          reason: UpgradeReason.addKid,
-        );
+        await showPremiumUpgradeSheet(context, reason: UpgradeReason.addKid);
         return;
       }
     }
 
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    setState(() { _busy = true; _error = null; });
 
     try {
       if (_editingMemberId == null) {
-        // ADD: Create child (no PIN here; PIN handled per-kid via dialog)
         final newId = await _repo.addChild(
           familyId,
           displayName: _name.text.trim(),
           avatarKey: (_avatarKey?.trim().isEmpty ?? true) ? null : _avatarKey,
           pinHash: null,
         );
-
-        // 🔹 Age + bonus chores flag in one patch
         final patch = <String, dynamic>{
           if (_age != null) 'age': _age,
           'allowBonusChores': _allowBonusChores,
         };
-
-        if (patch.isNotEmpty) {
-          await _repo.updateMember(familyId, newId, patch);
-        }
-
+        if (patch.isNotEmpty) await _repo.updateMember(familyId, newId, patch);
         _clearFormAndRefocus();
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Kid added')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Kid added')));
         }
       } else {
-        // EDIT: Update existing child (still no PIN here)
         final memberId = _editingMemberId!;
         final patch = <String, dynamic>{
           'displayName': _name.text.trim(),
@@ -126,14 +108,11 @@ class _AddKidsPageState extends State<AddKidsPage> {
           if (_age != null) 'age': _age,
           'allowBonusChores': _allowBonusChores,
         };
-
         await _repo.updateMember(familyId, memberId, patch);
-
         _clearFormAndRefocus();
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Kid updated')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Kid updated')));
         }
       }
     } catch (e) {
@@ -148,37 +127,51 @@ class _AddKidsPageState extends State<AddKidsPage> {
     final familyId = app.family?.id;
     if (familyId == null || familyId.isEmpty) return;
 
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Remove ${m.displayName}?'),
+        content: const Text('This will remove the kid from your family. Their chore history will be kept but they will no longer appear on your dashboard.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              foregroundColor: Theme.of(ctx).colorScheme.onError,
+            ),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
 
+    setState(() { _busy = true; _error = null; });
     try {
       await app.removeMember(m.id);
     } catch (e) {
       setState(() => _error = e.toString());
     } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-        });
-      }
+      if (mounted) setState(() => _busy = false);
     }
   }
 
-void _startEdit(Member m) {
+  void _startEdit(Member m) {
     setState(() {
       _editingMemberId = m.id;
       _name.text = m.displayName;
       _avatarKey = (m.avatarKey != null && m.avatarKey!.trim().isNotEmpty)
           ? m.avatarKey
           : null;
-      _age = m.age; // ✅ pre-populate from stored age, if any
+      _age = m.age;
       _allowBonusChores = m.allowBonusChores;
     });
     _nameNode.requestFocus();
   }
-
 
   void _cancelEdit() => setState(() {
     _editingMemberId = null;
@@ -187,8 +180,8 @@ void _startEdit(Member m) {
     _name.clear();
     _age = null;
     _avatarKey = null;
-    _nameNode.requestFocus();
     _allowBonusChores = true;
+    _nameNode.requestFocus();
   });
 
   void _clearFormAndRefocus() {
@@ -215,7 +208,7 @@ void _startEdit(Member m) {
         final cs = theme.colorScheme;
 
         return StatefulBuilder(
-          builder: (ctx, setState) {
+          builder: (ctx, setDialogState) {
             return AlertDialog(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -230,7 +223,7 @@ void _startEdit(Member m) {
                       contentPadding: EdgeInsets.zero,
                       value: pinEnabled,
                       onChanged: (value) {
-                        setState(() {
+                        setDialogState(() {
                           pinEnabled = value;
                           if (!value) {
                             pinController.clear();
@@ -248,37 +241,27 @@ void _startEdit(Member m) {
                       ),
                     ),
                     if (pinEnabled) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       TextField(
                         controller: pinController,
                         keyboardType: TextInputType.number,
                         maxLength: 4,
                         obscureText: true,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: '4-digit PIN',
-                          border: OutlineInputBorder(),
-                        ),
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: themedInput(ctx, '4-digit PIN'),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       TextField(
                         controller: pinConfirmController,
                         keyboardType: TextInputType.number,
                         maxLength: 4,
                         obscureText: true,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: const InputDecoration(
-                          labelText: 'Confirm PIN',
-                          border: OutlineInputBorder(),
-                        ),
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        decoration: themedInput(ctx, 'Confirm PIN'),
                       ),
                       if (hasExistingPin)
                         Padding(
-                          padding: const EdgeInsets.only(top: 4.0),
+                          padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             'Leave both fields blank to keep the existing PIN.',
                             style: theme.textTheme.bodySmall?.copyWith(
@@ -302,7 +285,6 @@ void _startEdit(Member m) {
                 FilledButton(
                   onPressed: () async {
                     if (!pinEnabled) {
-                      // Turning PIN off
                       if (hasExistingPin) {
                         await app.updateMemberPin(memberId: m.id, pin: null);
                       }
@@ -314,26 +296,21 @@ void _startEdit(Member m) {
                     final confirmPin = pinConfirmController.text.trim();
 
                     if (newPin.isEmpty && hasExistingPin) {
-                      // Keep existing PIN
                       if (ctx.mounted) Navigator.of(ctx).pop(true);
                       return;
                     }
-
                     if (newPin.isEmpty && !hasExistingPin) {
-                      setState(() {
-                        error =
-                            'Enter a 4-digit PIN or turn PIN off to continue.';
-                      });
+                      setDialogState(() => error =
+                          'Enter a 4-digit PIN or turn PIN off to continue.');
                       return;
                     }
-
                     if (!RegExp(r'^\d{4}$').hasMatch(newPin)) {
-                      setState(() => error = 'PIN must be exactly 4 digits.');
+                      setDialogState(
+                          () => error = 'PIN must be exactly 4 digits.');
                       return;
                     }
-
                     if (newPin != confirmPin) {
-                      setState(() => error = 'PINs do not match.');
+                      setDialogState(() => error = 'PINs do not match.');
                       return;
                     }
 
@@ -355,30 +332,27 @@ void _startEdit(Member m) {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final kids =
-        app.members
-            .where((m) => m.role == FamilyRole.child && m.active)
-            .toList()
-          ..sort(
-            (a, b) => a.displayName.toLowerCase().compareTo(
-              b.displayName.toLowerCase(),
-            ),
-          );
+    final kids = app.members
+        .where((m) => m.role == FamilyRole.child && m.active)
+        .toList()
+      ..sort((a, b) =>
+          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()));
 
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
-
     final isEditing = _editingMemberId != null;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Kids'),
+        backgroundColor: cs.secondary,
+        foregroundColor: Colors.white,
         actions: [
           if (isEditing)
             TextButton.icon(
               onPressed: _busy ? null : _cancelEdit,
-              icon: const Icon(Icons.clear),
-              label: const Text('Cancel edit'),
+              icon: const Icon(Icons.clear, color: Colors.white),
+              label: const Text('Cancel', style: TextStyle(color: Colors.white)),
             ),
         ],
       ),
@@ -388,10 +362,13 @@ void _startEdit(Member m) {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ---------- Simple Add/Edit Kid Card ----------
+              // ── Add / edit form ──────────────────────────────────────────
               Card(
                 elevation: 0,
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: cs.outlineVariant),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Form(
@@ -401,24 +378,29 @@ void _startEdit(Member m) {
                       children: [
                         Text(
                           isEditing ? 'Edit kid' : 'Add a kid',
-                          style: ts.titleMedium,
+                          style: ts.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                         const SizedBox(height: 12),
 
-                        // Preview avatar + name
+                        // Avatar preview + name
                         Row(
                           children: [
-                            CircleAvatar(
-                              radius: 28,
-                              backgroundColor: cs.tertiaryContainer,
-                              child: Text(
-                                (_avatarKey == null ||
-                                        _avatarKey!.trim().isEmpty)
-                                    ? _initial(_name.text)
-                                    : _avatarKey!,
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w700,
+                            GestureDetector(
+                              onTap: _busy ? null : _pickAvatar,
+                              child: CircleAvatar(
+                                radius: 28,
+                                backgroundColor: cs.tertiaryContainer,
+                                child: Text(
+                                  (_avatarKey == null ||
+                                          _avatarKey!.trim().isEmpty)
+                                      ? _initial(_name.text)
+                                      : _avatarKey!,
+                                  style: const TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
@@ -428,16 +410,12 @@ void _startEdit(Member m) {
                                 controller: _name,
                                 focusNode: _nameNode,
                                 textCapitalization: TextCapitalization.words,
-                                decoration: const InputDecoration(
-                                  labelText: 'Name',
-                                  hintText: 'e.g., Sam',
-                                  border: OutlineInputBorder(),
-                                ),
+                                textInputAction: TextInputAction.next,
+                                decoration: themedInput(context, 'Name',
+                                    hint: 'e.g., Sam'),
                                 validator: (v) {
                                   final t = v?.trim() ?? '';
-                                  if (t.isEmpty) {
-                                    return 'Please enter a name';
-                                  }
+                                  if (t.isEmpty) return 'Please enter a name';
                                   if (t.length > 30) {
                                     return 'Keep it under 30 characters';
                                   }
@@ -449,38 +427,27 @@ void _startEdit(Member m) {
                         ),
                         const SizedBox(height: 12),
 
-                        // Age + Avatar row (responsive)
+                        // Age + avatar row (responsive)
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            // Tweak this threshold if you want
                             final isNarrow = constraints.maxWidth < 480;
 
                             final ageField = DropdownButtonFormField<int>(
                               initialValue: _age,
                               isExpanded: true,
-                              decoration: const InputDecoration(
-                                labelText: 'Age (optional)',
-                                border: OutlineInputBorder(),
-                              ),
-                              items:
-                                  List.generate(42, (i) => i + 3) // 3..45
-                                      .map(
-                                        (a) => DropdownMenuItem<int>(
-                                          value: a,
-                                          child: Text(a.toString()),
-                                        ),
-                                      )
-                                      .toList(),
-                              onChanged: _busy
-                                  ? null
-                                  : (v) => setState(() => _age = v),
+                              decoration: themedInput(context, 'Age (optional)'),
+                              items: List.generate(42, (i) => i + 3)
+                                  .map((a) => DropdownMenuItem<int>(
+                                        value: a,
+                                        child: Text(a.toString()),
+                                      ))
+                                  .toList(),
+                              onChanged:
+                                  _busy ? null : (v) => setState(() => _age = v),
                             );
 
                             final avatarField = InputDecorator(
-                              decoration: const InputDecoration(
-                                labelText: 'Avatar',
-                                border: OutlineInputBorder(),
-                              ),
+                              decoration: themedInput(context, 'Avatar'),
                               child: Row(
                                 children: [
                                   Text(
@@ -488,30 +455,29 @@ void _startEdit(Member m) {
                                             _avatarKey!.trim().isEmpty)
                                         ? '🙂'
                                         : _avatarKey!,
-                                    style: const TextStyle(fontSize: 24),
+                                    style: const TextStyle(fontSize: 22),
                                   ),
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      'Choose emoji avatar',
+                                      'Choose emoji',
                                       style: ts.bodyMedium?.copyWith(
                                         color: cs.onSurfaceVariant,
                                       ),
                                     ),
                                   ),
-                                  FilledButton.tonalIcon(
+                                  FilledButton.tonal(
                                     onPressed: _busy ? null : _pickAvatar,
-                                    icon: const Icon(
-                                      Icons.emoji_emotions_outlined,
+                                    style: FilledButton.styleFrom(
+                                      visualDensity: VisualDensity.compact,
                                     ),
-                                    label: const Text('Pick'),
+                                    child: const Text('Pick'),
                                   ),
                                 ],
                               ),
                             );
 
                             if (isNarrow) {
-                              // Phone: stack vertically so the avatar field gets full width
                               return Column(
                                 children: [
                                   ageField,
@@ -520,7 +486,6 @@ void _startEdit(Member m) {
                                 ],
                               );
                             } else {
-                              // Tablet / wide: keep them side by side
                               return Row(
                                 children: [
                                   Expanded(child: ageField),
@@ -531,7 +496,7 @@ void _startEdit(Member m) {
                             }
                           },
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 4),
 
                         SwitchListTile.adaptive(
                           contentPadding: EdgeInsets.zero,
@@ -541,31 +506,37 @@ void _startEdit(Member m) {
                               : (v) => setState(() => _allowBonusChores = v),
                           title: const Text('Show bonus chores'),
                           subtitle: const Text(
-                            'When on, this kid can see optional extra chores for extra coins and XP.',
+                            'Lets this kid see optional extra chores for extra coins and XP.',
                           ),
                         ),
 
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
 
-                        // Add / Save button
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
                             onPressed: _busy ? null : _save,
-                            icon: Icon(isEditing ? Icons.save : Icons.add),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              shape: const StadiumBorder(),
+                            ),
+                            icon: _busy
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Icon(isEditing ? Icons.save : Icons.add),
                             label: Text(isEditing ? 'Save changes' : 'Add kid'),
                           ),
                         ),
 
                         if (_error != null) ...[
                           const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              _error!,
-                              style: TextStyle(color: cs.error),
-                            ),
-                          ),
+                          Text(_error!, style: TextStyle(color: cs.error)),
                         ],
                       ],
                     ),
@@ -575,24 +546,37 @@ void _startEdit(Member m) {
 
               const SizedBox(height: 24),
 
-              // ---------- List ----------
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Current kids', style: ts.titleMedium),
+              // ── Current kids list ────────────────────────────────────────
+              Text(
+                'Current kids',
+                style: ts.labelMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 8),
 
               if (kids.isEmpty)
-                Text(
-                  'No kids yet — add one above.',
-                  style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'No kids yet — add one above.',
+                    style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
                 ),
 
               ...kids.map((m) {
                 final hasPin =
                     (m.pinHash != null && m.pinHash!.trim().isNotEmpty);
+                final isBeingEdited = _editingMemberId == m.id;
 
                 return Card(
+                  shape: isBeingEdited
+                      ? RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: cs.primary, width: 2),
+                        )
+                      : null,
                   child: ListTile(
                     leading: CircleAvatar(
                       backgroundColor: cs.tertiaryContainer,
@@ -615,21 +599,21 @@ void _startEdit(Member m) {
                           onPressed: _busy ? null : () => _showPinDialog(m),
                           icon: Icon(
                             hasPin
-                                ? Icons.lock_outline_rounded
+                                ? Icons.lock_rounded
                                 : Icons.lock_open_rounded,
+                            color: hasPin ? cs.primary : cs.onSurfaceVariant,
                           ),
                         ),
                         IconButton(
-                          tooltip: 'Edit details',
+                          tooltip: 'Edit',
                           onPressed: _busy ? null : () => _startEdit(m),
-                          icon: const Icon(Icons.edit),
+                          icon: Icon(Icons.edit_outlined, color: cs.primary),
                         ),
                         IconButton(
                           tooltip: 'Remove',
-                          onPressed: _busy
-                              ? null
-                              : () => _removeKidFromFamily(m),
-                          icon: const Icon(Icons.block),
+                          onPressed: _busy ? null : () => _removeKidFromFamily(m),
+                          icon: Icon(Icons.person_remove_outlined,
+                              color: cs.error),
                         ),
                       ],
                     ),
@@ -651,7 +635,8 @@ void _startEdit(Member m) {
   }
 }
 
-/// Bottom sheet avatar picker with large tap targets and responsive grid.
+// ── Avatar picker sheet ──────────────────────────────────────────────────────
+
 class _AvatarPickerSheet extends StatefulWidget {
   const _AvatarPickerSheet({required this.avatars, this.initial});
 
@@ -668,14 +653,15 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
   @override
   void initState() {
     super.initState();
-    _selected =
-        widget.initial ??
+    _selected = widget.initial ??
         (widget.avatars.isNotEmpty ? widget.avatars.first : '🙂');
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -684,11 +670,20 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
         top: 8,
       ),
       child: SizedBox(
-        height: 360,
+        height: 380,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Pick an avatar', style: theme.textTheme.titleMedium),
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: cs.tertiaryContainer,
+                  child: Text(_selected, style: const TextStyle(fontSize: 22)),
+                ),
+                const SizedBox(width: 12),
+                Text('Pick an avatar', style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              ],
+            ),
             const SizedBox(height: 12),
             Expanded(
               child: LayoutBuilder(
@@ -723,6 +718,7 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
                 const Spacer(),
                 FilledButton.icon(
                   onPressed: () => Navigator.pop(context, _selected),
+                  style: FilledButton.styleFrom(shape: const StadiumBorder()),
                   icon: const Icon(Icons.check),
                   label: const Text('Use avatar'),
                 ),
@@ -748,6 +744,7 @@ class _EmojiTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -755,11 +752,10 @@ class _EmojiTile extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
+          color: selected ? cs.primaryContainer : null,
           border: Border.all(
             width: selected ? 2 : 1,
-            color: selected
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).dividerColor,
+            color: selected ? cs.primary : cs.outlineVariant,
           ),
         ),
         alignment: Alignment.center,
@@ -769,42 +765,10 @@ class _EmojiTile extends StatelessWidget {
   }
 }
 
-// Your default avatar set (replace with your global list if you have one)
 const _defaultAvatars = [
-  '🦖',
-  '🦄',
-  '🐱',
-  '🐶',
-  '🐵',
-  '🐼',
-  '🦊',
-  '🐯',
-  '🐸',
-  '🐨',
-  '🐰',
-  '🐮',
-  '🐹',
-  '🐻',
-  '🐷',
-  '🐭',
-  '🦁',
-  '🐔',
-  '🐥',
-  '🦉',
-  '🦋',
-  '🐞',
-  '🐙',
-  '🐳',
-  '🚀',
-  '⚽',
-  '🎮',
-  '🎲',
-  '🎸',
-  '🎯',
-  '🌈',
-  '🍕',
-  '🍩',
-  '🍪',
-  '🍎',
-  '🧩',
+  '🦖', '🦄', '🐱', '🐶', '🐵', '🐼', '🦊', '🐯',
+  '🐸', '🐨', '🐰', '🐮', '🐹', '🐻', '🐷', '🐭',
+  '🦁', '🐔', '🐥', '🦉', '🦋', '🐞', '🐙', '🐳',
+  '🚀', '⚽', '🎮', '🎲', '🎸', '🎯', '🌈', '🍕',
+  '🍩', '🍪', '🍎', '🧩',
 ];

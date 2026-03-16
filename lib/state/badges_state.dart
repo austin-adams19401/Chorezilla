@@ -2,16 +2,15 @@
 part of 'app_state.dart';
 
 extension BadgeStateAuth on AppState {
-  /// Check the kid's current streak and award any new streak badges.
+  /// Check all badge conditions and award any newly unlocked badges.
   /// Returns the list of BadgeDefinitions that were newly unlocked.
-  Future<List<BadgeDefinition>> checkAndAwardStreakBadgesForKid(
+  Future<List<BadgeDefinition>> checkAndAwardBadgesForKid(
     String memberId,
   ) async {
-    final member =
-        members.firstWhere((m) => m.id == memberId, orElse: () => throw Exception('Member not found'));
-
-    final currentStreak = member.currentStreak;
-    if (currentStreak <= 0) return const [];
+    final member = members.firstWhere(
+      (m) => m.id == memberId,
+      orElse: () => throw Exception('Member not found'),
+    );
 
     final newBadgeIds = <String>[];
 
@@ -21,21 +20,27 @@ extension BadgeStateAuth on AppState {
       newBadgeIds.add(badgeId);
     }
 
-    maybeUnlock('streak_3_days', currentStreak >= 3);
-    maybeUnlock('streak_7_days', currentStreak >= 7);
-    maybeUnlock('streak_14_days', currentStreak >= 14);
-    maybeUnlock('streak_30_days', currentStreak >= 30);
+    // Streak badges
+    final streak = member.currentStreak;
+    maybeUnlock('streak_3_days', streak >= 3);
+    maybeUnlock('streak_7_days', streak >= 7);
+    maybeUnlock('streak_14_days', streak >= 14);
+    maybeUnlock('streak_30_days', streak >= 30);
+
+    // Chore-count badges
+    final total = member.totalChoresCompleted;
+    maybeUnlock('chores_1', total >= 1);
+    maybeUnlock('chores_10', total >= 10);
+    maybeUnlock('chores_25', total >= 25);
+    maybeUnlock('chores_50', total >= 50);
+    maybeUnlock('chores_100', total >= 100);
 
     if (newBadgeIds.isEmpty) return const [];
 
     final updatedBadges = [...member.badges, ...newBadgeIds];
 
-    // Persist badges to Firestore (and local cache via existing helper).
-    await updateMember(member.id, {
-      'badges': updatedBadges,
-    });
+    await updateMember(member.id, {'badges': updatedBadges});
 
-    // Return full badge definitions for UI celebrations.
     final unlockedDefs = <BadgeDefinition>[];
     for (final id in newBadgeIds) {
       final def = BadgeCatalog.byId(id);
@@ -43,4 +48,9 @@ extension BadgeStateAuth on AppState {
     }
     return unlockedDefs;
   }
+
+  /// Kept for backwards compatibility — delegates to checkAndAwardBadgesForKid.
+  Future<List<BadgeDefinition>> checkAndAwardStreakBadgesForKid(
+    String memberId,
+  ) => checkAndAwardBadgesForKid(memberId);
 }

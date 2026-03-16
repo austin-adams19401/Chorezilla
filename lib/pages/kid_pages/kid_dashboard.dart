@@ -674,7 +674,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
             // Existing completion logic (status, XP, coins, streaks, etc.)
       await app.completeAssignment(a.id);
 
-            final newBadges = await app.checkAndAwardStreakBadgesForKid(a.memberId);
+            final newBadges = await app.checkAndAwardBadgesForKid(a.memberId);
 
       if (!mounted) return;
 

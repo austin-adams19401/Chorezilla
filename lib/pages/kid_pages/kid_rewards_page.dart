@@ -638,48 +638,33 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
 
   Future<void> _openLootBox(LootBoxDefinition box) async {
     final app = context.read<AppState>();
+    final member = app.members.firstWhere(
+      (m) => m.id == widget.member.id,
+      orElse: () => widget.member,
+    );
 
-    if (widget.member.coins < box.costCoins) {
+    if (member.coins < box.costCoins) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Not enough coins to open this box.')),
       );
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Open ${box.name}?'),
-        content: Text(
-          'This costs ${box.costCoins} coins and cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Open it!'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
     setState(() => _busyIds.add(box.id));
     try {
-      final result = await app.openLootBox(widget.member.id, box);
-      if (!mounted) return;
-      await showDialog(
+      // The dialog handles the 3-click mechanic and returns the final result
+      final clickState = await showDialog<LootBoxClickState>(
         context: context,
         barrierDismissible: false,
         builder: (_) => LootBoxOpenDialog(
           boxDefinition: box,
-          result: result,
+          ownedCosmetics: member.ownedCosmetics,
         ),
       );
+
+      if (clickState == null || !mounted) return;
+
+      await app.openLootBox(widget.member.id, box, clickState);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -761,23 +746,27 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
         // ── Loot Boxes ──────────────────────────────────────────────────────
         _SectionHeader(title: 'Loot Boxes', emoji: '🎲'),
         const SizedBox(height: 8),
-        Row(
-          children: LootBoxCatalog.boxes.map((box) {
-            final busy = _busyIds.contains(box.id);
-            final canAfford = member.coins >= box.costCoins;
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _LootBoxCard(
-                  box: box,
-                  canAfford: canAfford,
-                  busy: busy,
-                  onOpen: () => _openLootBox(box),
+        // 2×2 grid of category boxes
+        for (int row = 0; row < 2; row++) ...[
+          Row(
+            children: LootBoxCatalog.boxes.skip(row * 2).take(2).map((box) {
+              final busy = _busyIds.contains(box.id);
+              final canAfford = member.coins >= box.costCoins;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: _LootBoxCard(
+                    box: box,
+                    canAfford: canAfford,
+                    busy: busy,
+                    onOpen: () => _openLootBox(box),
+                  ),
                 ),
-              ),
-            );
-          }).toList(),
-        ),
+              );
+            }).toList(),
+          ),
+          if (row == 0) const SizedBox(height: 8),
+        ],
 
         const SizedBox(height: 20),
 
@@ -887,7 +876,7 @@ class _LootBoxCard extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(box.tierEmoji, style: const TextStyle(fontSize: 36)),
+            Text(box.categoryEmoji, style: const TextStyle(fontSize: 36)),
             const SizedBox(height: 4),
             Text(
               box.name,

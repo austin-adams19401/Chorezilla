@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import 'package:chorezilla/components/day_detail_sheet.dart';
+import 'package:chorezilla/components/premium_upgrade_sheet.dart';
+import 'package:chorezilla/screens/kid_month_screen.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/history.dart';
 import 'package:chorezilla/models/member.dart';
@@ -391,7 +394,24 @@ class _KidHistoryCard extends StatelessWidget {
         ),
       ),
       color: cs.surface,
-      child: Container(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => KidMonthScreen(
+                member: member,
+                avatarIndex: avatarIndex,
+              ),
+            ),
+          );
+          // Re-register the week watcher now that the month screen is gone.
+          if (context.mounted) {
+            context.read<AppState>().watchHistoryWeek(weekStart);
+          }
+        },
+        child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -456,6 +476,7 @@ class _KidHistoryCard extends StatelessWidget {
             ],
           ],
         ),
+      ),
       ),
     );
   }
@@ -535,7 +556,7 @@ class _DayRow extends StatelessWidget {
                 isScrollControlled: true,
                 showDragHandle: true,
                 builder: (ctx) {
-                  return _DayDetailSheet(member: history.member, date: date);
+                  return DayDetailSheet(member: history.member, date: date);
                 },
               );
             },
@@ -629,117 +650,6 @@ class _DayStatusIcon extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Day detail sheet (status picker)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _DayDetailSheet extends StatefulWidget {
-  final Member member;
-  final DateTime date;
-
-  const _DayDetailSheet({required this.member, required this.date});
-
-  @override
-  State<_DayDetailSheet> createState() => _DayDetailSheetState();
-}
-
-class _DayDetailSheetState extends State<_DayDetailSheet> {
-  late DayStatus _status;
-
-  @override
-  void initState() {
-    super.initState();
-    final app = context.read<AppState>();
-    _status = app.dayStatusFor(widget.member.id, widget.date);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fmt = DateFormat.yMMMEd();
-    final ts = Theme.of(context).textTheme;
-
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 4,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 12,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              '${widget.member.displayName} – ${fmt.format(widget.date)}',
-              style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-
-            /// RadioGroup manages groupValue & onChanged
-            RadioGroup<DayStatus>(
-              groupValue: _status,
-              onChanged: (DayStatus? value) {
-                if (value != null) {
-                  setState(() => _status = value);
-                }
-              },
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  RadioListTile<DayStatus>(
-                    value: DayStatus.completed,
-                    title: const Text('Completed (all chores done)'),
-                  ),
-                  RadioListTile<DayStatus>(
-                    value: DayStatus.missed,
-                    title: const Text('Missed (chores not completed)'),
-                  ),
-                  RadioListTile<DayStatus>(
-                    value: DayStatus.excused,
-                    title: const Text('Excused (doesn\'t count against them)'),
-                  ),
-                  RadioListTile<DayStatus>(
-                    value: DayStatus.noChores,
-                    title: const Text('Auto (based on chores completed)'),
-                    subtitle: const Text('Removes any manual override'),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () async {
-                  final app = context.read<AppState>();
-                  try {
-                    await app.setDayStatus(
-                      memberId: widget.member.id,
-                      date: widget.date,
-                      status: _status,
-                    );
-                    if (!context.mounted) return;
-                    Navigator.of(context).pop();
-                  } catch (_) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Could not save. Check your connection.'),
-                      ),
-                    );
-                  }
-                },
-                child: const Text('Save'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Allowance controls
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -751,6 +661,9 @@ class _AllowanceToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final isPremium = app.family?.isPremium ?? false;
+
     final enabled = allowanceConfig.enabled;
     final amount = allowanceConfig.fullAmountCents > 0
         ? allowanceConfig.fullAmountCents / 100.0
@@ -763,6 +676,14 @@ class _AllowanceToggle extends StatelessWidget {
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
 
+    void handleTap() {
+      if (!isPremium) {
+        showPremiumUpgradeSheet(context, reason: UpgradeReason.allowance);
+        return;
+      }
+      _showConfigSheet(context);
+    }
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -770,11 +691,15 @@ class _AllowanceToggle extends StatelessWidget {
         Switch(
           value: enabled,
           onChanged: (value) async {
+            if (!isPremium) {
+              showPremiumUpgradeSheet(context, reason: UpgradeReason.allowance);
+              return;
+            }
             if (!value) {
               // Turning OFF → just disable, no sheet
-              final app = context.read<AppState>();
+              final appState = context.read<AppState>();
               try {
-                await app.updateAllowanceForMember(
+                await appState.updateAllowanceForMember(
                   member.id,
                   allowanceConfig.copyWith(enabled: false),
                 );
@@ -795,7 +720,7 @@ class _AllowanceToggle extends StatelessWidget {
         const SizedBox(width: 4),
         // Tap the label to edit config any time
         InkWell(
-          onTap: () => _showConfigSheet(context),
+          onTap: handleTap,
           child: Text(
             label,
             style: ts.labelSmall?.copyWith(

@@ -176,7 +176,7 @@ class _KidHeroHeader extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 160,
+      height: hasAllowance ? 210 : 160,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -272,6 +272,26 @@ class _KidHeroHeader extends StatelessWidget {
                           ),
                         ],
                       ),
+
+                      if (member.currentStreak > 0) ...[
+                        const SizedBox(height: 5),
+                        Row(
+                          children: [
+                            const Text('🔥', style: TextStyle(fontSize: 13)),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '${member.currentStreak} day streak',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: ts.labelSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
 
                       const SizedBox(height: 5),
                       // Spend button — full width
@@ -851,11 +871,11 @@ class _CyclingMascotState extends State<_CyclingMascot>
     _MascotPhase.idle:     'assets/icons/mascot/sprite-sheets/idle.png',
     _MascotPhase.walking:  'assets/icons/mascot/sprite-sheets/walking.png',
     _MascotPhase.sweeping: 'assets/icons/mascot/sprite-sheets/sweeping.png',
-    _MascotPhase.looking:  'assets/icons/mascot/sprite-sheets/looking.png',
+    _MascotPhase.looking:  'assets/icons/mascot/sprite-sheets/idle2.png',
     _MascotPhase.wiping:   'assets/icons/mascot/sprite-sheets/wiping.png',
-    _MascotPhase.sitting:  'assets/icons/mascot/sprite-sheets/sitting_down.png',
-    _MascotPhase.poked:    'assets/icons/mascot/sprite-sheets/poked.png',
-    _MascotPhase.sleeping: 'assets/icons/mascot/sprite-sheets/sleeping.png',
+    _MascotPhase.sitting:  'assets/icons/mascot/sprite-sheets/wake-up.png',
+    _MascotPhase.poked:    'assets/icons/mascot/sprite-sheets/surprised.png',
+    _MascotPhase.sleeping: 'assets/icons/mascot/sprite-sheets/going-to-sleep.png',
     _MascotPhase.wave:     'assets/icons/mascot/sprite-sheets/wave.png',
   };
 

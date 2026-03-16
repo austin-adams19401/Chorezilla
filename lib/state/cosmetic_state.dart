@@ -23,11 +23,12 @@ extension AppStateCosmetics on AppState {
     );
   }
 
-  /// Opens a loot box for [memberId]. Rolls the result client-side, writes to
-  /// Firestore, and returns the [LootBoxResult] for the opening animation.
-  Future<LootBoxResult> openLootBox(
+  /// Opens a loot box for [memberId] using the result from the 3-click dialog.
+  /// Writes the outcome to Firestore.
+  Future<void> openLootBox(
     String memberId,
     LootBoxDefinition box,
+    LootBoxClickState result,
   ) async {
     final famId = _familyId!;
     final member = members.firstWhere((m) => m.id == memberId);
@@ -36,18 +37,14 @@ extension AppStateCosmetics on AppState {
       throw Exception('Not enough coins to open ${box.name}');
     }
 
-    final result = LootBoxCatalog.roll(box, member.ownedCosmetics);
-
     await repo.openLootBox(
       famId,
       memberId: memberId,
       boxCostCoins: box.costCoins,
-      wonItemId: result.wonItem.id,
+      wonItemId: result.wonItem!.id,
       isDuplicate: result.isDuplicate,
       coinRefund: result.coinRefund,
     );
-
-    return result;
   }
 
   /// Equips a cosmetic item for [memberId], updating the relevant Firestore field.

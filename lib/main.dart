@@ -63,11 +63,12 @@ class Chorezilla extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = context.select<AppState, ThemeMode>((s) => s.themeMode);
 
     return MaterialApp(
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.light,
+      themeMode: themeMode,
       debugShowCheckedModeBanner: false,
       title: 'Chorezilla',
       home: const AuthGate(),
