@@ -433,7 +433,7 @@ class _RevealAnimation extends StatelessWidget {
                     children: [
                       const SpriteSheetAnimation(
                         assetPath:
-                            'assets/icons/mascot/sprite-sheets/celebrate.png',
+                            'assets/mascot/sprite-sheets/celebrate.png',
                         size: 64,
                         columns: 6,
                         rows: 6,
@@ -467,6 +467,17 @@ class _RarityMeter extends StatelessWidget {
   final CosmeticRarity rarity;
   final AnimationController upgradeController;
 
+  static String _rarityIconPath(CosmeticRarity r) {
+    switch (r) {
+      case CosmeticRarity.common:
+        return 'assets/icons/common-loot.png';
+      case CosmeticRarity.rare:
+        return 'assets/icons/rare-loot.png';
+      case CosmeticRarity.epic:
+        return 'assets/icons/epic-loot.png';
+    }
+  }
+
   static Color _rarityColor(CosmeticRarity r) {
     switch (r) {
       case CosmeticRarity.common:
@@ -494,19 +505,10 @@ class _RarityMeter extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(3, (i) {
-              return Icon(
-                i < rarity.starCount
-                    ? Icons.star_rounded
-                    : Icons.star_border_rounded,
-                color: i < rarity.starCount
-                    ? color
-                    : Colors.grey.withValues(alpha: 0.4),
-                size: 32,
-              );
-            }),
+          Image.asset(
+            _rarityIconPath(rarity),
+            width: 64,
+            height: 64,
           ),
           const SizedBox(height: 4),
           Text(
@@ -536,19 +538,22 @@ class _ItemReveal extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final String emoji;
+    final Widget typeIcon;
     switch (item.type) {
       case CosmeticType.background:
-        emoji = '🖼️';
+        typeIcon = Image.asset('assets/backgrounds/background-icon.png', width: 32, height: 32);
         break;
       case CosmeticType.zillaSkin:
-        emoji = '🦖';
+        typeIcon = const Text('🦖', style: TextStyle(fontSize: 32));
         break;
       case CosmeticType.avatarFrame:
-        emoji = '⭐';
+        typeIcon = const Text('⭐', style: TextStyle(fontSize: 32));
         break;
       case CosmeticType.title:
-        emoji = '🏆';
+        typeIcon = const Text('🏆', style: TextStyle(fontSize: 32));
+        break;
+      case CosmeticType.avatar:
+        typeIcon = const Text('🧑', style: TextStyle(fontSize: 32));
         break;
     }
 
@@ -561,7 +566,7 @@ class _ItemReveal extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 32)),
+          typeIcon,
           const SizedBox(width: 12),
           Text(
             item.name,

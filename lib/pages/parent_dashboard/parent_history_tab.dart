@@ -427,11 +427,9 @@ class _KidHistoryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header: avatar + name + allowance toggle
+            // Header: name + allowance toggle
             Row(
               children: [
-                _MemberAvatar(member: member, index: avatarIndex),
-                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,50 +475,6 @@ class _KidHistoryCard extends StatelessWidget {
           ],
         ),
       ),
-      ),
-    );
-  }
-}
-
-class _MemberAvatar extends StatelessWidget {
-  final Member member;
-  final int index;
-  const _MemberAvatar({required this.member, required this.index});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final ts = Theme.of(context).textTheme;
-
-    final initial = member.displayName.isNotEmpty
-        ? member.displayName.characters.first.toUpperCase()
-        : '?';
-
-    // Cycle through four distinct container colours.
-    final backgrounds = [
-      cs.primaryContainer,
-      cs.secondaryContainer,
-      cs.tertiaryContainer,
-      cs.errorContainer,
-    ];
-    final foregrounds = [
-      cs.onPrimaryContainer,
-      cs.onSecondaryContainer,
-      cs.onTertiaryContainer,
-      cs.onErrorContainer,
-    ];
-    final bg = backgrounds[index % backgrounds.length];
-    final fg = foregrounds[index % foregrounds.length];
-
-    return CircleAvatar(
-      radius: 18,
-      backgroundColor: bg,
-      child: Text(
-        initial,
-        style: ts.titleMedium?.copyWith(
-          color: fg,
-          fontWeight: FontWeight.w700,
-        ),
       ),
     );
   }

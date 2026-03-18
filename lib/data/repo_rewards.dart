@@ -224,273 +224,23 @@ extension RewardRepo on ChorezillaRepo {
     final batch = firebaseDB.batch();
     final coll = rewardsColl(firebaseDB, familyId);
 
-    void addReward({
-      required String title,
-      String? description,
-      String? icon,
-      required int coinCost,
-      required RewardCategory category,
-      bool requiresApproval = false,
-    }) {
+    for (final template in kDefaultRewards) {
       final ref = coll.doc();
       batch.set(ref, {
-        'title': title,
-        'name': title,
-        'description': description,
-        'icon': icon,
-        'coinCost': coinCost,
-        'priceCoins': coinCost,
-        'category': category.name,
-        'requiresApproval': requiresApproval,
+        'title': template.title,
+        'name': template.title,
+        'description': template.description,
+        'icon': template.icon,
+        'coinCost': template.coinCost,
+        'priceCoins': template.coinCost,
+        'category': template.category.name,
+        'requiresApproval': true,
         'isCustom': false,
         'stock': null,
         'active': true,
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
-// 5 coins
-addReward(
-  title: 'Candy',
-  description: 'Pick a small candy treat.',
-  icon: '🍬',
-  coinCost: 5,
-  category: RewardCategory.snack,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Sticker',
-  description: 'Choose a fun sticker.',
-  icon: '🏷️',
-  coinCost: 5,
-  category: RewardCategory.toy,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Temporary Tattoo',
-  description: 'Pick a temporary tattoo to wear.',
-  icon: '🖋️',
-  coinCost: 5,
-  category: RewardCategory.toy,
-  requiresApproval: true,
-);
-
-// 10 coins
-addReward(
-  title: 'Dessert',
-  description: 'You choose what we have for dessert tonight.',
-  icon: '🍰',
-  coinCost: 10,
-  category: RewardCategory.snack,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Treasure Box',
-  description: 'Pick one prize from the family treasure box.',
-  icon: '🧰',
-  coinCost: 10,
-  category: RewardCategory.toy,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Choose Dinner',
-  description: 'You decide what the family has for dinner.',
-  icon: '🍽️',
-  coinCost: 10,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Bedtime Story',
-  description: 'Choose a special bedtime story and extra reading time.',
-  icon: '📚',
-  coinCost: 10,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-// 20 coins
-addReward(
-  title: 'Choose Car Music',
-  description: 'You control the music in the car for the trip.',
-  icon: '🚗',
-  coinCost: 20,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Double XP for 1 Day',
-  description: 'Earn double XP on all chores for one full day.',
-  icon: '✨',
-  coinCost: 20,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Go to the Park',
-  description: 'Special trip to the park to play.',
-  icon: '🏞️',
-  coinCost: 20,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Extra Backscratch',
-  description: 'Get an extra-long backscratch or cuddle time.',
-  icon: '🤗',
-  coinCost: 20,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-// 30 coins
-addReward(
-  title: 'Stay Up 30 Minutes Late',
-  description: 'Bedtime is moved 30 minutes later for one night.',
-  icon: '🌙',
-  coinCost: 30,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: '3D Print',
-  description: 'Design and print a small item on the 3D printer.',
-  icon: '🖨️',
-  coinCost: 30,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Bake Cookies',
-  description: 'Bake a batch of cookies together.',
-  icon: '🍪',
-  coinCost: 30,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Gas Station Treats',
-  description: 'Trip to the gas station for a drink or snack.',
-  icon: '🍩',
-  coinCost: 30,
-  category: RewardCategory.snack,
-  requiresApproval: true,
-);
-
-// 40 coins
-addReward(
-  title: 'Game Night',
-  description: 'Family game night with games you choose.',
-  icon: '🎲',
-  coinCost: 40,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Movie Night',
-  description: 'Family movie night with your movie choice.',
-  icon: '🎬',
-  coinCost: 40,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-// 50 coins
-addReward(
-  title: 'Room Decoration',
-  description: 'Pick a new decoration or poster for your room.',
-  icon: '🖼️',
-  coinCost: 50,
-  category: RewardCategory.toy,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'New Toy',
-  description: 'Choose a small new toy within the family budget.',
-  icon: '🧸',
-  coinCost: 50,
-  category: RewardCategory.toy,
-  requiresApproval: true,
-);
-
-// 80 coins
-addReward(
-  title: 'Sleepover in Living Room',
-  description: 'Sleep in the living room with blankets, pillows, and a movie or game.',
-  icon: '🛋️',
-  coinCost: 80,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-addReward(
-  title: '\$5 Cash',
-  description: 'Get \$5 to save or spend (with parent help).',
-  icon: '💵',
-  coinCost: 80,
-  category: RewardCategory.money,
-  requiresApproval: true,
-);
-
-// 150 coins
-addReward(
-  title: 'New Video Game',
-  description: 'Pick a new video game within the family budget.',
-  icon: '🎮',
-  coinCost: 150,
-  category: RewardCategory.toy,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Bike Upgrade',
-  description: 'Get an upgrade or accessory for your bike.',
-  icon: '🚲',
-  coinCost: 150,
-  category: RewardCategory.toy,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Go to Arcade',
-  description: 'Trip to the arcade for games and fun.',
-  icon: '🕹️',
-  coinCost: 150,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
-// 750 coins
-addReward(
-  title: '\$100 Cash',
-  description: 'Big reward: \$100 to save or spend with parent guidance.',
-  icon: '💰',
-  coinCost: 750,
-  category: RewardCategory.money,
-  requiresApproval: true,
-);
-
-addReward(
-  title: 'Go to Sports Game',
-  description: 'Go to a live sports game together.',
-  icon: '🏟️',
-  coinCost: 750,
-  category: RewardCategory.experience,
-  requiresApproval: true,
-);
-
 
     await batch.commit();
   }
@@ -536,7 +286,27 @@ addReward(
         throw Exception('Not enough coins');
       }
 
-      tx.update(memberRef, {'coins': FieldValue.increment(-reward.coinCost)});
+      final newCoins = member.coins - reward.coinCost;
+
+      // Track daily coin spend for Big Spender achievement title.
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final spendDate = member.dailyCoinsSpentDate;
+      final prevSpendDay = spendDate == null
+          ? null
+          : DateTime(spendDate.year, spendDate.month, spendDate.day);
+      final newDailySpent = (prevSpendDay == today)
+          ? member.dailyCoinsSpent + reward.coinCost
+          : reward.coinCost;
+
+      // If coins drop below 100, reset the hoard-since timestamp.
+      final memberUpdate = <String, dynamic>{
+        'coins': FieldValue.increment(-reward.coinCost),
+        'dailyCoinsSpent': newDailySpent,
+        'dailyCoinsSpentDate': Timestamp.fromDate(today),
+        if (newCoins < 100) 'coinsHoardSince': null,
+      };
+      tx.update(memberRef, memberUpdate);
 
       if (reward.stock != null) {
         final rSnap = await tx.get(rewardRef);

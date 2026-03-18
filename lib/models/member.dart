@@ -8,7 +8,9 @@ class Member {
   final String? userUid;
   final String? avatarKey;
   final String? pinHash;
-  final int? age;
+
+  /// Birth month/year — day is always 1; used to compute age dynamically.
+  final DateTime? birthMonth;
 
   /// Kid wallet fields
   final int level;
@@ -40,6 +42,37 @@ class Member {
   final String? equippedTitleId;
   final List<String> unlockedAnimations;
 
+  // --- Badge counter fields ---
+  final int roomChoresCompleted;
+  final int laundryChoresCompleted;
+  final int dishChoresCompleted;
+  final int trashChoresCompleted;
+  final int petChoresCompleted;
+  final int allTaskDaysCompleted;
+  final int activeDays;
+  final int peakCoins;
+  final DateTime? lastSatCompleted;
+  final DateTime? lastSunCompleted;
+
+  /// Up to 3 badge base IDs the kid has chosen to display on their profile card.
+  /// Backed by a nullable field so hot-reload and missing Firestore fields
+  /// never cause a null-dereference crash.
+  final List<String>? _featuredBadgeIds;
+  List<String> get featuredBadgeIds => _featuredBadgeIds ?? const [];
+
+  // --- Away / split-custody fields ---
+  final DateTime? awayStartDate;
+  final DateTime? awayUntil;
+  final bool awayRecurring;
+  final int? awayIntervalDays;
+
+  /// Achievement title tracking
+  /// Set to now when coins first reach 100; cleared if coins drop below 100.
+  final DateTime? coinsHoardSince;
+  /// Coins spent today (resets on a new calendar day).
+  final int dailyCoinsSpent;
+  final DateTime? dailyCoinsSpentDate;
+
   const Member({
     required this.id,
     required this.displayName,
@@ -47,11 +80,12 @@ class Member {
     this.userUid,
     this.avatarKey,
     this.pinHash,
-    this.age,
+    this.birthMonth,
     this.level = 1,
     this.xp = 0,
     this.coins = 0,
     this.badges = const [],
+    List<String>? featuredBadgeIds,
     this.createdAt,
     this.active = true,
     this.allowanceEnabled = false,
@@ -70,7 +104,24 @@ class Member {
     this.equippedTitleId,
     this.unlockedAnimations = const [],
     this.allowBonusChores = true,
-  });
+    this.awayStartDate,
+    this.awayUntil,
+    this.awayRecurring = false,
+    this.awayIntervalDays,
+    this.coinsHoardSince,
+    this.dailyCoinsSpent = 0,
+    this.dailyCoinsSpentDate,
+    this.roomChoresCompleted = 0,
+    this.laundryChoresCompleted = 0,
+    this.dishChoresCompleted = 0,
+    this.trashChoresCompleted = 0,
+    this.petChoresCompleted = 0,
+    this.allTaskDaysCompleted = 0,
+    this.activeDays = 0,
+    this.peakCoins = 0,
+    this.lastSatCompleted,
+    this.lastSunCompleted,
+  }) : _featuredBadgeIds = featuredBadgeIds;
 
   Member copyWith({
     String? displayName,
@@ -78,11 +129,12 @@ class Member {
     String? userUid,
     String? avatarKey,
     String? pinHash,
-    int? age,
+    DateTime? birthMonth,
     int? level,
     int? xp,
     int? coins,
     List<String>? badges,
+    List<String>? featuredBadgeIds,
     DateTime? createdAt,
     bool? active,
     bool? allowanceEnabled,
@@ -101,6 +153,30 @@ class Member {
     String? equippedTitleId,
     List<String>? unlockedAnimations,
     bool? allowBonusChores,
+    DateTime? awayStartDate,
+    bool clearAwayStartDate = false,
+    DateTime? awayUntil,
+    bool clearAwayUntil = false,
+    bool? awayRecurring,
+    int? awayIntervalDays,
+    bool clearAwayIntervalDays = false,
+    DateTime? coinsHoardSince,
+    bool clearCoinsHoardSince = false,
+    int? dailyCoinsSpent,
+    DateTime? dailyCoinsSpentDate,
+    bool clearDailyCoinsSpentDate = false,
+    int? roomChoresCompleted,
+    int? laundryChoresCompleted,
+    int? dishChoresCompleted,
+    int? trashChoresCompleted,
+    int? petChoresCompleted,
+    int? allTaskDaysCompleted,
+    int? activeDays,
+    int? peakCoins,
+    DateTime? lastSatCompleted,
+    bool clearLastSatCompleted = false,
+    DateTime? lastSunCompleted,
+    bool clearLastSunCompleted = false,
   }) => Member(
     id: id,
     displayName: displayName ?? this.displayName,
@@ -108,11 +184,12 @@ class Member {
     userUid: userUid ?? this.userUid,
     avatarKey: avatarKey ?? this.avatarKey,
     pinHash: pinHash ?? this.pinHash,
-    age: age ?? this.age,
+    birthMonth: birthMonth ?? this.birthMonth,
     level: level ?? this.level,
     xp: xp ?? this.xp,
     coins: coins ?? this.coins,
     badges: badges ?? this.badges,
+    featuredBadgeIds: featuredBadgeIds ?? this.featuredBadgeIds,
     createdAt: createdAt ?? this.createdAt,
     active: active ?? this.active,
     allowanceEnabled: allowanceEnabled ?? this.allowanceEnabled,
@@ -133,6 +210,23 @@ class Member {
     equippedTitleId: equippedTitleId ?? this.equippedTitleId,
     unlockedAnimations: unlockedAnimations ?? this.unlockedAnimations,
     allowBonusChores: allowBonusChores ?? this.allowBonusChores,
+    awayStartDate: clearAwayStartDate ? null : (awayStartDate ?? this.awayStartDate),
+    awayUntil: clearAwayUntil ? null : (awayUntil ?? this.awayUntil),
+    awayRecurring: awayRecurring ?? this.awayRecurring,
+    awayIntervalDays: clearAwayIntervalDays ? null : (awayIntervalDays ?? this.awayIntervalDays),
+    coinsHoardSince: clearCoinsHoardSince ? null : (coinsHoardSince ?? this.coinsHoardSince),
+    dailyCoinsSpent: dailyCoinsSpent ?? this.dailyCoinsSpent,
+    dailyCoinsSpentDate: clearDailyCoinsSpentDate ? null : (dailyCoinsSpentDate ?? this.dailyCoinsSpentDate),
+    roomChoresCompleted: roomChoresCompleted ?? this.roomChoresCompleted,
+    laundryChoresCompleted: laundryChoresCompleted ?? this.laundryChoresCompleted,
+    dishChoresCompleted: dishChoresCompleted ?? this.dishChoresCompleted,
+    trashChoresCompleted: trashChoresCompleted ?? this.trashChoresCompleted,
+    petChoresCompleted: petChoresCompleted ?? this.petChoresCompleted,
+    allTaskDaysCompleted: allTaskDaysCompleted ?? this.allTaskDaysCompleted,
+    activeDays: activeDays ?? this.activeDays,
+    peakCoins: peakCoins ?? this.peakCoins,
+    lastSatCompleted: clearLastSatCompleted ? null : (lastSatCompleted ?? this.lastSatCompleted),
+    lastSunCompleted: clearLastSunCompleted ? null : (lastSunCompleted ?? this.lastSunCompleted),
   );
 
     Map<String, dynamic> toMap() => {
@@ -141,11 +235,12 @@ class Member {
     'userUid': userUid,
     'avatarKey': avatarKey,
     'pinHash': pinHash,
-    'age': age,
+    'birthMonth': birthMonth == null ? null : Timestamp.fromDate(birthMonth!),
     'level': level,
     'xp': xp,
     'coins': coins,
     'badges': badges,
+    'featuredBadgeIds': featuredBadgeIds,
     'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
     'active': active,
 
@@ -170,6 +265,23 @@ class Member {
     'equippedTitleId': equippedTitleId,
     'unlockedAnimations': unlockedAnimations,
     'allowBonusChores': allowBonusChores,
+    'awayStartDate': awayStartDate == null ? null : Timestamp.fromDate(awayStartDate!),
+    'awayUntil': awayUntil == null ? null : Timestamp.fromDate(awayUntil!),
+    'awayRecurring': awayRecurring,
+    'awayIntervalDays': awayIntervalDays,
+    'coinsHoardSince': coinsHoardSince == null ? null : Timestamp.fromDate(coinsHoardSince!),
+    'dailyCoinsSpent': dailyCoinsSpent,
+    'dailyCoinsSpentDate': dailyCoinsSpentDate == null ? null : Timestamp.fromDate(dailyCoinsSpentDate!),
+    'roomChoresCompleted': roomChoresCompleted,
+    'laundryChoresCompleted': laundryChoresCompleted,
+    'dishChoresCompleted': dishChoresCompleted,
+    'trashChoresCompleted': trashChoresCompleted,
+    'petChoresCompleted': petChoresCompleted,
+    'allTaskDaysCompleted': allTaskDaysCompleted,
+    'activeDays': activeDays,
+    'peakCoins': peakCoins,
+    'lastSatCompleted': lastSatCompleted == null ? null : Timestamp.fromDate(lastSatCompleted!),
+    'lastSunCompleted': lastSunCompleted == null ? null : Timestamp.fromDate(lastSunCompleted!),
   };
 
   factory Member.fromDoc(DocumentSnapshot doc) {
@@ -183,12 +295,15 @@ class Member {
       userUid: data['userUid'] as String?,
       avatarKey: data['avatarKey'] as String?,
       pinHash: data['pinHash'] as String?,
-      age: data['age'] as int?,
+      birthMonth: tsAsDate(data['birthMonth']),
       level: (data['level'] as num?)?.toInt() ?? 1,
       xp: (data['xp'] as num?)?.toInt() ?? 0,
       coins: (data['coins'] as num?)?.toInt() ?? 0,
       badges:
           (data['badges'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
+      featuredBadgeIds:
+          (data['featuredBadgeIds'] as List?)?.map((e) => e.toString()).toList() ??
           const [],
       createdAt: tsAsDate(data['createdAt']),
       active: (data['active'] as bool?) ?? true,
@@ -216,6 +331,23 @@ class Member {
               .toList() ??
           const [],
       allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
+      awayStartDate: tsAsDate(data['awayStartDate']),
+      awayUntil: tsAsDate(data['awayUntil']),
+      awayRecurring: (data['awayRecurring'] as bool?) ?? false,
+      awayIntervalDays: (data['awayIntervalDays'] as num?)?.toInt(),
+      coinsHoardSince: tsAsDate(data['coinsHoardSince']),
+      dailyCoinsSpent: (data['dailyCoinsSpent'] as num?)?.toInt() ?? 0,
+      dailyCoinsSpentDate: tsAsDate(data['dailyCoinsSpentDate']),
+      roomChoresCompleted: (data['roomChoresCompleted'] as num?)?.toInt() ?? 0,
+      laundryChoresCompleted: (data['laundryChoresCompleted'] as num?)?.toInt() ?? 0,
+      dishChoresCompleted: (data['dishChoresCompleted'] as num?)?.toInt() ?? 0,
+      trashChoresCompleted: (data['trashChoresCompleted'] as num?)?.toInt() ?? 0,
+      petChoresCompleted: (data['petChoresCompleted'] as num?)?.toInt() ?? 0,
+      allTaskDaysCompleted: (data['allTaskDaysCompleted'] as num?)?.toInt() ?? 0,
+      activeDays: (data['activeDays'] as num?)?.toInt() ?? 0,
+      peakCoins: (data['peakCoins'] as num?)?.toInt() ?? 0,
+      lastSatCompleted: tsAsDate(data['lastSatCompleted']),
+      lastSunCompleted: tsAsDate(data['lastSunCompleted']),
     );
   }
 
@@ -227,11 +359,12 @@ class Member {
     'userUid': userUid,
     'avatarKey': avatarKey,
     'pinHash': pinHash,
-    'age': age,
+    'birthMonth': birthMonth?.toIso8601String(),
     'level': level,
     'xp': xp,
     'coins': coins,
     'badges': badges,
+    'featuredBadgeIds': featuredBadgeIds,
     'createdAt': createdAt?.toIso8601String(),
     'active': active,
     'allowanceEnabled': allowanceEnabled,
@@ -250,6 +383,23 @@ class Member {
     'equippedTitleId': equippedTitleId,
     'unlockedAnimations': unlockedAnimations,
     'allowBonusChores': allowBonusChores,
+    'awayStartDate': awayStartDate?.toIso8601String(),
+    'awayUntil': awayUntil?.toIso8601String(),
+    'awayRecurring': awayRecurring,
+    'awayIntervalDays': awayIntervalDays,
+    'coinsHoardSince': coinsHoardSince?.toIso8601String(),
+    'dailyCoinsSpent': dailyCoinsSpent,
+    'dailyCoinsSpentDate': dailyCoinsSpentDate?.toIso8601String(),
+    'roomChoresCompleted': roomChoresCompleted,
+    'laundryChoresCompleted': laundryChoresCompleted,
+    'dishChoresCompleted': dishChoresCompleted,
+    'trashChoresCompleted': trashChoresCompleted,
+    'petChoresCompleted': petChoresCompleted,
+    'allTaskDaysCompleted': allTaskDaysCompleted,
+    'activeDays': activeDays,
+    'peakCoins': peakCoins,
+    'lastSatCompleted': lastSatCompleted?.toIso8601String(),
+    'lastSunCompleted': lastSunCompleted?.toIso8601String(),
   };
 
 
@@ -261,12 +411,15 @@ class Member {
       userUid: data['userUid'] as String?,
       avatarKey: data['avatarKey'] as String?,
       pinHash: data['pinHash'] as String?,
-      age: data['age'] as int?,
+      birthMonth: parseIsoDateTimeOrNull(data['birthMonth']),
       level: (data['level'] as num?)?.toInt() ?? 1,
       xp: (data['xp'] as num?)?.toInt() ?? 0,
       coins: (data['coins'] as num?)?.toInt() ?? 0,
       badges:
           (data['badges'] as List?)?.map((e) => e.toString()).toList() ??
+          const [],
+      featuredBadgeIds:
+          (data['featuredBadgeIds'] as List?)?.map((e) => e.toString()).toList() ??
           const [],
       createdAt: parseIsoDateTimeOrNull(data['createdAt']),
       active: (data['active'] as bool?) ?? true,
@@ -297,11 +450,53 @@ class Member {
               .toList() ??
           const [],
       allowBonusChores: (data['allowBonusChores'] as bool?) ?? true,
+      awayStartDate: parseIsoDateTimeOrNull(data['awayStartDate']),
+      awayUntil: parseIsoDateTimeOrNull(data['awayUntil']),
+      awayRecurring: (data['awayRecurring'] as bool?) ?? false,
+      awayIntervalDays: (data['awayIntervalDays'] as num?)?.toInt(),
+      coinsHoardSince: parseIsoDateTimeOrNull(data['coinsHoardSince']),
+      dailyCoinsSpent: (data['dailyCoinsSpent'] as num?)?.toInt() ?? 0,
+      dailyCoinsSpentDate: parseIsoDateTimeOrNull(data['dailyCoinsSpentDate']),
+      roomChoresCompleted: (data['roomChoresCompleted'] as num?)?.toInt() ?? 0,
+      laundryChoresCompleted: (data['laundryChoresCompleted'] as num?)?.toInt() ?? 0,
+      dishChoresCompleted: (data['dishChoresCompleted'] as num?)?.toInt() ?? 0,
+      trashChoresCompleted: (data['trashChoresCompleted'] as num?)?.toInt() ?? 0,
+      petChoresCompleted: (data['petChoresCompleted'] as num?)?.toInt() ?? 0,
+      allTaskDaysCompleted: (data['allTaskDaysCompleted'] as num?)?.toInt() ?? 0,
+      activeDays: (data['activeDays'] as num?)?.toInt() ?? 0,
+      peakCoins: (data['peakCoins'] as num?)?.toInt() ?? 0,
+      lastSatCompleted: parseIsoDateTimeOrNull(data['lastSatCompleted']),
+      lastSunCompleted: parseIsoDateTimeOrNull(data['lastSunCompleted']),
     );
+  }
+
+  int? get age {
+    if (birthMonth == null) return null;
+    final now = DateTime.now();
+    int a = now.year - birthMonth!.year;
+    if (now.month < birthMonth!.month) a--;
+    return a;
   }
 
   bool ownsCosmetic(String cosmeticId) => ownedCosmetics.contains(cosmeticId);
 
   bool hasBadge(String badgeId) => badges.contains(badgeId);
+
+  bool isAwayOnDate(DateTime date) {
+    if (awayUntil == null || awayStartDate == null) return false;
+    final d = DateTime(date.year, date.month, date.day);
+    final start = DateTime(awayStartDate!.year, awayStartDate!.month, awayStartDate!.day);
+    final until = DateTime(awayUntil!.year, awayUntil!.month, awayUntil!.day);
+
+    if (!awayRecurring || awayIntervalDays == null) {
+      return !d.isBefore(start) && !d.isAfter(until);
+    }
+    // Recurring: compute position within cycle
+    final durationDays = until.difference(start).inDays + 1;
+    final daysSinceAnchor = d.difference(start).inDays;
+    if (daysSinceAnchor < 0) return false;
+    final posInCycle = daysSinceAnchor % awayIntervalDays!;
+    return posInCycle < durationDays;
+  }
 
 }

@@ -146,7 +146,13 @@ extension AppStateHistoryAllowance on AppState {
     final manual = _dayStatusByMemberId[memberId]?[key];
     if (manual != null) return manual;
 
-    // 2) Auto from month range
+    // 2) Away check — auto-excuse days when kid is marked away
+    final awayMember = members.where((m) => m.id == memberId).firstOrNull;
+    if (awayMember != null && awayMember.isAwayOnDate(date)) {
+      return DayStatus.excused;
+    }
+
+    // 3) Auto from month range
     if (_monthRangeStart != null && _monthRangeEnd != null) {
       final d = normalizeDate(date);
       if (!d.isBefore(_monthRangeStart!) && d.isBefore(_monthRangeEnd!)) {
@@ -209,7 +215,13 @@ extension AppStateHistoryAllowance on AppState {
     final manual = _dayStatusByMemberId[memberId]?[key];
     if (manual != null) return manual;
 
-    // 2) Auto from assignments if this date is in the watched history week
+    // 2) Away check — auto-excuse days when kid is marked away
+    final awayMember = members.where((m) => m.id == memberId).firstOrNull;
+    if (awayMember != null && awayMember.isAwayOnDate(date)) {
+      return DayStatus.excused;
+    }
+
+    // 3) Auto from assignments if this date is in the watched history week
     if (_historyWeekStart != null) {
       final ws = weekStartFor(date);
       if (ws.isAtSameMomentAs(_historyWeekStart!)) {

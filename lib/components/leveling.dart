@@ -1,4 +1,6 @@
-// lib/models/leveling.dart
+// lib/components/leveling.dart
+
+import 'package:chorezilla/models/cosmetics.dart';
 
 class LevelInfo {
   final int level;
@@ -93,24 +95,41 @@ LevelInfo levelInfoForXp(int totalXp) {
 }
 
 /// A cosmetic / perk reward unlocked at a specific level.
-/// For now this is a static config; later we can move to Firestore.
 class LevelRewardDefinition {
   final int level;
   final String emoji;
   final String title;
   final String description;
+  /// If set, this in-game cosmetic ID is auto-granted to the kid on level-up.
+  final String? cosmeticId;
 
   const LevelRewardDefinition({
     required this.level,
     required this.emoji,
     required this.title,
     required this.description,
+    this.cosmeticId,
   });
+
+  Map<String, dynamic> toMap() => {
+        'emoji': emoji,
+        'title': title,
+        'description': description,
+        if (cosmeticId != null) 'cosmeticId': cosmeticId,
+      };
+
+  factory LevelRewardDefinition.fromMap(int level, Map<String, dynamic> m) =>
+      LevelRewardDefinition(
+        level: level,
+        emoji: m['emoji'] as String,
+        title: m['title'] as String,
+        description: m['description'] as String,
+        cosmeticId: m['cosmeticId'] as String?,
+      );
 }
 
-/// Default level-up rewards (v2 baseline).
-///
-/// You can tweak these anytime, or later replace with per-family config.
+/// Default level-up rewards — a mix of real-world perks and in-game cosmetic unlocks.
+/// Cosmetic rewards (cosmeticId set) are auto-granted on level-up.
 const List<LevelRewardDefinition> kDefaultLevelRewards = [
   LevelRewardDefinition(
     level: 2,
@@ -118,98 +137,168 @@ const List<LevelRewardDefinition> kDefaultLevelRewards = [
     title: 'Small Treat',
     description: 'Pick a small snack or candy.',
   ),
-    LevelRewardDefinition(
+  LevelRewardDefinition(
     level: 3,
-    emoji: '🎬',
-    title: 'Pick the movie',
-    description: 'Choose the show to watch.',
+    emoji: '🦎',
+    title: 'Sky Blue Zilla Skin!',
+    description: 'Your Zilla turns sky blue — auto-unlocked!',
+    cosmeticId: 'zilla_sky_blue',
   ),
-    LevelRewardDefinition(
+  LevelRewardDefinition(
     level: 4,
-    emoji: '🎖',
-    title: 'Treasure Box Prize',
-    description: 'Pick 2 prizes from the treasure box.',
+    emoji: '🎬',
+    title: 'Pick the Movie',
+    description: 'Choose the show or movie to watch tonight.',
   ),
   LevelRewardDefinition(
     level: 5,
-    emoji: '🧱',
-    title: 'Room Decoration',
-    description: 'Pick out a decoration for your room',
+    emoji: '💵',
+    title: '\$5 to Spend',
+    description: 'Five dollars to spend however you want — you earned it!',
   ),
-    LevelRewardDefinition(
+  LevelRewardDefinition(
     level: 6,
+    emoji: '🦕',
+    title: 'Dino World Background!',
+    description: 'Your Zilla now roams a prehistoric world — auto-unlocked!',
+    cosmeticId: 'bg_dino',
+  ),
+  LevelRewardDefinition(
+    level: 7,
     emoji: '💻',
     title: 'Extra Screen Time',
     description: 'Earn 60 minutes of bonus screen time.',
   ),
-    LevelRewardDefinition(
-    level: 7,
-    emoji: '🎮',
-    title: 'Game Night',
-    description: '1 hour game night with Mom or Dad',
-  ),
   LevelRewardDefinition(
     level: 8,
-    emoji: '🛏',
-    title: 'Late Bedtime',
-    description: 'Stay up 30 minutes later than usual.',
+    emoji: '⭐',
+    title: 'Starry Frame!',
+    description: 'A gold star border for your avatar — auto-unlocked!',
+    cosmeticId: 'frame_stars',
   ),
-    LevelRewardDefinition(
+  LevelRewardDefinition(
     level: 9,
-    emoji: '🍭',
-    title: 'Gas Station Treats',
-    description: 'Pick out a drink and a snack',
+    emoji: '🎮',
+    title: 'Game Night',
+    description: '1 hour game night with Mom or Dad.',
   ),
-    LevelRewardDefinition(
+  LevelRewardDefinition(
     level: 10,
     emoji: '💰',
-    title: '\$10 to spend',
-    description: 'You get a \$10 bill!',
+    title: '\$10 to Spend',
+    description: 'You earn a \$10 bill — nice work!',
   ),
-    LevelRewardDefinition(
+  LevelRewardDefinition(
     level: 11,
-    emoji: '👫',
-    title: 'Parents do your chores',
-    description: 'Mom and Dad do your chores for the day.',
+    emoji: '🦎',
+    title: 'Coral Zilla Skin!',
+    description: 'Your Zilla glows coral orange — auto-unlocked!',
+    cosmeticId: 'zilla_coral',
   ),
   LevelRewardDefinition(
     level: 12,
-    emoji: '🛏️',
-    title: 'Stay Up Late',
-    description: 'Stay up 20 minutes past usual bedtime.',
+    emoji: '👫',
+    title: 'Parents Do Your Chores',
+    description: 'Mom and Dad do your chores for the day.',
   ),
-    LevelRewardDefinition(
+  LevelRewardDefinition(
     level: 13,
-    emoji: '🧑‍🍳',
-    title: 'Choose a meal',
-    description: 'Choose what the family eats for one meal',
+    emoji: '🌊',
+    title: 'Ocean Background!',
+    description: 'Deep blue waves behind your Zilla — auto-unlocked!',
+    cosmeticId: 'bg_ocean',
   ),
-    LevelRewardDefinition(
+  LevelRewardDefinition(
     level: 14,
-    emoji: '👨‍👩‍👦',
-    title: 'Date Night',
-    description: 'Get a date night with Mom or Dad.',
+    emoji: '🛋',
+    title: 'Late Bedtime',
+    description: 'Stay up 30 minutes later than usual.',
   ),
   LevelRewardDefinition(
     level: 15,
-    emoji: '🛋',
-    title: 'Later Bedtime',
-    description: 'Your bedtime is now an hour later.',
+    emoji: '🍕',
+    title: 'Pizza Night',
+    description: 'The whole family is having pizza — your pick!',
+  ),
+  LevelRewardDefinition(
+    level: 16,
+    emoji: '🦎',
+    title: 'Purple Zilla Skin!',
+    description: 'Royally cool — your Zilla goes purple! Auto-unlocked.',
+    cosmeticId: 'zilla_purple',
+  ),
+  LevelRewardDefinition(
+    level: 17,
+    emoji: '👨‍👩‍👦',
+    title: 'Date Night',
+    description: 'A special one-on-one date night with Mom or Dad.',
+  ),
+  LevelRewardDefinition(
+    level: 18,
+    emoji: '🌈',
+    title: 'Rainbow Frame!',
+    description: 'All the colors around your avatar — auto-unlocked!',
+    cosmeticId: 'frame_rainbow',
+  ),
+  LevelRewardDefinition(
+    level: 19,
+    emoji: '🏆',
+    title: 'Gold Zilla Skin!',
+    description: 'Champion status. Your Zilla shines gold — auto-unlocked!',
+    cosmeticId: 'zilla_gold',
+  ),
+  LevelRewardDefinition(
+    level: 20,
+    emoji: '🕹️',
+    title: 'Arcade Day',
+    description: 'A trip to the arcade — you made it to level 20!',
   ),
 ];
 
-/// Reward for this exact level, if any.
-LevelRewardDefinition? levelRewardForLevel(int level) {
-  for (final def in kDefaultLevelRewards) {
-    if (def.level == level) return def;
+/// All rewards for a specific level.
+/// If [customRewards] is provided (premium families), those override the defaults.
+List<LevelRewardDefinition> levelRewardsForLevel(
+  int level, {
+  Map<int, List<LevelRewardDefinition>>? customRewards,
+}) {
+  if (customRewards != null) {
+    final custom = customRewards[level];
+    if (custom != null && custom.isNotEmpty) return custom;
   }
-  return null;
+  return kDefaultLevelRewards.where((r) => r.level == level).toList();
+}
+
+/// First reward for this exact level, if any.
+/// Pass [customRewards] (from premium family settings) to use family overrides.
+LevelRewardDefinition? levelRewardForLevel(
+  int level, {
+  Map<int, List<LevelRewardDefinition>>? customRewards,
+}) {
+  final list = levelRewardsForLevel(level, customRewards: customRewards);
+  return list.isEmpty ? null : list.first;
 }
 
 /// Next upcoming reward *after* the given level, if any.
-LevelRewardDefinition? nextLevelRewardFromLevel(int currentLevel) {
+/// Pass [customRewards] (from premium family settings) to use family overrides.
+LevelRewardDefinition? nextLevelRewardFromLevel(
+  int currentLevel, {
+  Map<int, List<LevelRewardDefinition>>? customRewards,
+}) {
+  final source = customRewards != null && customRewards.isNotEmpty
+      ? [
+          for (final entry in customRewards.entries)
+            ...entry.value.map((r) => LevelRewardDefinition(
+                  level: entry.key,
+                  emoji: r.emoji,
+                  title: r.title,
+                  description: r.description,
+                  cosmeticId: r.cosmeticId,
+                )),
+        ]
+      : kDefaultLevelRewards;
+
   LevelRewardDefinition? best;
-  for (final def in kDefaultLevelRewards) {
+  for (final def in source) {
     if (def.level > currentLevel) {
       if (best == null || def.level < best.level) {
         best = def;
@@ -217,5 +306,16 @@ LevelRewardDefinition? nextLevelRewardFromLevel(int currentLevel) {
     }
   }
   return best;
+}
+
+/// Returns the title cosmetic awarded at [level] (levels 1–20), or null if none.
+CosmeticItem? titleForLevel(int level) {
+  if (level < 1 || level > 20) return null;
+  final id = 'title_level_$level';
+  try {
+    return CosmeticCatalog.items.firstWhere((c) => c.id == id);
+  } catch (_) {
+    return null;
+  }
 }
 

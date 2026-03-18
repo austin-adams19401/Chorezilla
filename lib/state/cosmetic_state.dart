@@ -69,6 +69,8 @@ extension AppStateCosmetics on AppState {
         return 'equippedAvatarFrameId';
       case CosmeticType.title:
         return 'equippedTitleId';
+      case CosmeticType.avatar:
+        return 'avatarKey';
     }
   }
 }

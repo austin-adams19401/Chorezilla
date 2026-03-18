@@ -72,11 +72,11 @@ flutter_launcher_icons:
   android: true
   ios: true
   # Use one big square PNG; the tool will generate all sizes
-  image_path_android: "assets/icons/mascot/mascot_no_bg.png"
-  image_path_ios: "assets/icons/mascot/mascot_no_bg.png"
+  image_path_android: "assets/mascot/mascot_no_bg.png"
+  image_path_ios: "assets/mascot/mascot_no_bg.png"
 
   # Adaptive icon (Android 8+): use your square art as the foreground and a solid bg color
-  adaptive_icon_foreground: "assets/icons/mascot/mascot_no_bg.png"
+  adaptive_icon_foreground: "assets/mascot/mascot_no_bg.png"
   adaptive_icon_background: "#0B2545"
 
   # iOS tips
@@ -93,10 +93,14 @@ flutter:
   uses-material-design: true
   assets:
     - assets/backgrounds/
+    - assets/frames/
     - assets/icons/
-    - assets/icons/logos/
-    - assets/icons/mascot/
-    - assets/icons/mascot/sprite-sheets/
+    - assets/mascot/
+    - assets/mascot/sprite-sheets/
+    - assets/avatars/default/
+    - assets/avatars/rare/
+    - assets/badges/one-time-badges/
+    - assets/badges/tiered-badges/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

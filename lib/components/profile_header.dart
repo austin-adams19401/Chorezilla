@@ -2,10 +2,11 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/pages/kid_pages/kid_edit_profile_page.dart';
-import 'package:chorezilla/pages/kid_pages/kid_rewards_page.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -43,9 +44,6 @@ class ProfileHeader extends StatelessWidget {
     final Member m = maybe;
 
     final isChild = m.role == FamilyRole.child;
-    final allowanceConfig = isChild ? app.allowanceForMember(m.id) : null;
-    final hasAllowance =
-        isChild && allowanceConfig != null && allowanceConfig.enabled;
 
     // Kids get the redesigned two-zone hero header.
     if (isChild) {
@@ -55,7 +53,6 @@ class ProfileHeader extends StatelessWidget {
           member: m,
           showSwitchButton: showSwitchButton,
           onSwitchMember: onSwitchMember,
-          hasAllowance: hasAllowance,
         ),
       );
     }
@@ -150,13 +147,11 @@ class _KidHeroHeader extends StatelessWidget {
     required this.member,
     required this.showSwitchButton,
     this.onSwitchMember,
-    required this.hasAllowance,
   });
 
   final Member member;
   final bool showSwitchButton;
   final VoidCallback? onSwitchMember;
-  final bool hasAllowance;
 
   @override
   Widget build(BuildContext context) {
@@ -176,7 +171,7 @@ class _KidHeroHeader extends StatelessWidget {
     }
 
     return SizedBox(
-      height: hasAllowance ? 210 : 160,
+      height: 160 + (showTitle ? 24 : 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -188,7 +183,7 @@ class _KidHeroHeader extends StatelessWidget {
                 topLeft: Radius.circular(24),
                 bottomLeft: Radius.circular(24),
               ),
-              child: _buildMascotPanel(member),
+              child: _buildMascotPanel(context, member),
             ),
           ),
 
@@ -199,35 +194,30 @@ class _KidHeroHeader extends StatelessWidget {
               children: [
                 // Stats column
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.max,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Avatar + Name (leave room for edit icon on the right)
-                      Row(
-                        children: [
-                          _AvatarCircle(member: member, radius: 16),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              member.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: ts.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          // Space so text doesn't run under the edit icon
-                          const SizedBox(width: 20),
-                        ],
+                      // Avatar — larger, centered
+                      _AvatarCircle(member: member, radius: 32),
+
+                      const SizedBox(height: 4),
+
+                      // Name
+                      Text(
+                        member.displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: ts.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
 
                       // Title chip (only if equipped)
                       if (titleName != null) ...[
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 3),
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 6,
@@ -250,77 +240,9 @@ class _KidHeroHeader extends StatelessWidget {
                         ),
                       ],
 
-                      const SizedBox(height: 6),
-                      // Level / XP bar (compact — no "next level" line)
+                      const SizedBox(height: 5),
+                      // Level / XP bar
                       _LevelProgressBar(member: member, compact: true),
-
-                      const SizedBox(height: 5),
-                      // Coins count
-                      Row(
-                        children: [
-                          const Text('🪙', style: TextStyle(fontSize: 13)),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              '${member.coins} coins',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: ts.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      if (member.currentStreak > 0) ...[
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            const Text('🔥', style: TextStyle(fontSize: 13)),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                '${member.currentStreak} day streak',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: ts.labelSmall?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-
-                      const SizedBox(height: 5),
-                      // Spend button — full width
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.tonal(
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            minimumSize: Size.zero,
-                          ),
-                          onPressed: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  KidRewardsPage(memberId: member.id),
-                            ),
-                          ),
-                          child: const Text('🎁 Spend'),
-                        ),
-                      ),
-
-                      if (hasAllowance) ...[
-                        const SizedBox(height: 5),
-                        _AllowanceHeaderSummary(memberId: member.id),
-                      ],
                     ],
                   ),
                 ),
@@ -365,7 +287,7 @@ class _KidHeroHeader extends StatelessWidget {
     );
   }
 
-  Widget _buildMascotPanel(Member m) {
+  Widget _buildMascotPanel(BuildContext context, Member m) {
     // Resolve background asset: use equipped bg, fall back to bg_kitchen.
     String bgAsset = 'assets/backgrounds/bg_kitchen.png';
     final bgId = m.equippedBackgroundId;
@@ -385,7 +307,11 @@ class _KidHeroHeader extends StatelessWidget {
       ),
       child: Align(
         alignment: Alignment.bottomCenter,
-        child: _CyclingMascot(skinId: m.equippedZillaSkinId),
+        child: _CyclingMascot(
+      skinId: m.equippedZillaSkinId,
+      isPremium: context.read<AppState>().family?.isPremium ?? false,
+      unlockedAnimations: m.unlockedAnimations,
+    ),
       ),
     );
   }
@@ -395,8 +321,8 @@ class _KidHeroHeader extends StatelessWidget {
 // Allowance summary (header)
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _AllowanceHeaderSummary extends StatelessWidget {
-  const _AllowanceHeaderSummary({required this.memberId});
+class AllowanceHeaderSummary extends StatelessWidget {
+  const AllowanceHeaderSummary({super.key, required this.memberId});
   final String memberId;
 
   @override
@@ -449,15 +375,10 @@ class _AllowanceHeaderSummary extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Allowance: '
-          '\$${earned.toStringAsFixed(2)} of \$${full.toStringAsFixed(2)}',
+          '\$${earned.toStringAsFixed(2)}/\$${full.toStringAsFixed(2)} · $effectiveDays/$requiredDays days',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
-        Text(
-          'Days: $effectiveDays/$requiredDays',
-          style: ts.bodySmall?.copyWith(
-            color: cs.onSurfaceVariant.withValues(alpha: .9),
-          ),
         ),
       ],
     );
@@ -477,13 +398,7 @@ class _AvatarCircle extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
 
-    final avatar = (member.avatarKey ?? '').trim();
-    final String display = avatar.isNotEmpty
-        ? avatar
-        : _initials(member.displayName);
-
-    final double emojiSize = radius * 0.95;
-
+    final avatarKey = (member.avatarKey ?? '').trim();
     final frameId = member.equippedAvatarFrameId;
 
     final circle = CircleAvatar(
@@ -491,11 +406,7 @@ class _AvatarCircle extends StatelessWidget {
       backgroundColor: member.role == FamilyRole.child
           ? cs.primaryContainer
           : cs.secondaryContainer,
-      child: Text(
-        display,
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: emojiSize, fontWeight: FontWeight.w700),
-      ),
+      child: buildAvatarContent(avatarKey, radius * 0.95, _initials(member.displayName)),
     );
 
     if (frameId == null || frameId == 'frame_default') return circle;
@@ -504,7 +415,7 @@ class _AvatarCircle extends StatelessWidget {
       alignment: Alignment.center,
       children: [
         circle,
-        _FrameOverlay(frameId: frameId, radius: radius),
+        FrameOverlay(frameId: frameId, radius: radius),
       ],
     );
   }
@@ -524,169 +435,6 @@ class _AvatarCircle extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Frame overlay (pure Flutter — no images needed)
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _FrameOverlay extends StatelessWidget {
-  const _FrameOverlay({required this.frameId, required this.radius});
-  final String frameId;
-  final double radius;
-
-  @override
-  Widget build(BuildContext context) {
-    switch (frameId) {
-      case 'frame_stars':
-        return _StarFrame(radius: radius, color: Colors.amber);
-      case 'frame_rainbow':
-        return _GradientBorderFrame(
-          radius: radius,
-          colors: const [
-            Colors.red, Colors.orange, Colors.yellow,
-            Colors.green, Colors.blue, Colors.purple,
-          ],
-        );
-      case 'frame_gold':
-        return _DoubleBorderFrame(
-          radius: radius,
-          outerColor: const Color(0xFFFFD700),
-          innerColor: const Color(0xFFFFA000),
-        );
-      case 'frame_fire':
-        return _StarFrame(
-          radius: radius,
-          color: Colors.deepOrange,
-          icon: Icons.local_fire_department,
-        );
-      default:
-        return const SizedBox.shrink();
-    }
-  }
-}
-
-class _StarFrame extends StatelessWidget {
-  const _StarFrame({
-    required this.radius,
-    required this.color,
-    this.icon = Icons.star,
-  });
-  final double radius;
-  final Color color;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    const int count = 8;
-    final double outerRadius = radius + 10;
-    return SizedBox(
-      width: outerRadius * 2,
-      height: outerRadius * 2,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: outerRadius * 2,
-            height: outerRadius * 2,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: color.withValues(alpha: 0.6), width: 2),
-            ),
-          ),
-          ...List.generate(count, (i) {
-            final angle = (i * 2 * math.pi) / count - math.pi / 2;
-            final dx = outerRadius * 0.85 * math.cos(angle);
-            final dy = outerRadius * 0.85 * math.sin(angle);
-            return Transform.translate(
-              offset: Offset(dx, dy),
-              child: Icon(icon, size: 10, color: color),
-            );
-          }),
-        ],
-      ),
-    );
-  }
-}
-
-class _GradientBorderFrame extends StatelessWidget {
-  const _GradientBorderFrame({required this.radius, required this.colors});
-  final double radius;
-  final List<Color> colors;
-
-  @override
-  Widget build(BuildContext context) {
-    final double size = (radius + 10) * 2;
-    return CustomPaint(
-      size: Size(size, size),
-      painter: _GradientRingPainter(colors: colors, strokeWidth: 3),
-    );
-  }
-}
-
-class _GradientRingPainter extends CustomPainter {
-  const _GradientRingPainter({required this.colors, required this.strokeWidth});
-  final List<Color> colors;
-  final double strokeWidth;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final paint = Paint()
-      ..shader = SweepGradient(colors: colors).createShader(rect)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth;
-    canvas.drawCircle(
-      size.center(Offset.zero),
-      size.width / 2 - strokeWidth / 2,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_GradientRingPainter old) => false;
-}
-
-class _DoubleBorderFrame extends StatelessWidget {
-  const _DoubleBorderFrame({
-    required this.radius,
-    required this.outerColor,
-    required this.innerColor,
-  });
-  final double radius;
-  final Color outerColor;
-  final Color innerColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final double outer = (radius + 11) * 2;
-    final double inner = (radius + 7) * 2;
-    return SizedBox(
-      width: outer,
-      height: outer,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: outer,
-            height: outer,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: outerColor, width: 2.5),
-            ),
-          ),
-          Container(
-            width: inner,
-            height: inner,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: innerColor, width: 1.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Level + XP progress
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -702,6 +450,33 @@ class _LevelProgressBar extends StatelessWidget {
 
     final info = levelInfoForXp(member.xp);
     final nextReward = nextLevelRewardFromLevel(info.level);
+
+    if (compact) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            'Level ${info.level}',
+            style: ts.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              minHeight: 6,
+              value: info.progress,
+              backgroundColor: cs.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            '${info.xpIntoLevel} / ${info.xpNeededThisLevel} XP',
+            style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -732,7 +507,7 @@ class _LevelProgressBar extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
           ),
         ),
-        if (nextReward != null && !compact) ...[
+        if (nextReward != null) ...[
           const SizedBox(height: 4),
           Text(
             'Next: Lvl ${nextReward.level} – ${nextReward.title}',
@@ -789,17 +564,28 @@ class _InviteDialog extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cycling mascot — idle → walk (with horizontal movement) → sitting loop
+// Cycling mascot — idle → walk (with horizontal movement) → stationary phases
+// After 30 s of inactivity: go-to-sleep → sleeping loop → wake-up on touch
 // ─────────────────────────────────────────────────────────────────────────────
 
+enum _SleepState { awake, goingToSleep, sleeping, wakingUp }
+
 enum _MascotPhase {
-  idle, walking, sweeping, looking, wiping, sitting,
-  poked, sleeping, wave,
+  idle, walking, sweeping, looking, wiping,
+  wave,
+  grumpy, grrr,
+  goingToSleep, sleepingLoop, wakingUp,
 }
 
 class _CyclingMascot extends StatefulWidget {
-  const _CyclingMascot({this.skinId});
+  const _CyclingMascot({
+    this.skinId,
+    this.isPremium = false,
+    this.unlockedAnimations = const [],
+  });
   final String? skinId;
+  final bool isPremium;
+  final List<String> unlockedAnimations;
 
   @override
   State<_CyclingMascot> createState() => _CyclingMascotState();
@@ -813,42 +599,58 @@ class _CyclingMascotState extends State<_CyclingMascot>
   _MascotPhase _phase = _MascotPhase.idle;
   bool _facingRight = true;
   bool _resumeWalkAfterPoke = false;
+  bool _isPoking = false;
+  int _pokeIndex = 0;
 
   // Bag of stationary phases — shuffled and consumed, refilled when empty.
   final _bag = <_MascotPhase>[];
 
-  static const _stationaryPhases = [
+  // Free phases always available in the random cycle.
+  static const _freeStationaryPhases = [
     _MascotPhase.idle,
-    _MascotPhase.sweeping,
     _MascotPhase.looking,
-    _MascotPhase.wiping,
-    _MascotPhase.sitting,
-    _MascotPhase.sleeping,
-    _MascotPhase.wave,
   ];
+
+  // Premium phases and the animation IDs that unlock them.
+  static const _premiumPhases = <String, _MascotPhase>{
+    'wave':     _MascotPhase.wave,
+    'sweeping': _MascotPhase.sweeping,
+    'wiping':   _MascotPhase.wiping,
+  };
+
+  List<_MascotPhase> get _stationaryPhases {
+    final phases = [..._freeStationaryPhases];
+    if (widget.isPremium) {
+      for (final id in widget.unlockedAnimations) {
+        final phase = _premiumPhases[id];
+        if (phase != null) phases.add(phase);
+      }
+    }
+    return phases;
+  }
 
   // Sprite loop duration for each phase
   static const _spriteDuration = <_MascotPhase, Duration>{
-    _MascotPhase.idle:     Duration(milliseconds: 3500),
-    _MascotPhase.sweeping: Duration(milliseconds: 2250),
-    _MascotPhase.looking:  Duration(milliseconds: 2500),
-    _MascotPhase.wiping:   Duration(milliseconds: 2250),
-    _MascotPhase.sitting:  Duration(milliseconds: 2500),
-    _MascotPhase.poked:    Duration(milliseconds: 2000),
-    _MascotPhase.sleeping: Duration(milliseconds: 4000),
-    _MascotPhase.wave:     Duration(milliseconds: 2250),
-    _MascotPhase.walking:  Duration(milliseconds: 2500),
+    _MascotPhase.idle:          Duration(milliseconds: 3500),
+    _MascotPhase.sweeping:      Duration(milliseconds: 2250),
+    _MascotPhase.looking:       Duration(milliseconds: 2500),
+    _MascotPhase.wiping:        Duration(milliseconds: 2250),
+    _MascotPhase.wave:          Duration(milliseconds: 2250),
+    _MascotPhase.walking:       Duration(milliseconds: 2500),
+    _MascotPhase.grumpy:        Duration(milliseconds: 1800),
+    _MascotPhase.grrr:          Duration(milliseconds: 1400),
+    _MascotPhase.goingToSleep:  Duration(milliseconds: 2000),
+    _MascotPhase.sleepingLoop:  Duration(milliseconds: 2500),
+    _MascotPhase.wakingUp:      Duration(milliseconds: 1800),
   };
 
   // How long to hold each stationary phase (seconds)
+  // Sleep phases don't use this — they're managed via whenCompleteOrCancel.
   static const _holdDuration = <_MascotPhase, int>{
     _MascotPhase.idle:     4,
     _MascotPhase.sweeping: 4,
     _MascotPhase.looking:  3,
     _MascotPhase.wiping:   4,
-    _MascotPhase.sitting:  3,
-    _MascotPhase.poked:    2,
-    _MascotPhase.sleeping: 5,
     _MascotPhase.wave:     3,
   };
 
@@ -860,23 +662,23 @@ class _CyclingMascotState extends State<_CyclingMascot>
 
   Timer? _phaseTimer;
 
-  static const _skinTints = <String, Color>{
-    'zilla_blue_hoodie': Color(0xFF1565C0),
-    'zilla_red_cape': Color(0xFFB71C1C),
-    'zilla_pirate': Color(0xFF4A148C),
-    'zilla_wizard': Color(0xFF1A237E),
-  };
+  // Sleep state machine
+  static const _inactivityTimeout = Duration(seconds: 30);
+  Timer? _inactivityTimer;
+  _SleepState _sleepState = _SleepState.awake;
 
   static const _assetPaths = <_MascotPhase, String>{
-    _MascotPhase.idle:     'assets/icons/mascot/sprite-sheets/idle.png',
-    _MascotPhase.walking:  'assets/icons/mascot/sprite-sheets/walking.png',
-    _MascotPhase.sweeping: 'assets/icons/mascot/sprite-sheets/sweeping.png',
-    _MascotPhase.looking:  'assets/icons/mascot/sprite-sheets/idle2.png',
-    _MascotPhase.wiping:   'assets/icons/mascot/sprite-sheets/wiping.png',
-    _MascotPhase.sitting:  'assets/icons/mascot/sprite-sheets/wake-up.png',
-    _MascotPhase.poked:    'assets/icons/mascot/sprite-sheets/surprised.png',
-    _MascotPhase.sleeping: 'assets/icons/mascot/sprite-sheets/going-to-sleep.png',
-    _MascotPhase.wave:     'assets/icons/mascot/sprite-sheets/wave.png',
+    _MascotPhase.idle:          'assets/mascot/sprite-sheets/idle.png',
+    _MascotPhase.walking:       'assets/mascot/sprite-sheets/walking.png',
+    _MascotPhase.sweeping:      'assets/mascot/sprite-sheets/sweeping.png',
+    _MascotPhase.looking:       'assets/mascot/sprite-sheets/idle2.png',
+    _MascotPhase.wiping:        'assets/mascot/sprite-sheets/wiping.png',
+    _MascotPhase.wave:          'assets/mascot/sprite-sheets/wave.png',
+    _MascotPhase.grumpy:        'assets/mascot/sprite-sheets/grumpy.png',
+    _MascotPhase.grrr:          'assets/mascot/sprite-sheets/grrr.png',
+    _MascotPhase.goingToSleep:  'assets/mascot/sprite-sheets/going-to-sleep.png',
+    _MascotPhase.sleepingLoop:  'assets/mascot/sprite-sheets/sleeping.png',
+    _MascotPhase.wakingUp:      'assets/mascot/sprite-sheets/wake-up.png',
   };
 
   @override
@@ -884,6 +686,8 @@ class _CyclingMascotState extends State<_CyclingMascot>
     super.initState();
     _spriteCtrl = AnimationController(vsync: this);
     _posCtrl = AnimationController(vsync: this);
+    GestureBinding.instance.pointerRouter.addGlobalRoute(_onGlobalPointerEvent);
+    _resetInactivityTimer();
     _loadImages();
   }
 
@@ -907,16 +711,29 @@ class _CyclingMascotState extends State<_CyclingMascot>
     return decodeImageFromList(data.buffer.asUint8List());
   }
 
+  static const _pokePhases = [
+    _MascotPhase.wave,
+    _MascotPhase.grumpy,
+    _MascotPhase.grrr,
+  ];
+
   void _pokeMascot() {
     if (!mounted) return;
+    if (_sleepState != _SleepState.awake) return;
+    if (_isPoking) return;
+
+    _isPoking = true;
     _phaseTimer?.cancel();
     // If poked while walking, stop movement and resume walk after poke.
     _resumeWalkAfterPoke = _phase == _MascotPhase.walking;
     if (_resumeWalkAfterPoke) _posCtrl.stop();
-    setState(() => _phase = _MascotPhase.poked);
-    _spriteCtrl.duration = _spriteDuration[_MascotPhase.poked]!;
+    final reaction = _pokePhases[_pokeIndex % _pokePhases.length];
+    _pokeIndex++;
+    setState(() => _phase = reaction);
+    _spriteCtrl.duration = _spriteDuration[reaction]!;
     _spriteCtrl.forward(from: 0).whenCompleteOrCancel(() {
       if (!mounted) return;
+      _isPoking = false;
       if (_resumeWalkAfterPoke) {
         _resumeWalkAfterPoke = false;
         _startPhase(_MascotPhase.walking);
@@ -924,6 +741,52 @@ class _CyclingMascotState extends State<_CyclingMascot>
         _advanceSequence();
       }
     });
+  }
+
+  void _resetInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = Timer(_inactivityTimeout, _triggerSleepSequence);
+  }
+
+  void _triggerSleepSequence() {
+    if (!mounted || _sleepState != _SleepState.awake) return;
+    _sleepState = _SleepState.goingToSleep;
+    _phaseTimer?.cancel();
+    _posCtrl.stop();
+    setState(() => _phase = _MascotPhase.goingToSleep);
+    _spriteCtrl.duration = _spriteDuration[_MascotPhase.goingToSleep]!;
+    _spriteCtrl.forward(from: 0).whenCompleteOrCancel(() {
+      if (!mounted || _sleepState != _SleepState.goingToSleep) return;
+      _sleepState = _SleepState.sleeping;
+      setState(() => _phase = _MascotPhase.sleepingLoop);
+      _spriteCtrl.duration = _spriteDuration[_MascotPhase.sleepingLoop]!;
+      _spriteCtrl.repeat();
+    });
+  }
+
+  void _wakeUp() {
+    if (!mounted || _sleepState == _SleepState.awake) return;
+    _sleepState = _SleepState.wakingUp;
+    _phaseTimer?.cancel();
+    _spriteCtrl.stop();
+    setState(() => _phase = _MascotPhase.wakingUp);
+    _spriteCtrl.duration = _spriteDuration[_MascotPhase.wakingUp]!;
+    _spriteCtrl.forward(from: 0).whenCompleteOrCancel(() {
+      if (!mounted) return;
+      _sleepState = _SleepState.awake;
+      _resetInactivityTimer();
+      _advanceSequence();
+    });
+  }
+
+  void _onGlobalPointerEvent(PointerEvent event) {
+    if (event is! PointerDownEvent) return;
+    if (_sleepState == _SleepState.sleeping ||
+        _sleepState == _SleepState.goingToSleep) {
+      _wakeUp();
+    } else {
+      _resetInactivityTimer();
+    }
   }
 
   void _advanceSequence() {
@@ -956,7 +819,9 @@ class _CyclingMascotState extends State<_CyclingMascot>
           ? _posCtrl.animateTo(1.0, curve: Curves.linear)
           : _posCtrl.animateTo(0.0, curve: Curves.linear);
       future.whenCompleteOrCancel(() {
-        if (mounted) {
+        // _resumeWalkAfterPoke means we were interrupted mid-walk by a poke —
+        // skip the direction flip and sequence advance; _pokeMascot handles resumption.
+        if (mounted && !_resumeWalkAfterPoke) {
           setState(() => _facingRight = !_facingRight);
           _advanceSequence();
         }
@@ -969,7 +834,9 @@ class _CyclingMascotState extends State<_CyclingMascot>
 
   @override
   void dispose() {
+    _inactivityTimer?.cancel();
     _phaseTimer?.cancel();
+    GestureBinding.instance.pointerRouter.removeGlobalRoute(_onGlobalPointerEvent);
     _spriteCtrl.dispose();
     _posCtrl.dispose();
     super.dispose();
@@ -982,6 +849,9 @@ class _CyclingMascotState extends State<_CyclingMascot>
     if (image == null) {
       return const SizedBox.expand();
     }
+
+    final colorValue = CosmeticCatalog.tintColorValueForSkin(widget.skinId);
+    final tintColor = colorValue != null ? Color(colorValue) : null;
 
     return GestureDetector(
       onTap: _pokeMascot,
@@ -1010,7 +880,6 @@ class _CyclingMascotState extends State<_CyclingMascot>
               ),
             );
 
-            final tintColor = _skinTints[widget.skinId];
             if (tintColor != null) {
               painter = ColorFiltered(
                 colorFilter: ColorFilter.mode(

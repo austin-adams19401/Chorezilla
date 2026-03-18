@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:chorezilla/components/sprite_sheet_animation.dart';
+import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/models/zilla_animations.dart';
 
 /// An animated Zilla mascot widget.
@@ -39,14 +40,6 @@ class _ZillaMascotState extends State<ZillaMascot>
   late final AnimationController _popController;
   final _rng = math.Random();
   int _animIndex = 0;
-
-  // Map skin IDs to tint colors. Default (null / classic) = no tint.
-  static const _skinTints = <String, Color>{
-    'zilla_blue_hoodie': Color(0xFF1565C0),
-    'zilla_red_cape': Color(0xFFB71C1C),
-    'zilla_pirate': Color(0xFF4A148C),
-    'zilla_wizard': Color(0xFF1A237E),
-  };
 
   List<ZillaAnimationDef> get _animations {
     final provided = widget.availableAnimations;
@@ -95,7 +88,8 @@ class _ZillaMascotState extends State<ZillaMascot>
   @override
   Widget build(BuildContext context) {
     final anim = _current;
-    final tintColor = _skinTints[widget.skinId];
+    final colorValue = CosmeticCatalog.tintColorValueForSkin(widget.skinId);
+    final tintColor = colorValue != null ? Color(colorValue) : null;
 
     Widget sprite = SpriteSheetAnimation(
       key: ValueKey(anim.id),

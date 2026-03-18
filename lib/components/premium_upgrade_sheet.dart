@@ -11,6 +11,7 @@ enum UpgradeReason {
   cosmetics,
   allowance,
   parentAccount,
+  levelRewards,
 }
 
 extension _UpgradeReasonCopy on UpgradeReason {
@@ -30,6 +31,8 @@ extension _UpgradeReasonCopy on UpgradeReason {
         return 'Track allowances for every kid';
       case UpgradeReason.parentAccount:
         return 'Add a co-parent to your family';
+      case UpgradeReason.levelRewards:
+        return 'Customize your level-up rewards';
     }
   }
 
@@ -49,6 +52,8 @@ extension _UpgradeReasonCopy on UpgradeReason {
         return 'Allowance tracking is a Premium feature. Set payday, work day requirements, and auto-calculate earnings.';
       case UpgradeReason.parentAccount:
         return 'Free families support one parent account. Go Premium to invite a co-parent.';
+      case UpgradeReason.levelRewards:
+        return 'Free families use built-in rewards. Go Premium to set your own rewards for every level.';
     }
   }
 }
@@ -159,6 +164,7 @@ class _FeatureList extends StatelessWidget {
   static const _features = [
     ('Unlimited kids', '👨‍👩‍👧‍👦'),
     ('Unlimited custom chores & rewards', '✅'),
+    ('Custom level-up rewards', '🎁'),
     ('Full assignment history', '📅'),
     ('Allowance tracking', '💵'),
     ('All Zilla skins, frames & titles', '🦎'),

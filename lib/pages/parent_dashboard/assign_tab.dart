@@ -20,6 +20,7 @@ class _AssignTabState extends State<AssignTab> {
   String _q = '';
   Timer? _deb;
   final _searchCtrl = TextEditingController();
+  final Set<int> _selectedDifficulties = {};
 
   @override
   void dispose() {
@@ -84,49 +85,6 @@ class _AssignTabState extends State<AssignTab> {
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
         child: Column(
           children: [
-            // Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-              decoration: BoxDecoration(
-                color: cs.secondary,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.assignment_turned_in_rounded,
-                    color: cs.onSecondary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Manage chores',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: cs.onSecondary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Create chores once, then schedule them for each kid.',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: cs.onSecondary.withValues(alpha: .9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
             // Search
             Material(
               color: Colors.transparent,
@@ -171,7 +129,53 @@ class _AssignTabState extends State<AssignTab> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
+
+            // Difficulty filters
+            SizedBox(
+              height: 36,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  FilterChip(
+                    label: const Text('All'),
+                    selected: _selectedDifficulties.isEmpty,
+                    showCheckmark: false,
+                    onSelected: (_) =>
+                        setState(() => _selectedDifficulties.clear()),
+                  ),
+                  const SizedBox(width: 6),
+                  ...List.generate(6, (d) {
+                    final color = _difficultyColor(d, cs);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: FilterChip(
+                        label: Text(_difficultyName(d)),
+                        avatar: Container(
+                          width: 10,
+                          height: 10,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: color,
+                          ),
+                        ),
+                        selected: _selectedDifficulties.contains(d),
+                        showCheckmark: false,
+                        onSelected: (on) => setState(() {
+                          if (on) {
+                            _selectedDifficulties.add(d);
+                          } else {
+                            _selectedDifficulties.remove(d);
+                          }
+                        }),
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 8),
 
             // Main panel
             Expanded(
@@ -201,6 +205,11 @@ class _AssignTabState extends State<AssignTab> {
                                 c.title.toLowerCase().contains(
                                   _q.toLowerCase(),
                                 ),
+                          )
+                          .where(
+                            (c) =>
+                                _selectedDifficulties.isEmpty ||
+                                _selectedDifficulties.contains(c.difficulty),
                           )
                           .toList();
 
@@ -250,7 +259,9 @@ class _AssignTabState extends State<AssignTab> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Text(
-                                  'No results for “$_q”',
+                                  _q.isNotEmpty
+                                      ? 'No results for “$_q”'
+                                      : 'No chores match the selected filters',
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w600,
@@ -262,9 +273,10 @@ class _AssignTabState extends State<AssignTab> {
                                   onPressed: () => setState(() {
                                     _q = '';
                                     _searchCtrl.clear();
+                                    _selectedDifficulties.clear();
                                   }),
                                   child: const Text(
-                                    'Clear search',
+                                    'Clear filters',
                                     style: TextStyle(color: Colors.white),
                                   ),
                                 ),

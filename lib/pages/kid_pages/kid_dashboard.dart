@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:chorezilla/components/badge_unlock_dialog.dart';
 import 'package:chorezilla/components/leveling.dart';
+import 'package:chorezilla/components/title_unlock_dialog.dart';
 import 'package:chorezilla/models/zilla_animations.dart';
 import 'package:chorezilla/components/profile_header.dart';
 import 'package:chorezilla/components/zilla_level_up_hero.dart';
@@ -53,6 +55,10 @@ class _KidDashboardPageState extends State<KidDashboardPage>
   late final ConfettiController _choreConfettiController;
   bool _showChoreConfetti = false;
 
+  bool _showRewardBurst = false;
+  int _burstCoins = 0;
+  int _burstXp = 0;
+
   // image picker for photo proof
   final ImagePicker _imagePicker = ImagePicker();
 
@@ -60,6 +66,11 @@ class _KidDashboardPageState extends State<KidDashboardPage>
   StreamSubscription<List<Assignment>>? _todayAssignmentsSub;
   List<Assignment> _todayAssignmentsForKid = [];
   bool _todayAssignmentsBootstrapped = false;
+
+  // Silent Ninja: track required chores completed in this session.
+  int _sessionRequiredTotal = 0;
+  int _sessionRequiredCompleted = 0;
+  bool _silentNinjaTriggered = false;
 
   @override
   void initState() {
@@ -133,6 +144,11 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     _watchingMemberId = member.id;
     _lastSeenLevel = null;
 
+    // Reset Silent Ninja session tracking for the new member.
+    _sessionRequiredTotal = 0;
+    _sessionRequiredCompleted = 0;
+    _silentNinjaTriggered = false;
+
     // Start AppState-level kid streams (for rewards, etc.)
     _app.startKidStreams(member.id);
 
@@ -157,6 +173,14 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
       if (!mounted) return;
       setState(() {
+        // On first load, snapshot how many required chores need to be done
+        // so we can track Silent Ninja progress for this session.
+        if (!_todayAssignmentsBootstrapped) {
+          _sessionRequiredTotal =
+              filtered.where((a) => !a.bonus && a.status == AssignmentStatus.assigned).length;
+          _sessionRequiredCompleted = 0;
+          _silentNinjaTriggered = false;
+        }
         _todayAssignmentsForKid = filtered;
         _todayAssignmentsBootstrapped = true;
       });
@@ -174,14 +198,26 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     return app.currentMember ?? app.members.firstOrNull;
   }
 
-  Future<void> _showBadgeUnlockDialogs(List<BadgeDefinition> badges) async {
-    for (final badge in badges) {
+  Future<void> _showBadgeUnlockDialogs(List<BadgeEvent> events) async {
+    for (final event in events) {
       if (!mounted) return;
 
       await showDialog<void>(
         context: context,
         barrierDismissible: true,
-        builder: (_) => BadgeUnlockDialog(badge: badge),
+        builder: (_) => BadgeUnlockDialog(event: event),
+      );
+    }
+  }
+
+  Future<void> _showTitleUnlockDialogs(List<CosmeticItem> titles) async {
+    for (final title in titles) {
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => TitleUnlockDialog(title: title),
       );
     }
   }
@@ -408,6 +444,10 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                 ),
               ),
 
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: _KidStatsBar(member: member),
+              ),
 
               if (pendingRewards.isNotEmpty)
                 Padding(
@@ -546,11 +586,19 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                     confettiController: _choreConfettiController,
                     blastDirectionality: BlastDirectionality.explosive,
                     shouldLoop: false,
-                    emissionFrequency: 0.08,
-                    numberOfParticles: 20,
-                    gravity: 0.4,
+                    emissionFrequency: 0.04,
+                    numberOfParticles: 10,
+                    gravity: 0.5,
                   ),
                 ),
+              ),
+            ),
+
+          // Reward burst overlay (coins + XP earned)
+          if (_showRewardBurst)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: _RewardBurst(coins: _burstCoins, xp: _burstXp),
               ),
             ),
 
@@ -674,12 +722,41 @@ class _KidDashboardPageState extends State<KidDashboardPage>
             // Existing completion logic (status, XP, coins, streaks, etc.)
       await app.completeAssignment(a.id);
 
-            final newBadges = await app.checkAndAwardBadgesForKid(a.memberId);
+      // Track Silent Ninja progress (required chores only).
+      bool silentNinja = false;
+      if (!a.bonus && !_silentNinjaTriggered) {
+        _sessionRequiredCompleted++;
+        if (_sessionRequiredTotal > 0 &&
+            _sessionRequiredCompleted >= _sessionRequiredTotal) {
+          _silentNinjaTriggered = true;
+          silentNinja = true;
+        }
+      }
+
+      final todaysAssignments = app.getTodaysAssignmentsForMember(a.memberId);
+      final badgeEvents = await app.checkAndAwardBadgesForKid(
+        a.memberId,
+        completedAssignment: a,
+        todaysAssignments: todaysAssignments,
+      );
 
       if (!mounted) return;
 
-      if (newBadges.isNotEmpty) {
-        await _showBadgeUnlockDialogs(newBadges);
+      if (badgeEvents.isNotEmpty) {
+        await _showBadgeUnlockDialogs(badgeEvents);
+      }
+
+      if (!mounted) return;
+
+      final newTitles = await app.checkAndAwardAchievementTitlesForKid(
+        a.memberId,
+        silentNinja: silentNinja,
+      );
+
+      if (!mounted) return;
+
+      if (newTitles.isNotEmpty) {
+        await _showTitleUnlockDialogs(newTitles);
       }
 
       if (mounted) {
@@ -688,6 +765,17 @@ class _KidDashboardPageState extends State<KidDashboardPage>
         Future.delayed(const Duration(milliseconds: 2500), () {
           if (mounted) setState(() => _showChoreConfetti = false);
         });
+
+        if (!a.requiresApproval) {
+          setState(() {
+            _showRewardBurst = true;
+            _burstCoins = a.coinAward;
+            _burstXp = a.xp;
+          });
+          Future.delayed(const Duration(milliseconds: 2200), () {
+            if (mounted) setState(() => _showRewardBurst = false);
+          });
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -760,11 +848,55 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     });
     _confettiController.play();
 
-    final lvlReward = levelRewardForLevel(info.level);
+    final app = context.read<AppState>();
+    final customRewards = (app.family?.isPremium ?? false)
+        ? app.family?.settings.customLevelRewards
+        : null;
+    final lvlReward = levelRewardForLevel(info.level, customRewards: customRewards);
+    final lvlTitle = titleForLevel(info.level);
+    CosmeticItem? grantedCosmetic;
 
     if (!simulate) {
-      final app = context.read<AppState>();
       app.updateMember(member.id, {'level': info.level});
+
+      // Award the level title (add to owned cosmetics if not already there).
+      if (lvlTitle != null &&
+          !member.ownedCosmetics.contains(lvlTitle.id)) {
+        final updatedOwned = [...member.ownedCosmetics, lvlTitle.id];
+        app.updateMember(member.id, {'ownedCosmetics': updatedOwned});
+      }
+
+      // Auto-grant in-game cosmetic if the level reward has one.
+      // If the kid already owns it, fall back to a random unowned cosmetic
+      // of the same type.
+      final cosId = lvlReward?.cosmeticId;
+      if (cosId != null) {
+        String grantId = cosId;
+        if (member.ownedCosmetics.contains(cosId)) {
+          final original = CosmeticCatalog.items
+              .where((c) => c.id == cosId)
+              .firstOrNull;
+          if (original != null) {
+            final pool = CosmeticCatalog.items
+                .where((c) =>
+                    c.type == original.type &&
+                    !member.ownedCosmetics.contains(c.id))
+                .toList();
+            grantId = pool.isNotEmpty
+                ? pool[Random().nextInt(pool.length)].id
+                : '';
+          } else {
+            grantId = '';
+          }
+        }
+        if (grantId.isNotEmpty) {
+          grantedCosmetic = CosmeticCatalog.items
+              .where((c) => c.id == grantId)
+              .firstOrNull;
+          final updatedOwned = [...member.ownedCosmetics, grantId];
+          app.updateMember(member.id, {'ownedCosmetics': updatedOwned});
+        }
+      }
 
       // Unlock a Zilla animation for premium families at this level.
       final animUnlock = ZillaAnimations.unlockForLevel(info.level);
@@ -849,9 +981,112 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                           color: cs.onSurfaceVariant,
                         ),
                       ),
-                      if (lvlReward != null && !simulate) ...[
+                      if (lvlTitle != null) ...[
                         const SizedBox(height: 16),
-                        // reward card...
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            lvlTitle.name,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: cs.onPrimaryContainer,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'New title unlocked!',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      if (lvlReward != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: cs.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(
+                                    lvlReward.emoji,
+                                    style: const TextStyle(fontSize: 28),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          lvlReward.title,
+                                          style: theme.textTheme.titleSmall
+                                              ?.copyWith(
+                                                  fontWeight:
+                                                      FontWeight.w700),
+                                        ),
+                                        if (lvlReward.description
+                                            .isNotEmpty)
+                                          Text(
+                                            lvlReward.description,
+                                            style: theme.textTheme.bodySmall
+                                                ?.copyWith(
+                                                    color: cs
+                                                        .onSurfaceVariant),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (grantedCosmetic != null) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: cs.primaryContainer,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.lock_open_rounded,
+                                          size: 14,
+                                          color: cs.onPrimaryContainer),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        '${grantedCosmetic.name} unlocked!',
+                                        style: theme.textTheme.labelSmall
+                                            ?.copyWith(
+                                          color: cs.onPrimaryContainer,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 16),
                       Text(
@@ -862,9 +1097,23 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                     ],
                   ),
                   actions: [
+                    if (lvlTitle != null && !simulate)
+                      TextButton(
+                        onPressed: () {
+                          ctx.read<AppState>().updateMember(member.id, {
+                            'equippedTitleId': lvlTitle.id,
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        child: const Text('Equip Title'),
+                      ),
                     TextButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(simulate ? 'Close' : 'Awesome!'),
+                      child: Text(
+                        simulate
+                            ? 'Close'
+                            : (lvlTitle != null ? 'Maybe Later' : 'Awesome!'),
+                      ),
                     ),
                   ],
                 ),
@@ -1481,6 +1730,220 @@ class _BonusChoresSection extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _KidStatsBar extends StatelessWidget {
+  const _KidStatsBar({required this.member});
+  final Member member;
+
+  @override
+  Widget build(BuildContext context) {
+    final app = context.watch<AppState>();
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    final allowanceConfig = app.allowanceForMember(member.id);
+    final hasAllowance = allowanceConfig.enabled && allowanceConfig.fullAmountCents > 0;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Coins
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '🪙 ${member.coins}',
+                    style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                  Text(
+                    'coins',
+                    style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+
+              // Streak (only if active)
+              if (member.currentStreak > 0) ...[
+                const SizedBox(width: 20),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '🔥 ${member.currentStreak}',
+                      style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                    Text(
+                      'day streak',
+                      style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ],
+
+              const Spacer(),
+
+              // Spend button
+              FilledButton.tonal(
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  minimumSize: Size.zero,
+                ),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => KidRewardsPage(memberId: member.id),
+                  ),
+                ),
+                child: const Text('🎁 Spend'),
+              ),
+            ],
+          ),
+
+          // Allowance section
+          if (hasAllowance) ...[
+            const SizedBox(height: 10),
+            Divider(height: 1, color: cs.outlineVariant),
+            const SizedBox(height: 10),
+            AllowanceHeaderSummary(memberId: member.id),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ---- Reward burst overlay -------------------------------------------------
+
+class _RewardBurst extends StatefulWidget {
+  final int coins;
+  final int xp;
+  const _RewardBurst({required this.coins, required this.xp});
+
+  @override
+  State<_RewardBurst> createState() => _RewardBurstState();
+}
+
+class _RewardBurstState extends State<_RewardBurst>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _opacity;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    _opacity = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0), weight: 15),
+      TweenSequenceItem(
+        tween: ConstantTween(1.0),
+        weight: 60,
+      ),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0), weight: 25),
+    ]).animate(_ctrl);
+
+    _slide = TweenSequence<Offset>([
+      TweenSequenceItem(
+        tween: Tween(begin: const Offset(0, 0.25), end: Offset.zero),
+        weight: 15,
+      ),
+      TweenSequenceItem(tween: ConstantTween(Offset.zero), weight: 60),
+      TweenSequenceItem(
+        tween: Tween(begin: Offset.zero, end: const Offset(0, -0.25)),
+        weight: 25,
+      ),
+    ]).animate(_ctrl);
+
+    _ctrl.forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (ctx, _) => Opacity(
+        opacity: _opacity.value,
+        child: SlideTransition(
+          position: _slide,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 18),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 24,
+                children: [
+                  _RewardChip(
+                    emoji: '🪙',
+                    value: '+${widget.coins}',
+                    color: Colors.amber,
+                  ),
+                  _RewardChip(
+                    emoji: '⭐',
+                    value: '+${widget.xp} XP',
+                    color: Colors.purpleAccent,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RewardChip extends StatelessWidget {
+  final String emoji;
+  final String value;
+  final Color color;
+  const _RewardChip({
+    required this.emoji,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 28)),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            color: color,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -50,9 +50,10 @@ extension ChoreRepo on ChorezillaRepo {
     int? difficulty,
     FamilySettings? settings,
     Recurrence? recurrence,
-    bool? active, 
+    bool? active,
     required bool requiresApproval,
     bool? bonusOnly,
+    ChoreCategory? category,
   }) async {
     final patch = <String, dynamic>{};
     if (title != null) patch['title'] = title;
@@ -69,8 +70,30 @@ extension ChoreRepo on ChorezillaRepo {
     if (recurrence != null) patch['recurrence'] = recurrence.toMap();
     if (active != null) patch['active'] = active;
     if (bonusOnly != null) patch['bonusOnly'] = bonusOnly;
+    if (category != null) patch['category'] = choreCategoryToString(category);
 
     await choresColl(firebaseDB, familyId).doc(choreId).update(patch);
+  }
+
+  /// Recalculates and updates the cached xp/coins on every active chore
+  /// document. Call this after saving new FamilySettings so display values
+  /// stay in sync with the current economy.
+  Future<void> recalculateChoreAwards(
+    String familyId,
+    FamilySettings settings,
+  ) async {
+    final snap = await choresColl(firebaseDB, familyId)
+        .where('active', isEqualTo: true)
+        .get();
+    if (snap.docs.isEmpty) return;
+    final batch = firebaseDB.batch();
+    for (final doc in snap.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final difficulty = (data['difficulty'] as num?)?.toInt() ?? 0;
+      final awards = calcAwards(difficulty: difficulty, settings: settings);
+      batch.update(doc.reference, {'xp': awards.xp, 'coins': awards.coins});
+    }
+    await batch.commit();
   }
 
     // ───────────────────────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
-import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
+import 'package:chorezilla/components/inputs.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -34,43 +35,14 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     '🐱',
     '🐶',
     '🐵',
-    '🐼',
     '🦊',
-    '🐯',
     '🐸',
-    '🐨',
-    '🐰',
-    '🐮',
-    '🐹',
-    '🐻',
-    '🐷',
-    '🐭',
     '🦁',
-    '🐔',
-    '🐥',
-    '🦉',
-    '🦋',
-    '🐞',
-    '🐙',
-    '🐳',
-    '🚀',
-    '⚽',
-    '🎮',
-    '🎲',
-    '🎸',
-    '🎯',
-    '🌈',
-    '🍕',
-    '🍩',
-    '🍪',
-    '🍎',
-    '🧩',
   ];
 
   @override
   void initState() {
     super.initState();
-    // We can't use context.watch in initState, so we lazily init in didChangeDependencies.
     _nameController = TextEditingController();
   }
 
@@ -82,7 +54,6 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     final member = app.members.firstWhere(
       (m) => m.id == widget.memberId,
       orElse: () {
-        // Fallback dummy; UI will show error if this happens.
         return app.currentMember ??
             Member(
               id: widget.memberId,
@@ -148,6 +119,13 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     }
   }
 
+  Member _previewMember(Member member) => member.copyWith(
+        avatarKey: _avatarEmoji,
+        equippedAvatarFrameId: _avatarFrameId,
+        equippedZillaSkinId: _zillaSkinId,
+        equippedTitleId: _titleId,
+      );
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
@@ -160,115 +138,111 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     final cs = theme.colorScheme;
     final ts = theme.textTheme;
 
-    final backgrounds = CosmeticCatalog.backgrounds().toList();
+    final ownedBackgrounds = CosmeticCatalog.backgrounds()
+        .where((b) => b.isDefault || member.ownsCosmetic(b.id))
+        .toList();
 
-    final selectedBgId =
-        _backgroundId ?? member.equippedBackgroundId ?? 'bg_default';
+    final selectedBgId = _backgroundId ?? member.equippedBackgroundId ?? 'bg_default';
+    final selectedBg = ownedBackgrounds.firstWhere(
+      (b) => b.id == selectedBgId,
+      orElse: () => ownedBackgrounds.first,
+    );
 
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: cs.secondary,
+        foregroundColor: Colors.white,
+        elevation: 0,
         title: Text('Edit ${member.displayName}\'s profile'),
         actions: [
           TextButton(
             onPressed: _saving ? null : _save,
+            style: TextButton.styleFrom(foregroundColor: Colors.white),
             child: _saving
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                 : const Text('Save'),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Big avatar preview
+            // ── Live preview ────────────────────────────────────────────────
             Center(
-              child: Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: cs.secondaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    _avatarEmoji ?? _defaultAvatar,
-                    style: const TextStyle(fontSize: 52),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                'Tap an avatar below to change it',
-                style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Avatar choices
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: _avatarChoices.map((emoji) {
-                final selected = emoji == _avatarEmoji;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() => _avatarEmoji = emoji);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(
-                        color: selected ? cs.primary : Colors.transparent,
-                        width: 2,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      width: 200,
+                      height: 130,
+                      decoration: BoxDecoration(
+                        color: cs.secondaryContainer,
+                        image: selectedBg.assetKey.isNotEmpty
+                            ? DecorationImage(
+                                image: AssetImage(selectedBg.assetKey),
+                                fit: BoxFit.cover,
+                              )
+                            : null,
                       ),
                     ),
-                    child: Center(
-                      child: Text(emoji, style: const TextStyle(fontSize: 28)),
-                    ),
                   ),
-                );
-              }).toList(),
+                  AvatarWithFrame(
+                    member: _previewMember(member),
+                    radius: 38,
+                  ),
+                ],
+              ),
             ),
+            const SizedBox(height: 20),
 
+            // ── Name field ──────────────────────────────────────────────────
+            TextField(
+              controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.done,
+              decoration: themedInput(context, 'Name'),
+            ),
             const SizedBox(height: 24),
+
+            // ── Avatar ──────────────────────────────────────────────────────
             Text(
-              'Background',
+              'Avatar',
               style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Pick the wallpaper for your chores screen.',
-              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            const SizedBox(height: 12),
+            _buildAvatarPicker(context, member, cs),
+
+            const SizedBox(height: 24),
+
+            // ── Background ──────────────────────────────────────────────────
+            _EditSectionHeader(
+              title: 'Background',
+              onGetMore: () => _goToCosmetics(context, member.id),
             ),
             const SizedBox(height: 12),
-
             SizedBox(
               height: 120,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
-                itemCount: backgrounds.length,
+                itemCount: ownedBackgrounds.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 10),
                 itemBuilder: (context, index) {
-                  final item = backgrounds[index];
+                  final item = ownedBackgrounds[index];
                   final selected = item.id == selectedBgId;
 
                   return GestureDetector(
-                    onTap: () {
-                      setState(() => _backgroundId = item.id);
-                    },
+                    onTap: () => setState(() => _backgroundId = item.id),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       width: 180,
@@ -279,8 +253,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
                           width: 2,
                         ),
                         color: cs.surfaceContainerHighest,
-                        image: item.type == CosmeticType.background &&
-                                item.assetKey.isNotEmpty
+                        image: item.assetKey.isNotEmpty
                             ? DecorationImage(
                                 image: AssetImage(item.assetKey),
                                 fit: BoxFit.cover,
@@ -289,7 +262,6 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
                       ),
                       child: Stack(
                         children: [
-                          // Gradient overlay for text readability, if desired
                           Positioned.fill(
                             child: DecoratedBox(
                               decoration: BoxDecoration(
@@ -343,7 +315,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
             const SizedBox(height: 24),
 
-            // ── Avatar Frame ────────────────────────────────────────────────
+            // ── Avatar Frame ─────────────────────────────────────────────────
             _EditSectionHeader(
               title: 'Avatar Frame',
               onGetMore: () => _goToCosmetics(context, member.id),
@@ -353,7 +325,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
             const SizedBox(height: 24),
 
-            // ── Zilla Skin ──────────────────────────────────────────────────
+            // ── Zilla Skin ───────────────────────────────────────────────────
             _EditSectionHeader(
               title: 'Zilla Skin',
               onGetMore: () => _goToCosmetics(context, member.id),
@@ -363,7 +335,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
             const SizedBox(height: 24),
 
-            // ── Title ────────────────────────────────────────────────────────
+            // ── Title ─────────────────────────────────────────────────────────
             _EditSectionHeader(
               title: 'Title',
               onGetMore: () => _goToCosmetics(context, member.id),
@@ -381,7 +353,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
   void _goToCosmetics(BuildContext context, String memberId) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => KidRewardsPage(memberId: memberId, initialTabIndex: 2),
+        builder: (_) => KidRewardsPage(memberId: memberId, initialTabIndex: 1),
       ),
     );
   }
@@ -425,8 +397,17 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('⭐', style: TextStyle(fontSize: 22)),
-                  const SizedBox(height: 2),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      CircleAvatar(
+                        radius: 18,
+                        backgroundColor: cs.surfaceContainerHigh,
+                      ),
+                      FrameOverlay(frameId: frame.id, radius: 18),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     frame.name,
                     style: const TextStyle(
@@ -446,13 +427,13 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     );
   }
 
-  Widget _buildSkinPicker(BuildContext context, Member member,
-      ColorScheme cs, TextTheme ts) {
+  Widget _buildSkinPicker(
+      BuildContext context, Member member, ColorScheme cs, TextTheme ts) {
     final owned = CosmeticCatalog.zillaSkins()
         .where((s) => s.isDefault || member.ownsCosmetic(s.id))
         .toList();
 
-    if (owned.length <= 1) {
+    if (owned.isEmpty) {
       return _EmptyCosmetics(label: 'Zilla skins');
     }
 
@@ -485,8 +466,16 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('🦖', style: TextStyle(fontSize: 22)),
-                  const SizedBox(height: 2),
+                  Image.asset(
+                    'assets/mascot/mascot_plain.png',
+                    width: 32,
+                    height: 32,
+                    color: skin.colorValue != null
+                        ? Color(skin.colorValue!)
+                        : null,
+                    colorBlendMode: BlendMode.srcIn,
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     skin.name,
                     style: const TextStyle(
@@ -506,8 +495,80 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     );
   }
 
-  Widget _buildTitlePicker(BuildContext context, Member member,
-      ColorScheme cs, TextTheme ts) {
+  Widget _buildAvatarPicker(
+      BuildContext context, Member member, ColorScheme cs) {
+    // Default image avatars (always available)
+    final defaultImageIds = CosmeticCatalog.avatars()
+        .where((a) => a.isDefault)
+        .map((a) => a.id)
+        .toList();
+
+    // Loot-box earned image avatars (owned by this member, non-default)
+    final earnedImageIds = CosmeticCatalog.avatars()
+        .where((a) => !a.isDefault && member.ownsCosmetic(a.id))
+        .map((a) => a.id)
+        .toList();
+
+    final allImageIds = [...defaultImageIds, ...earnedImageIds];
+
+    Widget tile({
+      required bool selected,
+      required VoidCallback onTap,
+      required Widget child,
+    }) {
+      return GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: selected ? cs.primary : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Center(child: child),
+          ),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.center,
+      children: [
+        // Emoji choices
+        ..._avatarChoices.map((emoji) => tile(
+              selected: emoji == _avatarEmoji,
+              onTap: () => setState(() => _avatarEmoji = emoji),
+              child: Text(emoji, style: const TextStyle(fontSize: 28)),
+            )),
+        // Image avatar choices
+        ...allImageIds.map((id) {
+          final item = CosmeticCatalog.byId(id);
+          return tile(
+            selected: id == _avatarEmoji,
+            onTap: () => setState(() => _avatarEmoji = id),
+            child: Image.asset(
+              item.assetKey,
+              width: 52,
+              height: 52,
+              fit: BoxFit.cover,
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildTitlePicker(
+      BuildContext context, Member member, ColorScheme cs, TextTheme ts) {
     final owned = CosmeticCatalog.titles()
         .where((t) => t.isDefault || member.ownsCosmetic(t.id))
         .toList();

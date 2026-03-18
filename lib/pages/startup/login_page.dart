@@ -40,7 +40,15 @@ class _LoginPageState extends State<LoginPage> {
         password: _password.text,
       );
     } on FirebaseAuthException catch (e) {
-      setState(() { _error = e.message; });
+      final msg = switch (e.code) {
+        'wrong-password' || 'invalid-credential' => 'Incorrect password. Please try again.',
+        'user-not-found' => 'No account found with that email.',
+        'invalid-email' => 'That doesn\'t look like a valid email address.',
+        'user-disabled' => 'This account has been disabled.',
+        'too-many-requests' => 'Too many failed attempts. Please try again later.',
+        _ => e.message ?? 'Sign in failed. Please try again.',
+      };
+      setState(() { _error = msg; });
     } finally {
       if (mounted) setState(() { _busy = false; });
     }

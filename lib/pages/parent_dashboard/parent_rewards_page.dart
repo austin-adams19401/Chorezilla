@@ -1,5 +1,6 @@
 // lib/pages/parent_dashboard/parent_rewards_page.dart
 import 'package:chorezilla/components/premium_upgrade_sheet.dart';
+import 'package:chorezilla/constants/default_rewards.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/services/subscription_service.dart';
 import 'package:flutter/material.dart';
@@ -914,6 +915,7 @@ class _RewardEditorSheet extends StatefulWidget {
 
 class _RewardEditorSheetState extends State<_RewardEditorSheet> {
   var _titleCtrl = TextEditingController();
+  final _titleFocusNode = FocusNode();
   var _descCtrl = TextEditingController();
   var _coinCtrl = TextEditingController(text: '5');
   var _iconCtrl = TextEditingController(text: '🎁');
@@ -922,6 +924,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
   bool _limitStock = false;
   var _stockCtrl = TextEditingController(text: '1');
   bool _busy = false;
+  bool _isFromTemplate = false;
 
     @override
   void initState() {
@@ -943,6 +946,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
   @override
   void dispose() {
     _titleCtrl.dispose();
+    _titleFocusNode.dispose();
     _descCtrl.dispose();
     _coinCtrl.dispose();
     _iconCtrl.dispose();
@@ -981,13 +985,93 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                TextField(
-                  controller: _titleCtrl,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    labelText: 'Reward name',
-                    hintText: 'e.g. Pick dessert tonight',
-                  ),
+                RawAutocomplete<DefaultReward>(
+                  textEditingController: _titleCtrl,
+                  focusNode: _titleFocusNode,
+                  displayStringForOption: (option) => option.title,
+                  optionsBuilder: (textEditingValue) {
+                    final input = textEditingValue.text.toLowerCase();
+                    if (input.length < 2) return const Iterable.empty();
+                    final existingTitles = context
+                        .read<AppState>()
+                        .rewards
+                        .map((r) => r.title.toLowerCase())
+                        .toSet();
+                    return kDefaultRewards.where(
+                      (r) =>
+                          r.title.toLowerCase().contains(input) &&
+                          !existingTitles.contains(r.title.toLowerCase()),
+                    );
+                  },
+                  onSelected: (DefaultReward template) {
+                    setState(() {
+                      _titleCtrl.text = template.title;
+                      _descCtrl.text = template.description;
+                      _iconCtrl.text = template.icon;
+                      _coinCtrl.text = template.coinCost.toString();
+                      _category = template.category;
+                      _isFromTemplate = true;
+                    });
+                  },
+                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: 'Reward name',
+                        hintText: 'e.g. Pick dessert tonight',
+                      ),
+                      onSubmitted: (_) => onFieldSubmitted(),
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    final cs = Theme.of(context).colorScheme;
+                    final ts = Theme.of(context).textTheme;
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(12),
+                        color: cs.surface,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200),
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            shrinkWrap: true,
+                            itemCount: options.length,
+                            itemBuilder: (context, index) {
+                              final option = options.elementAt(index);
+                              return InkWell(
+                                onTap: () => onSelected(option),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        option.icon,
+                                        style: const TextStyle(fontSize: 20),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          option.title,
+                                          style: ts.bodyMedium,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 8),
                 TextField(

@@ -6,8 +6,8 @@ class MascotHeader extends StatelessWidget {
   final String title;
   final String subtitle;
 
-  static const String _transparantMascot = 'assets/icons/mascot/mascot_no_bg.png';
-  static const String _squareMascot = 'assets/icons/mascot/mascot_1024.png';
+  static const String _transparantMascot = 'assets/mascot/mascot_no_bg.png';
+  static const String _squareMascot = 'assets/mascot/mascot_1024.png';
 
   @override
   Widget build(BuildContext context) {

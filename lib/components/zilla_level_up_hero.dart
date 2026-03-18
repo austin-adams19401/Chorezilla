@@ -80,7 +80,7 @@ class ZillaLevelUpHero extends StatelessWidget {
                 // Zilla celebrate sprite
                 SpriteSheetAnimation(
                   assetPath:
-                      'assets/icons/mascot/sprite-sheets/celebrate.png',
+                      'assets/mascot/sprite-sheets/celebrate.png',
                   size: size,
                   columns: 6,
                   rows: 6,

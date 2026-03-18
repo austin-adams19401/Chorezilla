@@ -31,15 +31,52 @@ class AppTheme {
   );
 
   // Dark scheme (navy surfaces; green pops as the brand color)
+  //
+  // Key usage patterns in the app that drive these choices:
+  //   - AppBar + hero sections use cs.secondary as BACKGROUND → must be dark with white text
+  //   - Pending card uses cs.secondary as card background
+  //   - Reward tiles inside pending card use surfaceContainerHighest→surface gradient
+  //   - Filter chips use secondaryContainer bg / onSecondaryContainer text
   static final ColorScheme _darkScheme = ColorScheme.fromSeed(
     seedColor: zillaGreen,
     brightness: Brightness.dark,
   ).copyWith(
-    primary: zillaGreen,
-    secondary: _lighten(deepNavy, 0.18),     // still navy-family but a bit lighter for contrast
+    // Primary — teal CTAs for dark mode (FAB, filled buttons, active tab, text buttons)
+    primary: const Color(0xFF26C6C6),
+    onPrimary: deepNavy,
+    primaryContainer: const Color(0xFF0D5C5C),      // teal pill/container bg
+    onPrimaryContainer: const Color(0xFFB2EFEF),    // pale cyan text on teal
+
+    // Secondary — used as AppBar bg, hero sections, pending card bg
+    // Must be dark enough for white text to work on it
+    secondary: const Color(0xFF1A3A60),
+    onSecondary: Colors.white,
+    secondaryContainer: const Color(0xFF254E7A),    // medium navy for filter chips
+    onSecondaryContainer: const Color(0xFFD4E8F8),  // near-white for chip text
+
+    // Tertiary — mint accent for badges, XP, pending chips
     tertiary: mint,
-    surface: deepNavy,                       // matches your icon background
-    inversePrimary: _lighten(zillaGreen, 0.30),
+    onTertiary: deepNavy,
+    tertiaryContainer: const Color(0xFF0F3D28),     // dark green container
+    onTertiaryContainer: const Color(0xFF86EFAC),   // light mint text
+
+    // Surface — scaffold and card background (deepest layer)
+    surface: const Color(0xFF0D1B30),
+    onSurface: Colors.white,
+    onSurfaceVariant: const Color(0xFFB0C4D8),      // muted secondary text / icons
+
+    // Surface containers — stepped lighter navies so tiles inside cards look good
+    surfaceContainerLowest: const Color(0xFF0A1525),
+    surfaceContainerLow:    const Color(0xFF0F2035),
+    surfaceContainer:       const Color(0xFF142840),
+    surfaceContainerHigh:   const Color(0xFF1A3050),
+    surfaceContainerHighest: const Color(0xFF1E3860),
+
+    // Outlines
+    outline: const Color(0xFF3D5E7A),
+    outlineVariant: const Color(0xFF2A4A6A),
+
+    inversePrimary: const Color(0xFF80E8E8),
   );
 
   static ThemeData get light => ThemeData(
@@ -59,22 +96,33 @@ class AppTheme {
         ),
       );
 
-  static ThemeData get dark => ThemeData(
-        useMaterial3: true,
-        colorScheme: _darkScheme,
-        scaffoldBackgroundColor: _darkScheme.surface,
-        appBarTheme: AppBarTheme(
-          backgroundColor: _darkScheme.surface,
-          foregroundColor: Colors.white,
-          elevation: 0,
+  static ThemeData get dark {
+    // Flutter's TextTheme colors are independent of colorScheme — force all
+    // text white so it's legible on the deep navy surface.
+    final baseTextTheme = ThemeData(useMaterial3: true, colorScheme: _darkScheme).textTheme;
+    final whiteTextTheme = baseTextTheme.apply(
+      bodyColor: Colors.white,
+      displayColor: Colors.white,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: _darkScheme,
+      textTheme: whiteTextTheme,
+      scaffoldBackgroundColor: _darkScheme.surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: _darkScheme.surface,
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _darkScheme.primary,
+          foregroundColor: deepNavy,
         ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _darkScheme.primary,
-            foregroundColor: deepNavy, // readable on bright green
-          ),
-        ),
-      );
+      ),
+    );
+  }
 }
 
 // primary:	

@@ -51,6 +51,7 @@ extension AppStateWrites on AppState {
     bool requiresApproval = true,
     bool bonusOnly = false,
     bool isCustom = true,
+    ChoreCategory category = ChoreCategory.other,
   }) async {
     final famId = _familyId!;
     final db = FirebaseFirestore.instance;
@@ -75,6 +76,7 @@ extension AppStateWrites on AppState {
       'requiresApproval': requiresApproval,
       'bonusOnly': bonusOnly,
       'isCustom': isCustom,
+      'category': choreCategoryToString(category),
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
@@ -89,6 +91,7 @@ extension AppStateWrites on AppState {
     Recurrence? recurrence,
     bool requiresApproval = true,
     bool bonusOnly = false,
+    ChoreCategory category = ChoreCategory.other,
   }) async {
     final fam = family!;
     await repo.updateChoreTemplate(
@@ -102,6 +105,7 @@ extension AppStateWrites on AppState {
       recurrence: recurrence,
       requiresApproval: requiresApproval,
       bonusOnly: bonusOnly,
+      category: category,
     );
   }
 
@@ -453,6 +457,7 @@ extension AppStateWrites on AppState {
         'choreId': chore.id,
         'choreTitle': chore.title,
         'choreIcon': chore.icon,
+        'choreCategory': choreCategoryToString(chore.category),
         'memberId': m.id,
         'memberName': m.displayName,
         'difficulty': chore.difficulty,
@@ -808,6 +813,7 @@ extension AppStateWrites on AppState {
           'choreId': chore.id,
           'choreTitle': chore.title,
           'choreIcon': chore.icon,
+          'choreCategory': choreCategoryToString(chore.category),
           'memberId': member.id,
           'memberName': member.displayName,
           'difficulty': chore.difficulty,
@@ -949,6 +955,7 @@ extension AppStateWrites on AppState {
                 'choreId': chore.id,
                 'choreTitle': chore.title,
                 'choreIcon': chore.icon,
+                'choreCategory': choreCategoryToString(chore.category),
                 'memberId': fallbackMember.id,
                 'memberName': fallbackMember.displayName,
                 'difficulty': chore.difficulty,
@@ -1003,6 +1010,7 @@ extension AppStateWrites on AppState {
         'choreId': chore.id,
         'choreTitle': chore.title,
         'choreIcon': chore.icon,
+        'choreCategory': choreCategoryToString(chore.category),
         'memberId': member.id,
         'memberName': member.displayName,
         'difficulty': chore.difficulty,

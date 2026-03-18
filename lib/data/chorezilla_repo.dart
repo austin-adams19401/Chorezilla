@@ -1,6 +1,7 @@
 
 library;
 
+import 'package:chorezilla/constants/default_rewards.dart';
 import 'package:chorezilla/models/chore_member_schedule.dart';
 import 'package:chorezilla/models/recurrance.dart';
 import 'package:chorezilla/models/reward_redemption.dart';

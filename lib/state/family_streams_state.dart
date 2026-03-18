@@ -56,6 +56,7 @@ extension AppStateFamilyStreams on AppState {
 
       if (!_membersLoaded) {
         _membersLoaded = true;
+        checkAndRestoreReturningKids();
       }
       _notifyStateChanged();
     });

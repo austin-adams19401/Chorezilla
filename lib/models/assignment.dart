@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'chore.dart';
 import 'common.dart';
 
 class Proof {
@@ -37,6 +38,7 @@ class Assignment {
   final DateTime? approvedAt;
   final Proof? proof;
   final bool bonus;
+  final ChoreCategory choreCategory;
 
   const Assignment({
     required this.id,
@@ -58,6 +60,7 @@ class Assignment {
     this.approvedAt,
     this.proof,
     this.bonus = false,
+    this.choreCategory = ChoreCategory.other,
   });
 
   /// Convenience: does this assignment *currently* need parent review?
@@ -86,6 +89,7 @@ class Assignment {
     'approvedAt': approvedAt == null ? null : Timestamp.fromDate(approvedAt!),
     'proof': proof?.toMap(),
     'bonus': bonus,
+    'choreCategory': choreCategoryToString(choreCategory),
   };
 
   factory Assignment.fromDoc(DocumentSnapshot doc) {
@@ -112,6 +116,7 @@ class Assignment {
           ? null
           : Proof.fromMap(data['proof'] as Map<String, dynamic>),
       bonus: (data['bonus'] as bool?) ?? false,
+      choreCategory: choreCategoryFromString(data['choreCategory'] as String?),
     );
   }
 
@@ -136,6 +141,7 @@ class Assignment {
     'approvedAt': approvedAt?.toIso8601String(),
     'proof': proof?.toMap(),
     'bonus': bonus,
+    'choreCategory': choreCategoryToString(choreCategory),
   };
 
   factory Assignment.fromCacheMap(Map<String, dynamic> data) {
@@ -161,6 +167,7 @@ class Assignment {
           ? null
           : Proof.fromMap(data['proof'] as Map<String, dynamic>),
       bonus: (data['bonus'] as bool?) ?? false,
+      choreCategory: choreCategoryFromString(data['choreCategory'] as String?),
     );
   }
 }

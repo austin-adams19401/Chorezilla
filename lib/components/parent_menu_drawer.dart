@@ -2,7 +2,9 @@ import 'package:chorezilla/components/inputs.dart';
 import 'package:chorezilla/models/family.dart';
 import 'package:chorezilla/pages/family_setup/add_kids_page.dart';
 import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
+import 'package:chorezilla/pages/parent_dashboard/settings/coin_economy_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
+import 'package:chorezilla/pages/parent_dashboard/settings/level_rewards_page.dart';
 import 'package:chorezilla/services/purchase_flow.dart';
 import 'package:chorezilla/services/purchase_service.dart';
 import 'package:chorezilla/themes/app_theme.dart';
@@ -78,6 +80,28 @@ class ParentDrawer extends StatelessWidget {
                 Navigator.of(context).pop();
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const AddKidsPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.monetization_on_outlined, color: cs.primary),
+              title: const Text('Coin economy'),
+              subtitle: const Text('XP and coin rewards per difficulty'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CoinEconomyPage()),
+                );
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.military_tech_rounded, color: cs.primary),
+              title: const Text('Level-up rewards'),
+              subtitle: const Text('Set what kids earn at each level'),
+              onTap: () {
+                Navigator.of(context).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const LevelRewardsPage()),
                 );
               },
             ),

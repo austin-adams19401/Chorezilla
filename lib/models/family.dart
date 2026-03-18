@@ -1,3 +1,4 @@
+import 'package:chorezilla/components/leveling.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'common.dart';
 
@@ -18,25 +19,59 @@ class FamilySettings {
   final Map<int, int> difficultyToXP; // 1..5 -> points
   final int dayStartHour; // 0-23
   final double coinPerPoint; // e.g., 0.2 means 5 points -> 1 coin
+  /// Per-family custom level-up rewards (premium only).
+  /// Keys are level numbers; values are ordered reward lists for that level.
+  /// When null, the app falls back to [kDefaultLevelRewards].
+  final Map<int, List<LevelRewardDefinition>>? customLevelRewards;
 
   const FamilySettings({
     this.difficultyToXP = const {1: 10, 2: 20, 3: 30, 4: 50, 5: 80},
     this.dayStartHour = 0,
     this.coinPerPoint = 0.1,
+    this.customLevelRewards,
   });
+
+  FamilySettings copyWith({
+    Map<int, int>? difficultyToXP,
+    int? dayStartHour,
+    double? coinPerPoint,
+    Map<int, List<LevelRewardDefinition>>? customLevelRewards,
+  }) =>
+      FamilySettings(
+        difficultyToXP: difficultyToXP ?? this.difficultyToXP,
+        dayStartHour: dayStartHour ?? this.dayStartHour,
+        coinPerPoint: coinPerPoint ?? this.coinPerPoint,
+        customLevelRewards: customLevelRewards ?? this.customLevelRewards,
+      );
 
   Map<String, dynamic> toMap() => {
         'xpPerDifficulty': mapIntIntToStringInt(difficultyToXP),
         'dayStartHour': dayStartHour,
         'coinPerPoint': coinPerPoint,
+        if (customLevelRewards != null)
+          'customLevelRewards': customLevelRewards!.map(
+            (k, v) => MapEntry('$k', v.map((r) => r.toMap()).toList()),
+          ),
       };
 
   factory FamilySettings.fromMap(Map<String, dynamic>? data) {
     if (data == null) return const FamilySettings();
+    final rawCustom = data['customLevelRewards'] as Map<String, dynamic>?;
     return FamilySettings(
       difficultyToXP: mapStringIntToIntInt(data['xpPerDifficulty'] as Map<String, dynamic>?),
       dayStartHour: (data['dayStartHour'] as num?)?.toInt() ?? 0,
       coinPerPoint: (data['coinPerPoint'] as num?)?.toDouble() ?? 0.1,
+      customLevelRewards: rawCustom?.map(
+        (k, v) => MapEntry(
+          int.parse(k),
+          (v as List)
+              .map((e) => LevelRewardDefinition.fromMap(
+                    int.parse(k),
+                    e as Map<String, dynamic>,
+                  ))
+              .toList(),
+        ),
+      ),
     );
   }
 }

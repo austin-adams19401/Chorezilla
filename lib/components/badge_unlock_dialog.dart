@@ -2,14 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:chorezilla/models/badge.dart';
 
 class BadgeUnlockDialog extends StatelessWidget {
-  const BadgeUnlockDialog({super.key, required this.badge});
+  const BadgeUnlockDialog({super.key, required this.event});
 
-  final BadgeDefinition badge;
+  final BadgeEvent event;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final badge = event.badge;
+    final tier = event.newTier;
+
+    // Pick asset path for the current tier (or one-time badge asset).
+    final assetPath = tier != null
+        ? badge.assetPathForTier(tier)
+        : badge.assetPath;
+
+    // Tier chip color
+    Color tierColor(BadgeTier t) {
+      switch (t) {
+        case BadgeTier.bronze:
+          return const Color(0xFFCD7F32);
+        case BadgeTier.silver:
+          return const Color(0xFF9E9E9E);
+        case BadgeTier.gold:
+          return const Color(0xFFFFB300);
+        default:
+          return cs.surfaceContainerHighest;
+      }
+    }
 
     return Center(
       child: TweenAnimationBuilder<double>(
@@ -30,7 +51,7 @@ class BadgeUnlockDialog extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Badge unlocked!',
+                      event.dialogTitle,
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                       ),
@@ -43,7 +64,7 @@ class BadgeUnlockDialog extends StatelessWidget {
                 children: [
                   const SizedBox(height: 8),
 
-                  // Badge icon
+                  // Badge image or emoji
                   Container(
                     width: 96,
                     height: 96,
@@ -51,14 +72,47 @@ class BadgeUnlockDialog extends StatelessWidget {
                       color: cs.primaryContainer,
                       shape: BoxShape.circle,
                     ),
+                    clipBehavior: Clip.antiAlias,
                     alignment: Alignment.center,
-                    child: Text(
-                      badge.icon,
-                      style: const TextStyle(fontSize: 48),
-                    ),
+                    child: assetPath != null
+                        ? Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Image.asset(
+                              assetPath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, _, _) => Text(
+                                badge.icon,
+                                style: const TextStyle(fontSize: 48),
+                              ),
+                            ),
+                          )
+                        : Text(
+                            badge.icon,
+                            style: const TextStyle(fontSize: 48),
+                          ),
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+
+                  // Tier chip for tiered badges
+                  if (tier != null && tier != BadgeTier.locked) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: tierColor(tier),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        BadgeCatalog.tierName(tier),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
 
                   Text(
                     badge.name,
@@ -77,6 +131,32 @@ class BadgeUnlockDialog extends StatelessWidget {
                       color: cs.onSurfaceVariant,
                     ),
                   ),
+
+                  if (event.coinBonus > 0) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFB300).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('🪙', style: TextStyle(fontSize: 18)),
+                          const SizedBox(width: 6),
+                          Text(
+                            '+${event.coinBonus} coins!',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFFFFB300),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 16),
 

@@ -1,5 +1,4 @@
-import 'package:chorezilla/components/premium_upgrade_sheet.dart';
-import 'package:chorezilla/components/zilla_level_up_hero.dart';
+import 'package:chorezilla/components/set_away_dialog.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/pages/parent_dashboard/parent_weekly_overview_page.dart';
@@ -161,10 +160,12 @@ final summaries = <_KidTodaySummary>[];
               pending: pending,
               rejected: rejected,
               assigned: assigned,
-              assignments: list, 
+              assignments: list,
               level: level,
               coins: coins,
-              bonusCount: bonusCount, 
+              bonusCount: bonusCount,
+              isAway: memberModel?.isAwayOnDate(DateTime.now()) ?? false,
+              awayUntil: memberModel?.awayUntil,
             ),
           );
         });
@@ -196,72 +197,6 @@ final summaries = <_KidTodaySummary>[];
                   ),
                 );
               },
-            ),
-
-            // DEBUG buttons — remove before release
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Row(
-                children: [
-                  const Text(
-                    'DEBUG:',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.red,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => showPremiumUpgradeSheet(
-                      context,
-                      reason: UpgradeReason.addKid,
-                    ),
-                    icon: const Icon(Icons.workspace_premium, size: 16),
-                    label: const Text('Paywall'),
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      foregroundColor: Colors.deepOrange,
-                      side: const BorderSide(color: Colors.deepOrange),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: () => showDialog<void>(
-                      context: context,
-                      builder: (dialogCtx) => AlertDialog(
-                        scrollable: false,
-                        title: const Text('Level up!'),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            SizedBox(height: 8),
-                            ZillaLevelUpHero(size: 96),
-                            SizedBox(height: 16),
-                            Text(
-                              'Debug Kid reached Level 5!',
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(dialogCtx).pop(),
-                            child: const Text('Close'),
-                          ),
-                        ],
-                      ),
-                    ),
-                    icon: const Icon(Icons.trending_up, size: 16),
-                    label: const Text('Level Up'),
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      foregroundColor: Colors.purple,
-                      side: const BorderSide(color: Colors.purple),
-                    ),
-                  ),
-                ],
-              ),
             ),
 
             Expanded(
@@ -505,7 +440,7 @@ class _TodayHero extends StatelessWidget {
             ),
             padding: const EdgeInsets.all(8),
             child: Image.asset(
-              'assets/icons/mascot/mascot_no_bg.png',
+              'assets/mascot/mascot_no_bg.png',
               fit: BoxFit.contain,
             ),
           ),
@@ -529,6 +464,8 @@ class _KidTodaySummary {
     required this.level,
     required this.coins,
     required this.bonusCount,
+    required this.isAway,
+    this.awayUntil,
   });
 
   final String memberId;
@@ -544,6 +481,8 @@ class _KidTodaySummary {
   final int level;
   final int coins;
   final int bonusCount;
+  final bool isAway;
+  final DateTime? awayUntil;
 }
 
 class _KidTodayCard extends StatelessWidget {
@@ -564,254 +503,401 @@ class _KidTodayCard extends StatelessWidget {
 
     final progress = total > 0 ? completed / total : 0.0;
     final isAllDone = total > 0 && completed == total;
+    final hasRejections = rejected > 0;
+    final isAway = summary.isAway;
 
-    final avatarRadius = 22.0;
-    final emojiSize = avatarRadius * 1.2;
+    final avatarRadius = 26.0;
+    final emojiSize = avatarRadius * 1.1;
 
-    final Color statusColor = isAllDone
-        ? cs.primary.withValues(alpha: 0.14)
-        : cs.secondaryContainer.withValues(alpha: 0.35);
+    // Dynamic gradient + border + shadow based on status
+    final List<Color> gradientColors;
+    final Color borderColor;
+    final double borderWidth;
+    final List<BoxShadow> shadows;
+
+    if (isAway) {
+      gradientColors = [
+        cs.surfaceContainerHigh.withValues(alpha: 0.5),
+        cs.surface,
+      ];
+      borderColor = cs.outline.withValues(alpha: 0.5);
+      borderWidth = 1.5;
+      shadows = [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.14),
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ];
+    } else if (isAllDone) {
+      gradientColors = [
+        cs.primary.withValues(alpha: 0.18),
+        cs.primaryContainer.withValues(alpha: 0.10),
+      ];
+      borderColor = cs.primary;
+      borderWidth = 2.0;
+      shadows = [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.22),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+        BoxShadow(
+          color: cs.primary.withValues(alpha: 0.28),
+          blurRadius: 18,
+          spreadRadius: 1,
+        ),
+      ];
+    } else if (hasRejections) {
+      gradientColors = [
+        cs.error.withValues(alpha: 0.08),
+        cs.surface,
+      ];
+      borderColor = cs.error.withValues(alpha: 0.5);
+      borderWidth = 1.5;
+      shadows = [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.22),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ];
+    } else {
+      gradientColors = [
+        cs.surfaceContainerHigh.withValues(alpha: 0.7),
+        cs.surface,
+      ];
+      borderColor = cs.outlineVariant;
+      borderWidth = 1.0;
+      shadows = [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.22),
+          blurRadius: 12,
+          offset: const Offset(0, 4),
+        ),
+      ];
+    }
+
+    // Status pill
+    final String statusText;
+    final Color statusBg;
+    final Color statusFg;
+    if (isAway) {
+      final awayUntil = summary.awayUntil;
+      final returnStr = awayUntil != null ? _formatShortDate(awayUntil) : '';
+      statusText = returnStr.isNotEmpty ? '✈ Away – Back $returnStr' : '✈ Away';
+      statusBg = cs.surfaceContainerHighest;
+      statusFg = cs.onSurfaceVariant;
+    } else if (isAllDone) {
+      statusText = 'All done!';
+      statusBg = cs.primary.withValues(alpha: 0.35);
+      statusFg = cs.primary;
+    } else if (hasRejections) {
+      statusText = 'Needs review';
+      statusBg = cs.errorContainer;
+      statusFg = cs.onErrorContainer;
+    } else {
+      statusText = '$remaining left';
+      statusBg = cs.secondaryContainer.withValues(alpha: 0.85);
+      statusFg = cs.onSecondaryContainer;
+    }
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
-      onTap: () {
-        _showKidDetailsDialog(context, summary);
-      },
-      child: Card(
-        elevation: isAllDone ? 2 : 0,
-        margin: EdgeInsets.zero,
-        color: isAllDone
-            ? cs.primaryContainer.withValues(alpha: 0.25)
-            : cs.surface,
-        shape: RoundedRectangleBorder(
+      onTap: () => _showKidDetailsDialog(context, summary),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: gradientColors,
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
           borderRadius: BorderRadius.circular(18),
-          side: BorderSide(
-            color: isAllDone ? cs.primary : cs.outlineVariant,
-            width: isAllDone ? 2 : 1,
-          ),
+          border: Border.all(color: borderColor, width: borderWidth),
+          boxShadow: shadows,
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            // subtle top-to-bottom tint so it feels less flat
-            gradient: LinearGradient(
-              colors: [
-                cs.surfaceContainerHighest.withValues(alpha: 0.24),
-                cs.surface,
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header row: avatar + name/level/coins + status pill
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: avatarRadius,
-                    backgroundColor: cs.primaryContainer,
-                    child:
-                        (summary.avatarKey != null &&
-                            summary.avatarKey!.isNotEmpty)
-                        ? Text(
-                            summary.avatarKey!,
-                            style: TextStyle(
-                              fontSize: emojiSize,
-                              color: cs.onPrimaryContainer,
-                            ),
-                          )
-                        : Text(
-                            _initialsFor(summary.name),
-                            style: TextStyle(
-                              fontSize: avatarRadius,
-                              fontWeight: FontWeight.bold,
-                              color: cs.onPrimaryContainer,
-                            ),
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Avatar with circular progress ring + name row
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Avatar + progress ring
+                SizedBox(
+                  width: (avatarRadius + 7) * 2,
+                  height: (avatarRadius + 7) * 2,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox.expand(
+                        child: CircularProgressIndicator(
+                          value: progress,
+                          strokeWidth: 4.0,
+                          backgroundColor: cs.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            isAllDone
+                                ? cs.primary
+                                : cs.primary.withValues(alpha: 0.75),
                           ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          summary.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: ts.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
+                          strokeCap: StrokeCap.round,
                         ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Text(
-                              'Lvl ${summary.level}',
-                              style: ts.labelMedium?.copyWith(
-                                color: cs.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
+                      ),
+                      CircleAvatar(
+                        radius: avatarRadius,
+                        backgroundColor: cs.primaryContainer,
+                        child: (summary.avatarKey != null &&
+                                summary.avatarKey!.isNotEmpty)
+                            ? Text(
+                                summary.avatarKey!,
+                                style: TextStyle(fontSize: emojiSize),
+                              )
+                            : Text(
+                                _initialsFor(summary.name),
+                                style: TextStyle(
+                                  fontSize: avatarRadius * 0.9,
+                                  fontWeight: FontWeight.bold,
+                                  color: cs.onPrimaryContainer,
+                                ),
+                              ),
+                      ),
+                      if (isAllDone)
+                        Positioned(
+                          right: 1,
+                          bottom: 1,
+                          child: Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: cs.primary,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: cs.surface,
+                                width: 1.5,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Row(
-                              children: [
-                                Text('🪙',
-                                  style: ts.labelMedium?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${summary.coins}',
-                                  style: ts.labelMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
+                            child: const Icon(
+                              Icons.check_rounded,
+                              size: 11,
+                              color: Colors.white,
                             ),
-                          ],
+                          ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: statusColor,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    // child: Row(
-                    //   mainAxisSize: MainAxisSize.min,
-                    //   children: [
-                    //     Icon(
-                    //       isAllDone
-                    //           ? Icons.check_circle_rounded
-                    //           : Icons.list_alt_rounded,
-                    //       size: 14,
-                    //       color: statusTextColor,
-                    //     ),
-                    //     const SizedBox(width: 4),
-                    //     // Text(
-                    //     //   statusText,
-                    //     //   style: ts.labelSmall?.copyWith(
-                    //     //     fontWeight: FontWeight.w600,
-                    //     //     color: statusTextColor,
-                    //     //   ),
-                    //     // ),
-                    //   ],
-                    // ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-
-              // Progress bar + count
-              Row(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 6,
-                        backgroundColor: cs.surfaceContainerHighest,
-                        valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                ),
+                const SizedBox(width: 10),
+                // Name + level/coins
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              summary.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ts.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (!isAway)
+                            Tooltip(
+                              message: 'Set away',
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(999),
+                                onTap: () => showSetAwayDialog(
+                                  context,
+                                  memberId: summary.memberId,
+                                  memberName: summary.name,
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.flight_takeoff_rounded,
+                                    size: 16,
+                                    color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Tooltip(
+                              message: 'Cancel away',
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(999),
+                                onTap: () => _confirmClearAway(context, summary),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(4),
+                                  child: Icon(
+                                    Icons.flight_land_rounded,
+                                    size: 16,
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: cs.secondaryContainer.withValues(
+                                alpha: 0.75,
+                              ),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Lvl ${summary.level}',
+                              style: ts.labelSmall?.copyWith(
+                                color: cs.onSecondaryContainer,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          const Text('🪙', style: TextStyle(fontSize: 12)),
+                          const SizedBox(width: 2),
+                          Text(
+                            '${summary.coins}',
+                            style: ts.labelSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '$completed / $total',
-                    style: ts.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Status pill — full width
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: statusBg,
+                borderRadius: BorderRadius.circular(999),
               ),
-
-              const SizedBox(height: 8),
-
-              // Chips row
-              Wrap(
-                spacing: 6,
-                runSpacing: 4,
-                children: [
-                  _StatChip(
-                    icon: Icons.checklist_rtl_rounded,
-                    label: 'Left',
-                    value: remaining,
-                    color: remaining == 0
-                        ? cs.primary.withValues(alpha: 0.16)
-                        : cs.secondaryContainer.withValues(alpha: 0.6),
-                    textColor: remaining == 0
-                        ? cs.primary
-                        : cs.onSecondaryContainer,
-                  ),
-                  _StatChip(
-                    icon: Icons.hourglass_bottom_rounded,
-                    label: 'Pending',
-                    value: pending,
-                    color: cs.tertiaryContainer.withValues(alpha: 0.8),
-                    textColor: cs.onTertiaryContainer,
-                  ),
-                  _StatChip(
-                    icon: Icons.close_rounded,
-                    label: 'Rejected',
-                    value: rejected,
-                    color: rejected > 0
-                        ? cs.errorContainer.withValues(alpha: 0.9)
-                        : cs.surfaceContainerHighest.withValues(alpha: 0.7),
-                    textColor: rejected > 0
-                        ? cs.onErrorContainer
-                        : cs.onSurfaceVariant,
-                  ),
-                  if (summary.bonusCount > 0)
-                    _StatChip(
-                      icon: Icons.bolt_rounded,
-                      label: 'Bonus',
-                      value: summary.bonusCount,
-                      color: cs.primaryContainer.withValues(alpha: 0.7),
-                      textColor: cs.onPrimaryContainer,
-                    ),
-                ],
+              child: Text(
+                statusText,
+                textAlign: TextAlign.center,
+                style: ts.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: statusFg,
+                ),
               ),
+            ),
 
-              const SizedBox(height: 6),
-              const Spacer(),
+            const SizedBox(height: 8),
 
-              // Footer hint
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Text(
-                    'View today',
-                    style: ts.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 10,
-                    color: cs.onSurfaceVariant,
-                  ),
-                ],
+            // Progress bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(
+                value: progress,
+                minHeight: 8,
+                backgroundColor: cs.surfaceContainerHighest,
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isAllDone ? cs.primary : cs.primary.withValues(alpha: 0.8),
+                ),
               ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                '$completed / $total chores',
+                style: ts.labelSmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 6),
+
+            // Chips row
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                _StatChip(
+                  icon: Icons.checklist_rtl_rounded,
+                  label: 'Left',
+                  value: remaining,
+                  color: remaining == 0
+                      ? cs.primary.withValues(alpha: 0.30)
+                      : cs.secondaryContainer.withValues(alpha: 0.85),
+                  textColor: remaining == 0
+                      ? cs.primary
+                      : cs.onSecondaryContainer,
+                ),
+                _StatChip(
+                  icon: Icons.hourglass_bottom_rounded,
+                  label: 'Pending',
+                  value: pending,
+                  color: cs.tertiaryContainer,
+                  textColor: cs.onTertiaryContainer,
+                ),
+                _StatChip(
+                  icon: Icons.close_rounded,
+                  label: 'Rejected',
+                  value: rejected,
+                  color: rejected > 0
+                      ? cs.errorContainer
+                      : cs.surfaceContainerHighest,
+                  textColor: rejected > 0
+                      ? cs.onErrorContainer
+                      : cs.onSurfaceVariant,
+                ),
+                if (summary.bonusCount > 0)
+                  _StatChip(
+                    icon: Icons.bolt_rounded,
+                    label: 'Bonus',
+                    value: summary.bonusCount,
+                    color: cs.primaryContainer,
+                    textColor: cs.onPrimaryContainer,
+                  ),
+              ],
+            ),
+
+            const Spacer(),
+
+            // Footer hint
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text(
+                  'Tap to view chores',
+                  style: ts.labelSmall?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 10,
+                  color: cs.primary,
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -825,118 +911,234 @@ class _KidTodayCard extends StatelessWidget {
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final maxListHeight = MediaQuery.of(context).size.height * 0.6;
+    final maxListHeight = MediaQuery.of(context).size.height * 0.50;
 
     showDialog<void>(
       context: context,
       builder: (dialogCtx) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+        return Dialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 40,
           ),
-          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-          contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-          title: Row(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Text(
-                  '${summary.name} – today',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
+              // Gradient header
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      cs.secondary,
+                      cs.secondary.withValues(alpha: 0.88),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
+                padding: const EdgeInsets.fromLTRB(20, 20, 12, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Colors.white.withValues(alpha: 0.15),
+                          child: (summary.avatarKey != null &&
+                                  summary.avatarKey!.isNotEmpty)
+                              ? Text(
+                                  summary.avatarKey!,
+                                  style: const TextStyle(fontSize: 26),
+                                )
+                              : Text(
+                                  _initialsFor(summary.name),
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                summary.name,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${summary.completed} of ${summary.total} chores done',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.of(dialogCtx).pop(),
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white70,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: summary.total > 0
+                            ? summary.completed / summary.total
+                            : 0.0,
+                        minHeight: 6,
+                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(width: 8),
-              Text(
-                '${summary.completed}/${summary.total} done',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: cs.onSurfaceVariant,
+
+              // Chore list
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxListHeight),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  itemCount: assignments.length,
+                  itemBuilder: (ctx, i) {
+                    final a = assignments[i];
+                    final status = a.status;
+                    final isCompleted = status == AssignmentStatus.completed;
+
+                    final Color tileColor;
+                    final Border? tileBorder;
+                    final Color statusLabelColor;
+
+                    switch (status) {
+                      case AssignmentStatus.assigned:
+                        tileColor = cs.surfaceContainerLow;
+                        tileBorder = null;
+                        statusLabelColor = cs.onSurfaceVariant;
+                        break;
+                      case AssignmentStatus.pending:
+                        tileColor = cs.tertiaryContainer.withValues(alpha: 0.25);
+                        tileBorder = Border(
+                          left: BorderSide(color: cs.tertiary, width: 4),
+                        );
+                        statusLabelColor = cs.tertiary;
+                        break;
+                      case AssignmentStatus.rejected:
+                        tileColor = cs.error.withValues(alpha: 0.10);
+                        tileBorder = Border(
+                          left: BorderSide(color: cs.error, width: 4),
+                        );
+                        statusLabelColor = cs.error;
+                        break;
+                      case AssignmentStatus.completed:
+                        tileColor = cs.surfaceContainerLowest;
+                        tileBorder = null;
+                        statusLabelColor = cs.onSurfaceVariant;
+                        break;
+                    }
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: tileColor,
+                        borderRadius: BorderRadius.circular(14),
+                        border: tileBorder,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: cs.surface,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                (a.choreIcon?.isNotEmpty ?? false)
+                                    ? a.choreIcon!
+                                    : '🧩',
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    a.choreTitle,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      decoration: isCompleted
+                                          ? TextDecoration.lineThrough
+                                          : null,
+                                      color: isCompleted
+                                          ? cs.onSurfaceVariant
+                                          : null,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    a.status.label,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: statusLabelColor,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isCompleted)
+                              TextButton.icon(
+                                onPressed: () async {
+                                  await _onUndoPressed(context, a);
+                                },
+                                icon: const Icon(Icons.undo_rounded, size: 16),
+                                label: const Text('Undo'),
+                                style: TextButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
           ),
-          // 🔧 THIS PART CHANGED
-          content: SizedBox(
-            width: double.maxFinite,
-            height: maxListHeight,
-            child: ListView.separated(
-              // ❌ remove shrinkWrap: true
-              itemCount: assignments.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 4),
-              itemBuilder: (ctx, i) {
-                final a = assignments[i];
-                final status = a.status;
-                Color? tileColor;
-                BorderSide? side;
-
-                switch (status) {
-                  case AssignmentStatus.assigned:
-                    tileColor = null;
-                    side = null;
-                    break;
-                  case AssignmentStatus.pending:
-                    tileColor = cs.tertiaryContainer.withValues(alpha: 0.3);
-                    side = BorderSide(color: cs.tertiary, width: 2);
-                    break;
-                  case AssignmentStatus.rejected:
-                    tileColor = cs.error.withValues(alpha: 0.12);
-                    side = BorderSide(color: cs.error, width: 1.5);
-                    break;
-                  case AssignmentStatus.completed:
-                    tileColor = cs.surfaceContainerHighest.withValues(
-                      alpha: 0.2,
-                    );
-                    side = null;
-                    break;
-                }
-
-                final titleStyle = theme.textTheme.titleMedium?.copyWith(
-                  decoration: status == AssignmentStatus.completed
-                      ? TextDecoration.lineThrough
-                      : null,
-                );
-
-                return ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Text(
-                    (a.choreIcon?.isNotEmpty ?? false) ? a.choreIcon! : '🧩',
-                    style: const TextStyle(fontSize: 26),
-                  ),
-                  title: Text(
-                    a.choreTitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: titleStyle,
-                  ),
-                  subtitle: Text(
-                    a.status.label,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  tileColor: tileColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: side ?? BorderSide.none,
-                  ),
-                  trailing: status == AssignmentStatus.completed
-                      ? TextButton.icon(
-                          onPressed: () async {
-                            await _onUndoPressed(context, a);
-                          },
-                          icon: const Icon(Icons.undo_rounded, size: 18),
-                          label: const Text('Undo'),
-                        )
-                      : null,
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Close'),
-            ),
-          ],
         );
       },
     );
@@ -996,6 +1198,40 @@ class _KidTodayCard extends StatelessWidget {
     }
   }
 
+
+  Future<void> _confirmClearAway(
+    BuildContext context,
+    _KidTodaySummary summary,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('${summary.name} is back?'),
+        content: const Text('This will cancel the away period and resume normal chore tracking.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes, back home'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!context.mounted) return;
+    await context.read<AppState>().clearMemberAway(summary.memberId);
+  }
+
+  String _formatShortDate(DateTime d) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[d.month - 1]} ${d.day}';
+  }
 
   String _initialsFor(String name) {
     final parts = name.trim().split(RegExp(r'\s+'));

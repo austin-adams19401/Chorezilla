@@ -2,6 +2,14 @@ import 'package:chorezilla/models/recurrance.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // chore.dart
+
+enum ChoreCategory { cleaning, laundry, dishes, trash, petCare, other }
+
+String choreCategoryToString(ChoreCategory c) => c.name;
+
+ChoreCategory choreCategoryFromString(String? s) => ChoreCategory.values
+    .firstWhere((e) => e.name == s, orElse: () => ChoreCategory.other);
+
 class Chore {
   final String id;
   final String title;
@@ -15,6 +23,7 @@ class Chore {
   final bool requiresApproval;
   final bool bonusOnly;
   final bool isCustom;
+  final ChoreCategory category;
 
   const Chore({
     required this.id,
@@ -29,6 +38,7 @@ class Chore {
     this.requiresApproval = false,
     this.bonusOnly = false,
     this.isCustom = true,
+    this.category = ChoreCategory.other,
   });
 
   factory Chore.fromDoc(DocumentSnapshot d) {
@@ -50,6 +60,7 @@ class Chore {
       requiresApproval: (m['requiresApproval'] as bool?) ?? false,
       bonusOnly: (m['bonusOnly'] as bool?) ?? false,
       isCustom: (m['isCustom'] as bool?) ?? true,
+      category: choreCategoryFromString(m['category'] as String?),
     );
   }
 
@@ -65,6 +76,7 @@ class Chore {
     'requiresApproval': requiresApproval,
     'bonusOnly': bonusOnly,
     'isCustom': isCustom,
+    'category': choreCategoryToString(category),
   };
 
     // --- Local cache mapping ---
@@ -80,6 +92,7 @@ class Chore {
     'defaultAssignees': defaultAssignees,
     'requiresApproval': requiresApproval,
     'bonusOnly': bonusOnly,
+    'category': choreCategoryToString(category),
   };
 
   factory Chore.fromCacheMap(Map<String, dynamic> m) {
@@ -99,6 +112,7 @@ class Chore {
           const [],
       requiresApproval: (m['requiresApproval'] as bool?) ?? false,
       bonusOnly: (m['bonusOnly'] as bool?) ?? false,
+      category: choreCategoryFromString(m['category'] as String?),
     );
   }
 

@@ -31,6 +31,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   bool _requiresApproval = false;
   bool _bonusOnly = false;
   bool _isFromTemplate = false;
+  ChoreCategory _category = ChoreCategory.other;
 
   @override
   void initState() {
@@ -48,6 +49,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
       _timeOfDay = c.recurrence?.timeOfDay;
       _requiresApproval = c.requiresApproval;
       _bonusOnly = c.bonusOnly;
+      _category = c.category;
     }
   }
 
@@ -74,18 +76,15 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
 
     return Padding(
       padding: EdgeInsets.only(bottom: viewInsets),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              primary: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          primary: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
                     // ── Header ──────────────────────────────────────────
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -143,7 +142,10 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
                         _title.text = chore.title;
                         _desc.text = chore.description;
                         _icon.text = chore.icon;
-                        setState(() => _isFromTemplate = true);
+                        setState(() {
+                          _isFromTemplate = true;
+                          _category = chore.category;
+                        });
                       },
                       fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
                         return TextField(
@@ -276,6 +278,34 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+
+                    // ── Category ─────────────────────────────────────────
+                    DropdownButtonFormField<ChoreCategory>(
+                      initialValue: _category,
+                      decoration: const InputDecoration(labelText: 'Category'),
+                      items: const [
+                        DropdownMenuItem(
+                            value: ChoreCategory.cleaning,
+                            child: Text('Cleaning')),
+                        DropdownMenuItem(
+                            value: ChoreCategory.laundry,
+                            child: Text('Laundry')),
+                        DropdownMenuItem(
+                            value: ChoreCategory.dishes,
+                            child: Text('Dishes / Kitchen')),
+                        DropdownMenuItem(
+                            value: ChoreCategory.trash,
+                            child: Text('Trash & Recycling')),
+                        DropdownMenuItem(
+                            value: ChoreCategory.petCare,
+                            child: Text('Pet Care')),
+                        DropdownMenuItem(
+                            value: ChoreCategory.other, child: Text('Other')),
+                      ],
+                      onChanged: (v) =>
+                          setState(() => _category = v ?? ChoreCategory.other),
+                    ),
                     const SizedBox(height: 16),
 
                     // ── Options section ──────────────────────────────────
@@ -359,12 +389,10 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
                         child: const Text('Cancel'),
                       ),
                     ),
-                  ],
-                ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -432,6 +460,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
           requiresApproval: _requiresApproval,
           bonusOnly: _bonusOnly,
           isCustom: !_isFromTemplate,
+          category: _category,
         );
       } else {
         await app.updateChore(
@@ -443,6 +472,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
           recurrence: rec,
           requiresApproval: _requiresApproval,
           bonusOnly: _bonusOnly,
+          category: _category,
         );
       }
       if (!mounted) return;

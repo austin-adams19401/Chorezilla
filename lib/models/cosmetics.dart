@@ -38,6 +38,7 @@ class CosmeticItem {
   final String assetKey; // 'assets/backgrounds/blue_sky.png' (empty for text/drawn types)
   final bool isDefault;
   final CosmeticRarity? rarity; // null for free defaults (excluded from loot box pools)
+  final int? colorValue; // ARGB int for color-tinted skins (e.g. zilla skins)
 
   const CosmeticItem({
     required this.id,
@@ -48,6 +49,7 @@ class CosmeticItem {
     this.assetKey = '',
     this.isDefault = false,
     this.rarity,
+    this.colorValue,
   });
 }
 
@@ -138,6 +140,14 @@ class LootBoxDefinition {
         .where((c) => c.type == cosmeticType && !c.isDefault && c.rarity != null)
         .toList();
 
+    if (pool.isEmpty) {
+      // No loot items exist for this box type yet — fall back to the default.
+      final defaults = CosmeticCatalog.items
+          .where((c) => c.type == cosmeticType && c.isDefault)
+          .toList();
+      return defaults.first;
+    }
+
     // 1. Try exact rarity, unowned
     final exactUnowned = pool
         .where((c) => c.rarity == targetRarity && !ownedCosmetics.contains(c.id))
@@ -178,13 +188,13 @@ class CosmeticCatalog {
       assetKey: 'assets/backgrounds/bg_kitchen.png',
       isDefault: true,
     ),
-    // ── Common (50–75 coins) ──
+    // ── Common (15 coins) ──
     CosmeticItem(
       id: 'bg_kitchen',
       type: CosmeticType.background,
       name: 'Kitchen',
       description: 'A bright cozy kitchen',
-      costCoins: 50,
+      costCoins: 15,
       assetKey: 'assets/backgrounds/bg_kitchen.png',
       rarity: CosmeticRarity.common,
     ),
@@ -193,7 +203,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Backyard',
       description: 'Sunny outdoor fun',
-      costCoins: 50,
+      costCoins: 15,
       assetKey: 'assets/backgrounds/bg_backyard.png',
       rarity: CosmeticRarity.common,
     ),
@@ -202,7 +212,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Laundry Room',
       description: 'Suds and spin cycles',
-      costCoins: 50,
+      costCoins: 15,
       assetKey: 'assets/backgrounds/bg_laundry.png',
       rarity: CosmeticRarity.common,
     ),
@@ -211,7 +221,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Dino World',
       description: 'Prehistoric Zilla territory',
-      costCoins: 75,
+      costCoins: 15,
       assetKey: 'assets/backgrounds/bg_dino.png',
       rarity: CosmeticRarity.common,
     ),
@@ -220,7 +230,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Jungle',
       description: 'Deep in the wild',
-      costCoins: 75,
+      costCoins: 15,
       assetKey: 'assets/backgrounds/bg_jungle.png',
       rarity: CosmeticRarity.common,
     ),
@@ -229,17 +239,17 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Candy Land',
       description: 'Everything is sweet',
-      costCoins: 75,
+      costCoins: 15,
       assetKey: 'assets/backgrounds/bg_candyland.png',
       rarity: CosmeticRarity.common,
     ),
-    // ── Rare (100–150 coins) ──
+    // ── Rare (25–30 coins) ──
     CosmeticItem(
       id: 'bg_ocean',
       type: CosmeticType.background,
       name: 'Ocean',
       description: 'Deep blue waves',
-      costCoins: 100,
+      costCoins: 25,
       assetKey: 'assets/backgrounds/bg_ocean.png',
       rarity: CosmeticRarity.rare,
     ),
@@ -248,7 +258,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Space',
       description: 'Blast off into the cosmos',
-      costCoins: 100,
+      costCoins: 25,
       assetKey: 'assets/backgrounds/bg_space.png',
       rarity: CosmeticRarity.rare,
     ),
@@ -257,7 +267,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Block World',
       description: 'Mine, craft, do chores',
-      costCoins: 100,
+      costCoins: 25,
       assetKey: 'assets/backgrounds/bg_minecraft.png',
       rarity: CosmeticRarity.rare,
     ),
@@ -266,7 +276,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Deep Space',
       description: 'A galaxy far, far away',
-      costCoins: 150,
+      costCoins: 30,
       assetKey: 'assets/backgrounds/bg_space2.png',
       rarity: CosmeticRarity.rare,
     ),
@@ -275,7 +285,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Pirate Seas',
       description: 'Arr, chores on the high seas',
-      costCoins: 150,
+      costCoins: 30,
       assetKey: 'assets/backgrounds/bg_pirate.png',
       rarity: CosmeticRarity.rare,
     ),
@@ -284,17 +294,17 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Dragon Lair',
       description: 'Here be dragons',
-      costCoins: 150,
+      costCoins: 30,
       assetKey: 'assets/backgrounds/bg_dragon.png',
       rarity: CosmeticRarity.rare,
     ),
-    // ── Epic (200 coins) ──
+    // ── Epic (50 coins) ──
     CosmeticItem(
       id: 'bg_arena',
       type: CosmeticType.background,
       name: 'Arena',
       description: 'Champion of chores',
-      costCoins: 200,
+      costCoins: 50,
       assetKey: 'assets/backgrounds/bg_arena.png',
       rarity: CosmeticRarity.epic,
     ),
@@ -303,7 +313,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Volcano',
       description: 'Hot hot hot',
-      costCoins: 200,
+      costCoins: 50,
       assetKey: 'assets/backgrounds/bg_volcano.png',
       rarity: CosmeticRarity.epic,
     ),
@@ -312,7 +322,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Treasure Cave',
       description: 'X marks the chore',
-      costCoins: 200,
+      costCoins: 50,
       assetKey: 'assets/backgrounds/bg_treasure.png',
       rarity: CosmeticRarity.epic,
     ),
@@ -321,7 +331,7 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Unicorn Land',
       description: 'Magical and sparkly',
-      costCoins: 200,
+      costCoins: 50,
       assetKey: 'assets/backgrounds/bg_unicorn.png',
       rarity: CosmeticRarity.epic,
     ),
@@ -330,57 +340,131 @@ class CosmeticCatalog {
       type: CosmeticType.background,
       name: 'Level Up',
       description: 'For the true Chore Champion',
-      costCoins: 200,
+      costCoins: 50,
       assetKey: 'assets/backgrounds/bg_levelup.png',
       rarity: CosmeticRarity.epic,
     ),
 
-    // ZILLA SKINS
+    // ZILLA SKINS — color variants
+    // ── Default (free, level 1) ──
     CosmeticItem(
       id: 'zilla_green_basic',
       type: CosmeticType.zillaSkin,
-      name: 'Classic Zilla',
-      description: 'The original green buddy',
+      name: 'Classic Green',
+      description: 'The original Zilla look',
       costCoins: 0,
-      assetKey: 'assets/zilla/green/basic_sheet.png',
+      colorValue: 0xFF2ECC71,
       isDefault: true,
     ),
-    // ── Rare (100–150 coins) ──
+    // ── Common (10–12 coins) ──
     CosmeticItem(
-      id: 'zilla_blue_hoodie',
+      id: 'zilla_grass_green',
       type: CosmeticType.zillaSkin,
-      name: 'Blue Hoodie',
-      description: 'Cozy hoodie Zilla',
-      costCoins: 100,
-      assetKey: 'assets/zilla/blue/hoodie_sheet.png',
+      name: 'Grass Green',
+      description: 'Fresh and classic',
+      costCoins: 10,
+      colorValue: 0xFF4CAF50,
+      rarity: CosmeticRarity.common,
+    ),
+    CosmeticItem(
+      id: 'zilla_sky_blue',
+      type: CosmeticType.zillaSkin,
+      name: 'Sky Blue',
+      description: 'Cool as a clear day',
+      costCoins: 10,
+      colorValue: 0xFF42A5F5,
+      rarity: CosmeticRarity.common,
+    ),
+    CosmeticItem(
+      id: 'zilla_sunny_yellow',
+      type: CosmeticType.zillaSkin,
+      name: 'Sunny Yellow',
+      description: 'Bright and cheerful',
+      costCoins: 10,
+      colorValue: 0xFFFFD600,
+      rarity: CosmeticRarity.common,
+    ),
+    CosmeticItem(
+      id: 'zilla_coral',
+      type: CosmeticType.zillaSkin,
+      name: 'Coral',
+      description: 'Warm and energetic',
+      costCoins: 12,
+      colorValue: 0xFFFF7043,
+      rarity: CosmeticRarity.common,
+    ),
+    // ── Rare (20–25 coins) ──
+    CosmeticItem(
+      id: 'zilla_purple',
+      type: CosmeticType.zillaSkin,
+      name: 'Purple',
+      description: 'Royally cool',
+      costCoins: 20,
+      colorValue: 0xFF7B1FA2,
       rarity: CosmeticRarity.rare,
     ),
     CosmeticItem(
-      id: 'zilla_red_cape',
+      id: 'zilla_teal',
       type: CosmeticType.zillaSkin,
-      name: 'Red Cape',
-      description: 'Super Zilla to the rescue',
-      costCoins: 150,
-      assetKey: 'assets/zilla/red/cape_sheet.png',
+      name: 'Teal',
+      description: 'Deep ocean vibes',
+      costCoins: 20,
+      colorValue: 0xFF00796B,
       rarity: CosmeticRarity.rare,
     ),
-    // ── Epic (200–250 coins) ──
     CosmeticItem(
-      id: 'zilla_pirate',
+      id: 'zilla_hot_pink',
       type: CosmeticType.zillaSkin,
-      name: 'Pirate Zilla',
-      description: "Arr, chores be done on time!",
-      costCoins: 200,
-      assetKey: 'assets/zilla/pirate/pirate_sheet.png',
+      name: 'Hot Pink',
+      description: 'Bold and vibrant',
+      costCoins: 22,
+      colorValue: 0xFFE91E63,
+      rarity: CosmeticRarity.rare,
+    ),
+    CosmeticItem(
+      id: 'zilla_midnight_blue',
+      type: CosmeticType.zillaSkin,
+      name: 'Midnight Blue',
+      description: 'Dark and mysterious',
+      costCoins: 25,
+      colorValue: 0xFF283593,
+      rarity: CosmeticRarity.rare,
+    ),
+    // ── Epic (35–45 coins) ──
+    CosmeticItem(
+      id: 'zilla_gold',
+      type: CosmeticType.zillaSkin,
+      name: 'Gold',
+      description: 'Champion status',
+      costCoins: 35,
+      colorValue: 0xFFFFB300,
       rarity: CosmeticRarity.epic,
     ),
     CosmeticItem(
-      id: 'zilla_wizard',
+      id: 'zilla_crimson',
       type: CosmeticType.zillaSkin,
-      name: 'Wizard Zilla',
-      description: 'Conjuring clean rooms since forever',
-      costCoins: 250,
-      assetKey: 'assets/zilla/wizard/wizard_sheet.png',
+      name: 'Crimson',
+      description: 'Fierce and powerful',
+      costCoins: 35,
+      colorValue: 0xFFC62828,
+      rarity: CosmeticRarity.epic,
+    ),
+    CosmeticItem(
+      id: 'zilla_emerald',
+      type: CosmeticType.zillaSkin,
+      name: 'Emerald',
+      description: 'Rare and radiant',
+      costCoins: 40,
+      colorValue: 0xFF1B5E20,
+      rarity: CosmeticRarity.epic,
+    ),
+    CosmeticItem(
+      id: 'zilla_galaxy',
+      type: CosmeticType.zillaSkin,
+      name: 'Galaxy',
+      description: 'Out of this world',
+      costCoins: 45,
+      colorValue: 0xFF4A148C,
       rarity: CosmeticRarity.epic,
     ),
 
@@ -393,22 +477,31 @@ class CosmeticCatalog {
       costCoins: 0,
       isDefault: true,
     ),
-    // ── Common (50 coins) ──
+    // ── Default (free, level 1) ──
+    CosmeticItem(
+      id: 'frame_green_basic',
+      type: CosmeticType.avatarFrame,
+      name: 'Green Border',
+      description: 'A fresh green ring — earned at level 1',
+      costCoins: 0,
+      isDefault: true,
+    ),
+    // ── Common (15 coins) ──
     CosmeticItem(
       id: 'frame_stars',
       type: CosmeticType.avatarFrame,
       name: 'Starry',
       description: 'Little gold stars',
-      costCoins: 50,
+      costCoins: 15,
       rarity: CosmeticRarity.common,
     ),
-    // ── Rare (100–150 coins) ──
+    // ── Rare (25–30 coins) ──
     CosmeticItem(
       id: 'frame_rainbow',
       type: CosmeticType.avatarFrame,
       name: 'Rainbow',
       description: 'All the colors',
-      costCoins: 100,
+      costCoins: 25,
       rarity: CosmeticRarity.rare,
     ),
     CosmeticItem(
@@ -416,20 +509,20 @@ class CosmeticCatalog {
       type: CosmeticType.avatarFrame,
       name: 'Gold',
       description: 'Shiny double gold border',
-      costCoins: 150,
+      costCoins: 30,
       rarity: CosmeticRarity.rare,
     ),
-    // ── Epic (200 coins) ──
+    // ── Epic (50 coins) ──
     CosmeticItem(
       id: 'frame_fire',
       type: CosmeticType.avatarFrame,
       name: 'Fire',
       description: 'Blazing flames border',
-      costCoins: 200,
+      costCoins: 50,
       rarity: CosmeticRarity.epic,
     ),
 
-    // TITLES (text only — assetKey unused)
+    // TITLES (text only — assetKey unused; earned via level-ups or achievements, not loot boxes)
     CosmeticItem(
       id: 'title_none',
       type: CosmeticType.title,
@@ -438,40 +531,213 @@ class CosmeticCatalog {
       costCoins: 0,
       isDefault: true,
     ),
-    // ── Common (30–75 coins) ──
+
+    // Level titles — awarded automatically on reaching the corresponding level
     CosmeticItem(
-      id: 'title_good_helper',
+      id: 'title_level_1',
       type: CosmeticType.title,
-      name: 'Good Helper',
-      description: 'A reliable member of the team',
-      costCoins: 30,
-      rarity: CosmeticRarity.common,
+      name: 'Rookie Helper',
+      description: 'Every hero starts somewhere',
+      costCoins: 0,
     ),
     CosmeticItem(
-      id: 'title_chore_champ',
+      id: 'title_level_2',
+      type: CosmeticType.title,
+      name: 'Task Starter',
+      description: 'The journey of a thousand chores begins with one',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_3',
+      type: CosmeticType.title,
+      name: 'Kinda Getting It Done',
+      description: 'Progress is progress',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_4',
+      type: CosmeticType.title,
+      name: 'Chore Apprentice',
+      description: 'Learning the ways of the clean',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_5',
+      type: CosmeticType.title,
+      name: 'Cleanup Cadet',
+      description: 'Reporting for duty',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_6',
+      type: CosmeticType.title,
+      name: 'Snack-Fueled Worker',
+      description: 'Powered by snacks and determination',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_7',
+      type: CosmeticType.title,
+      name: 'Task Tackler',
+      description: 'No chore is safe',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_8',
+      type: CosmeticType.title,
+      name: 'Reliable(ish) Helper',
+      description: 'Usually comes through',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_9',
       type: CosmeticType.title,
       name: 'Chore Champ',
       description: 'Crushing it every day',
-      costCoins: 50,
-      rarity: CosmeticRarity.common,
+      costCoins: 0,
     ),
     CosmeticItem(
-      id: 'title_streak_master',
+      id: 'title_level_10',
       type: CosmeticType.title,
-      name: 'Streak Master',
-      description: 'Never misses a day',
-      costCoins: 75,
-      rarity: CosmeticRarity.common,
+      name: 'Captain of Clean',
+      description: 'Commanding order in every room',
+      costCoins: 0,
     ),
-    // ── Rare (150 coins) ──
     CosmeticItem(
-      id: 'title_legend',
+      id: 'title_level_11',
       type: CosmeticType.title,
-      name: 'The Legend',
-      description: 'Need we say more?',
-      costCoins: 150,
-      rarity: CosmeticRarity.rare,
+      name: 'The Organizer',
+      description: 'Everything has a place',
+      costCoins: 0,
     ),
+    CosmeticItem(
+      id: 'title_level_12',
+      type: CosmeticType.title,
+      name: 'Efficiency Expert',
+      description: 'Done before anyone noticed it was messy',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_13',
+      type: CosmeticType.title,
+      name: 'The "I Did It Already" Kid',
+      description: 'Always one step ahead',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_14',
+      type: CosmeticType.title,
+      name: 'Master of Tasks',
+      description: 'Tasks? What tasks? Already done.',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_15',
+      type: CosmeticType.title,
+      name: 'The Finisher',
+      description: 'Started it, finished it, moved on',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_16',
+      type: CosmeticType.title,
+      name: 'Household Hero',
+      description: 'The whole family noticed',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_17',
+      type: CosmeticType.title,
+      name: 'Elite Cleaner',
+      description: 'A cut above the rest',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_18',
+      type: CosmeticType.title,
+      name: 'Chaos Controller',
+      description: 'Brought order to the storm',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_19',
+      type: CosmeticType.title,
+      name: 'Supreme Organizer',
+      description: 'Legendary status within reach',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_level_20',
+      type: CosmeticType.title,
+      name: 'The Ultimate Responsibility',
+      description: 'With great chores comes great reward',
+      costCoins: 0,
+    ),
+
+    // Achievement (secret) titles — earned via special conditions
+    CosmeticItem(
+      id: 'title_treasure_hoarder',
+      type: CosmeticType.title,
+      name: 'Treasure Hoarder',
+      description: 'Held onto 100+ coins for 3 days straight',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_big_spender',
+      type: CosmeticType.title,
+      name: 'Big Spender',
+      description: 'Spent 100+ coins in a single day',
+      costCoins: 0,
+    ),
+    CosmeticItem(
+      id: 'title_silent_ninja',
+      type: CosmeticType.title,
+      name: 'Silent Ninja',
+      description: 'Finished all required chores in one session without a fuss',
+      costCoins: 0,
+    ),
+
+    // AVATARS — image-based avatar icons
+    // ── Defaults (always free, no rarity) ──
+    CosmeticItem(
+      id: 'avatar_default_1',
+      type: CosmeticType.avatar,
+      name: 'Avatar 1',
+      description: 'A classic Chorezilla hero',
+      costCoins: 0,
+      assetKey: 'assets/avatars/default/avatar_1.png',
+      isDefault: true,
+    ),
+    CosmeticItem(
+      id: 'avatar_default_2',
+      type: CosmeticType.avatar,
+      name: 'Avatar 2',
+      description: 'A classic Chorezilla hero',
+      costCoins: 0,
+      assetKey: 'assets/avatars/default/avatar_2.png',
+      isDefault: true,
+    ),
+    CosmeticItem(
+      id: 'avatar_default_3',
+      type: CosmeticType.avatar,
+      name: 'Avatar 3',
+      description: 'A classic Chorezilla hero',
+      costCoins: 0,
+      assetKey: 'assets/avatars/default/avatar_4.png',
+      isDefault: true,
+    ),
+    CosmeticItem(
+      id: 'avatar_default_4',
+      type: CosmeticType.avatar,
+      name: 'Avatar 4',
+      description: 'A classic Chorezilla hero',
+      costCoins: 0,
+      assetKey: 'assets/avatars/default/avatar_5.png',
+      isDefault: true,
+    ),
+    // ── Common loot avatars (add asset files to assets/avatars/common/ to activate) ──
+    // ── Rare loot avatars (add asset files to assets/avatars/rare/ to activate) ──
+    // ── Epic loot avatars (add asset files to assets/avatars/epic/ to activate) ──
   ];
 
   /// Returns the cosmetic for [id], or the default cosmetic of the same type
@@ -489,7 +755,9 @@ class CosmeticCatalog {
                 ? CosmeticType.avatarFrame
                 : id.startsWith('title_')
                     ? CosmeticType.title
-                    : null;
+                    : id.startsWith('avatar_')
+                        ? CosmeticType.avatar
+                        : null;
 
     if (inferredType != null) {
       final typedDefault = items.where(
@@ -515,6 +783,21 @@ class CosmeticCatalog {
 
   static Iterable<CosmeticItem> titles() =>
       items.where((c) => c.type == CosmeticType.title);
+
+  static Iterable<CosmeticItem> avatars() =>
+      items.where((c) => c.type == CosmeticType.avatar);
+
+  /// Returns the ARGB color value for the given zilla skin ID, or null if the
+  /// skin doesn't exist or has no color (e.g. not a color-tinted skin).
+  static int? tintColorValueForSkin(String? skinId) {
+    if (skinId == null) return null;
+    for (final item in items) {
+      if (item.id == skinId && item.type == CosmeticType.zillaSkin) {
+        return item.colorValue;
+      }
+    }
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -528,32 +811,32 @@ class LootBoxCatalog {
       name: 'Background Box',
       categoryEmoji: '🖼️',
       cosmeticType: CosmeticType.background,
-      costCoins: 20,
-      duplicateCoinRefund: 5,
+      costCoins: 12,
+      duplicateCoinRefund: 3,
     ),
     LootBoxDefinition(
       id: 'lootbox_skins',
       name: 'Skin Box',
-      categoryEmoji: '🦎',
+      categoryEmoji: '🎨',
       cosmeticType: CosmeticType.zillaSkin,
-      costCoins: 25,
-      duplicateCoinRefund: 6,
+      costCoins: 8,
+      duplicateCoinRefund: 2,
     ),
     LootBoxDefinition(
       id: 'lootbox_frames',
       name: 'Frame Box',
       categoryEmoji: '✨',
       cosmeticType: CosmeticType.avatarFrame,
-      costCoins: 20,
-      duplicateCoinRefund: 5,
+      costCoins: 12,
+      duplicateCoinRefund: 3,
     ),
     LootBoxDefinition(
-      id: 'lootbox_titles',
-      name: 'Title Box',
-      categoryEmoji: '🏆',
-      cosmeticType: CosmeticType.title,
-      costCoins: 15,
-      duplicateCoinRefund: 4,
+      id: 'lootbox_avatars',
+      name: 'Avatar Box',
+      categoryEmoji: '🧑‍🎨',
+      cosmeticType: CosmeticType.avatar,
+      costCoins: 10,
+      duplicateCoinRefund: 2,
     ),
   ];
 

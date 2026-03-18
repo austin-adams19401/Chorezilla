@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:chorezilla/components/inputs.dart';
+import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/services/subscription_service.dart';
@@ -11,6 +12,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/models/member.dart';
+import 'package:chorezilla/models/cosmetics.dart';
 
 class AddKidsPage extends StatefulWidget {
   const AddKidsPage({super.key});
@@ -24,7 +26,11 @@ class _AddKidsPageState extends State<AddKidsPage> {
 
   final _name = TextEditingController();
   final _nameNode = FocusNode();
-  int? _age;
+  int? _birthYear;
+  int? _birthMonthNum;
+  DateTime? get _birthMonth => (_birthYear != null && _birthMonthNum != null)
+      ? DateTime(_birthYear!, _birthMonthNum!)
+      : null;
   String? _avatarKey;
   bool _allowBonusChores = true;
 
@@ -90,8 +96,9 @@ class _AddKidsPageState extends State<AddKidsPage> {
           avatarKey: (_avatarKey?.trim().isEmpty ?? true) ? null : _avatarKey,
           pinHash: null,
         );
+        final bm = _birthMonth;
         final patch = <String, dynamic>{
-          if (_age != null) 'age': _age,
+          if (bm != null) 'birthMonth': Timestamp.fromDate(bm),
           'allowBonusChores': _allowBonusChores,
         };
         if (patch.isNotEmpty) await _repo.updateMember(familyId, newId, patch);
@@ -105,7 +112,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
         final patch = <String, dynamic>{
           'displayName': _name.text.trim(),
           if (_avatarKey != null) 'avatarKey': _avatarKey,
-          if (_age != null) 'age': _age,
+          if (_birthMonth != null) 'birthMonth': Timestamp.fromDate(_birthMonth!),
           'allowBonusChores': _allowBonusChores,
         };
         await _repo.updateMember(familyId, memberId, patch);
@@ -167,7 +174,8 @@ class _AddKidsPageState extends State<AddKidsPage> {
       _avatarKey = (m.avatarKey != null && m.avatarKey!.trim().isNotEmpty)
           ? m.avatarKey
           : null;
-      _age = m.age;
+      _birthYear = m.birthMonth?.year;
+      _birthMonthNum = m.birthMonth?.month;
       _allowBonusChores = m.allowBonusChores;
     });
     _nameNode.requestFocus();
@@ -178,7 +186,8 @@ class _AddKidsPageState extends State<AddKidsPage> {
     _error = null;
     _busy = false;
     _name.clear();
-    _age = null;
+    _birthYear = null;
+    _birthMonthNum = null;
     _avatarKey = null;
     _allowBonusChores = true;
     _nameNode.requestFocus();
@@ -187,7 +196,8 @@ class _AddKidsPageState extends State<AddKidsPage> {
   void _clearFormAndRefocus() {
     _editingMemberId = null;
     _name.clear();
-    _age = null;
+    _birthYear = null;
+    _birthMonthNum = null;
     _avatarKey = null;
     _allowBonusChores = true;
     FocusScope.of(context).requestFocus(_nameNode);
@@ -363,263 +373,82 @@ class _AddKidsPageState extends State<AddKidsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Add / edit form ──────────────────────────────────────────
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: cs.outlineVariant),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isEditing ? 'Edit kid' : 'Add a kid',
-                          style: ts.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
+              _FormCard(
+                formKey: _formKey,
+                nameController: _name,
+                nameFocusNode: _nameNode,
+                avatarKey: _avatarKey,
+                birthYear: _birthYear,
+                birthMonthNum: _birthMonthNum,
+                allowBonusChores: _allowBonusChores,
+                busy: _busy,
+                error: _error,
+                isEditing: isEditing,
+                onPickAvatar: _pickAvatar,
+                onBirthYearChanged: (v) => setState(() => _birthYear = v),
+                onBirthMonthChanged: (v) => setState(() => _birthMonthNum = v),
+                onAllowBonusChoresChanged: (v) =>
+                    setState(() => _allowBonusChores = v),
+                onSave: _save,
+                onNameChanged: () => setState(() {}),
+              ),
 
-                        // Avatar preview + name
-                        Row(
-                          children: [
-                            GestureDetector(
-                              onTap: _busy ? null : _pickAvatar,
-                              child: CircleAvatar(
-                                radius: 28,
-                                backgroundColor: cs.tertiaryContainer,
-                                child: Text(
-                                  (_avatarKey == null ||
-                                          _avatarKey!.trim().isEmpty)
-                                      ? _initial(_name.text)
-                                      : _avatarKey!,
-                                  style: const TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: TextFormField(
-                                controller: _name,
-                                focusNode: _nameNode,
-                                textCapitalization: TextCapitalization.words,
-                                textInputAction: TextInputAction.next,
-                                decoration: themedInput(context, 'Name',
-                                    hint: 'e.g., Sam'),
-                                validator: (v) {
-                                  final t = v?.trim() ?? '';
-                                  if (t.isEmpty) return 'Please enter a name';
-                                  if (t.length > 30) {
-                                    return 'Keep it under 30 characters';
-                                  }
-                                  return null;
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
+              const SizedBox(height: 28),
 
-                        // Age + avatar row (responsive)
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final isNarrow = constraints.maxWidth < 480;
-
-                            final ageField = DropdownButtonFormField<int>(
-                              initialValue: _age,
-                              isExpanded: true,
-                              decoration: themedInput(context, 'Age (optional)'),
-                              items: List.generate(42, (i) => i + 3)
-                                  .map((a) => DropdownMenuItem<int>(
-                                        value: a,
-                                        child: Text(a.toString()),
-                                      ))
-                                  .toList(),
-                              onChanged:
-                                  _busy ? null : (v) => setState(() => _age = v),
-                            );
-
-                            final avatarField = InputDecorator(
-                              decoration: themedInput(context, 'Avatar'),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    (_avatarKey == null ||
-                                            _avatarKey!.trim().isEmpty)
-                                        ? '🙂'
-                                        : _avatarKey!,
-                                    style: const TextStyle(fontSize: 22),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Choose emoji',
-                                      style: ts.bodyMedium?.copyWith(
-                                        color: cs.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                  FilledButton.tonal(
-                                    onPressed: _busy ? null : _pickAvatar,
-                                    style: FilledButton.styleFrom(
-                                      visualDensity: VisualDensity.compact,
-                                    ),
-                                    child: const Text('Pick'),
-                                  ),
-                                ],
-                              ),
-                            );
-
-                            if (isNarrow) {
-                              return Column(
-                                children: [
-                                  ageField,
-                                  const SizedBox(height: 12),
-                                  avatarField,
-                                ],
-                              );
-                            } else {
-                              return Row(
-                                children: [
-                                  Expanded(child: ageField),
-                                  const SizedBox(width: 12),
-                                  Expanded(child: avatarField),
-                                ],
-                              );
-                            }
-                          },
-                        ),
-                        const SizedBox(height: 4),
-
-                        SwitchListTile.adaptive(
-                          contentPadding: EdgeInsets.zero,
-                          value: _allowBonusChores,
-                          onChanged: _busy
-                              ? null
-                              : (v) => setState(() => _allowBonusChores = v),
-                          title: const Text('Show bonus chores'),
-                          subtitle: const Text(
-                            'Lets this kid see optional extra chores for extra coins and XP.',
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        SizedBox(
-                          width: double.infinity,
-                          child: FilledButton.icon(
-                            onPressed: _busy ? null : _save,
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                              shape: const StadiumBorder(),
-                            ),
-                            icon: _busy
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : Icon(isEditing ? Icons.save : Icons.add),
-                            label: Text(isEditing ? 'Save changes' : 'Add kid'),
-                          ),
-                        ),
-
-                        if (_error != null) ...[
-                          const SizedBox(height: 8),
-                          Text(_error!, style: TextStyle(color: cs.error)),
-                        ],
-                      ],
+              // ── Section header ───────────────────────────────────────────
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 20,
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // ── Current kids list ────────────────────────────────────────
-              Text(
-                'Current kids',
-                style: ts.labelMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-
-              if (kids.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    'No kids yet — add one above.',
-                    style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Your Kids',
+                    style: ts.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
                   ),
-                ),
-
-              ...kids.map((m) {
-                final hasPin =
-                    (m.pinHash != null && m.pinHash!.trim().isNotEmpty);
-                final isBeingEdited = _editingMemberId == m.id;
-
-                return Card(
-                  shape: isBeingEdited
-                      ? RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: cs.primary, width: 2),
-                        )
-                      : null,
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: cs.tertiaryContainer,
+                  const SizedBox(width: 8),
+                  if (kids.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                       child: Text(
-                        (m.avatarKey == null || m.avatarKey!.trim().isEmpty)
-                            ? _initial(m.displayName)
-                            : m.avatarKey!,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
+                        '${kids.length}',
+                        style: ts.labelSmall?.copyWith(
+                          color: cs.onPrimaryContainer,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    title: Text(m.displayName),
-                    subtitle: Text(
-                      'Level ${m.level} • ${m.xp} XP • ${m.coins} coins',
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          tooltip: hasPin ? 'Edit PIN' : 'Set PIN',
-                          onPressed: _busy ? null : () => _showPinDialog(m),
-                          icon: Icon(
-                            hasPin
-                                ? Icons.lock_rounded
-                                : Icons.lock_open_rounded,
-                            color: hasPin ? cs.primary : cs.onSurfaceVariant,
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Edit',
-                          onPressed: _busy ? null : () => _startEdit(m),
-                          icon: Icon(Icons.edit_outlined, color: cs.primary),
-                        ),
-                        IconButton(
-                          tooltip: 'Remove',
-                          onPressed: _busy ? null : () => _removeKidFromFamily(m),
-                          icon: Icon(Icons.person_remove_outlined,
-                              color: cs.error),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              if (kids.isEmpty)
+                _EmptyKidsState(cs: cs, ts: ts)
+              else
+                ...kids.map((m) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _KidCard(
+                        member: m,
+                        isBeingEdited: _editingMemberId == m.id,
+                        busy: _busy,
+                        onEdit: () => _startEdit(m),
+                        onRemove: () => _removeKidFromFamily(m),
+                        onPin: () => _showPinDialog(m),
+                      ),
+                    )),
 
               const SizedBox(height: 40),
             ],
@@ -629,9 +458,757 @@ class _AddKidsPageState extends State<AddKidsPage> {
     );
   }
 
+}
+
+// ── Form card ────────────────────────────────────────────────────────────────
+
+class _FormCard extends StatelessWidget {
+  const _FormCard({
+    required this.formKey,
+    required this.nameController,
+    required this.nameFocusNode,
+    required this.avatarKey,
+    required this.birthYear,
+    required this.birthMonthNum,
+    required this.allowBonusChores,
+    required this.busy,
+    required this.error,
+    required this.isEditing,
+    required this.onPickAvatar,
+    required this.onBirthYearChanged,
+    required this.onBirthMonthChanged,
+    required this.onAllowBonusChoresChanged,
+    required this.onSave,
+    required this.onNameChanged,
+  });
+
+  final GlobalKey<FormState> formKey;
+  final TextEditingController nameController;
+  final FocusNode nameFocusNode;
+  final String? avatarKey;
+  final int? birthYear;
+  final int? birthMonthNum;
+  final bool allowBonusChores;
+  final bool busy;
+  final String? error;
+  final bool isEditing;
+  final VoidCallback onPickAvatar;
+  final ValueChanged<int?> onBirthYearChanged;
+  final ValueChanged<int?> onBirthMonthChanged;
+  final ValueChanged<bool> onAllowBonusChoresChanged;
+  final VoidCallback onSave;
+  final VoidCallback onNameChanged;
+
   String _initial(String name) {
     final n = name.trim();
     return n.isEmpty ? '?' : n.characters.first.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+    final isImageAvatar = avatarKey?.startsWith('avatar_') ?? false;
+
+    return Card(
+      elevation: 2,
+      shadowColor: cs.shadow.withValues(alpha: 0.15),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Gradient header
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  cs.secondary,
+                  cs.secondary.withValues(alpha: 0.75),
+                ],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isEditing ? Icons.edit_rounded : Icons.person_add_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  isEditing ? 'Edit Kid' : 'Add a Kid',
+                  style: ts.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Form(
+              key: formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Avatar preview + name
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: busy ? null : onPickAvatar,
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: cs.tertiaryContainer,
+                                border: Border.all(
+                                  color: cs.tertiary.withValues(alpha: 0.4),
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: cs.shadow.withValues(alpha: 0.12),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: isImageAvatar
+                                  ? Image.asset(
+                                      CosmeticCatalog.byId(avatarKey!)
+                                          .assetKey,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Center(
+                                      child: Text(
+                                        (avatarKey == null ||
+                                                avatarKey!.trim().isEmpty)
+                                            ? _initial(nameController.text)
+                                            : avatarKey!,
+                                        style: const TextStyle(
+                                          fontSize: 30,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: cs.primary,
+                                  border: Border.all(
+                                      color: cs.surface, width: 1.5),
+                                ),
+                                child: const Icon(
+                                  Icons.edit_rounded,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: TextFormField(
+                          controller: nameController,
+                          focusNode: nameFocusNode,
+                          textCapitalization: TextCapitalization.words,
+                          textInputAction: TextInputAction.next,
+                          onChanged: (_) => onNameChanged(),
+                          decoration:
+                              themedInput(context, 'Name', hint: 'e.g., Sam'),
+                          validator: (v) {
+                            final t = v?.trim() ?? '';
+                            if (t.isEmpty) return 'Please enter a name';
+                            if (t.length > 30) {
+                              return 'Keep it under 30 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Birthday + avatar row (responsive)
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final isNarrow = constraints.maxWidth < 480;
+                      final currentYear = DateTime.now().year;
+                      const monthNames = [
+                        'January', 'February', 'March', 'April',
+                        'May', 'June', 'July', 'August',
+                        'September', 'October', 'November', 'December',
+                      ];
+
+                      final birthdayField = Row(
+                        children: [
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              initialValue: birthMonthNum,
+                              isExpanded: true,
+                              decoration: themedInput(context, 'Month'),
+                              items: List.generate(12, (i) => i + 1)
+                                  .map((m) => DropdownMenuItem<int>(
+                                        value: m,
+                                        child: Text(monthNames[m - 1]),
+                                      ))
+                                  .toList(),
+                              onChanged: busy ? null : onBirthMonthChanged,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: DropdownButtonFormField<int>(
+                              initialValue: birthYear,
+                              isExpanded: true,
+                              decoration: themedInput(context, 'Year'),
+                              items: List.generate(
+                                      21, (i) => currentYear - i)
+                                  .map((y) => DropdownMenuItem<int>(
+                                        value: y,
+                                        child: Text(y.toString()),
+                                      ))
+                                  .toList(),
+                              onChanged: busy ? null : onBirthYearChanged,
+                            ),
+                          ),
+                        ],
+                      );
+
+                      final avatarField = InkWell(
+                        onTap: busy ? null : onPickAvatar,
+                        borderRadius: BorderRadius.circular(12),
+                        child: InputDecorator(
+                          decoration: themedInput(context, 'Avatar'),
+                          child: Row(
+                            children: [
+                              Text(
+                                (avatarKey == null ||
+                                        avatarKey!.trim().isEmpty)
+                                    ? '🙂'
+                                    : (avatarKey!.startsWith('avatar_')
+                                        ? '🖼️'
+                                        : avatarKey!),
+                                style: const TextStyle(fontSize: 22),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  avatarKey?.startsWith('avatar_') == true
+                                      ? CosmeticCatalog.byId(avatarKey!).name
+                                      : 'Choose emoji',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: cs.onSurfaceVariant,
+                                      ),
+                                ),
+                              ),
+                              FilledButton.tonal(
+                                onPressed: busy ? null : onPickAvatar,
+                                style: FilledButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                child: const Text('Pick'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+
+                      if (isNarrow) {
+                        return Column(
+                          children: [
+                            birthdayField,
+                            const SizedBox(height: 12),
+                            avatarField,
+                          ],
+                        );
+                      } else {
+                        return Row(
+                          children: [
+                            Expanded(child: birthdayField),
+                            const SizedBox(width: 12),
+                            Expanded(child: avatarField),
+                          ],
+                        );
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 4),
+
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    value: allowBonusChores,
+                    onChanged:
+                        busy ? null : onAllowBonusChoresChanged,
+                    title: const Text('Show bonus chores'),
+                    subtitle: const Text(
+                      'Lets this kid see optional extra chores for extra coins and XP.',
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: busy ? null : onSave,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        shape: const StadiumBorder(),
+                      ),
+                      icon: busy
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(isEditing ? Icons.save : Icons.add),
+                      label:
+                          Text(isEditing ? 'Save changes' : 'Add kid'),
+                    ),
+                  ),
+
+                  if (error != null) ...[
+                    const SizedBox(height: 8),
+                    Text(error!,
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Kid card ─────────────────────────────────────────────────────────────────
+
+class _KidCard extends StatelessWidget {
+  const _KidCard({
+    required this.member,
+    required this.isBeingEdited,
+    required this.busy,
+    required this.onEdit,
+    required this.onRemove,
+    required this.onPin,
+  });
+
+  final Member member;
+  final bool isBeingEdited;
+  final bool busy;
+  final VoidCallback onEdit;
+  final VoidCallback onRemove;
+  final VoidCallback onPin;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+    final hasPin =
+        (member.pinHash != null && member.pinHash!.trim().isNotEmpty);
+    final isImageAvatar = member.avatarKey?.startsWith('avatar_') ?? false;
+    final levelInfo = levelInfoForXp(member.xp);
+    final hasStreak = member.currentStreak > 1;
+
+    final title = member.equippedTitleId != null &&
+            member.equippedTitleId!.isNotEmpty &&
+            member.equippedTitleId != 'title_none'
+        ? CosmeticCatalog.byId(member.equippedTitleId!).name
+        : null;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: cs.surface,
+        border: Border.all(
+          color: isBeingEdited ? cs.primary : cs.outlineVariant,
+          width: isBeingEdited ? 2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isBeingEdited
+                ? cs.primary.withValues(alpha: 0.12)
+                : cs.shadow.withValues(alpha: 0.06),
+            blurRadius: isBeingEdited ? 10 : 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top row: avatar + name/title/level + actions
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Avatar
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: cs.tertiaryContainer,
+                    border: Border.all(
+                      color: cs.tertiary.withValues(alpha: 0.35),
+                      width: 2,
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: isImageAvatar
+                      ? Image.asset(
+                          CosmeticCatalog.byId(member.avatarKey!).assetKey,
+                          fit: BoxFit.cover,
+                        )
+                      : Center(
+                          child: Text(
+                            (member.avatarKey == null ||
+                                    member.avatarKey!.trim().isEmpty)
+                                ? _initial(member.displayName)
+                                : member.avatarKey!,
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 12),
+
+                // Name, title, level badge
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              member.displayName,
+                              style: ts.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          _LevelBadge(level: member.level, cs: cs, ts: ts),
+                        ],
+                      ),
+                      if (title != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          title,
+                          style: ts.labelSmall?.copyWith(
+                            color: cs.primary,
+                            fontStyle: FontStyle.italic,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+
+                // Action buttons
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _ActionIconButton(
+                      tooltip: hasPin ? 'Edit PIN' : 'Set PIN',
+                      onPressed: busy ? null : onPin,
+                      icon: hasPin
+                          ? Icons.lock_rounded
+                          : Icons.lock_open_rounded,
+                      color: hasPin ? cs.primary : cs.onSurfaceVariant,
+                    ),
+                    _ActionIconButton(
+                      tooltip: 'Edit',
+                      onPressed: busy ? null : onEdit,
+                      icon: Icons.edit_outlined,
+                      color: cs.primary,
+                    ),
+                    _ActionIconButton(
+                      tooltip: 'Remove',
+                      onPressed: busy ? null : onRemove,
+                      icon: Icons.person_remove_outlined,
+                      color: cs.error,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // XP progress bar
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'XP',
+                      style: ts.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      '${levelInfo.xpIntoLevel} / ${levelInfo.xpNeededThisLevel}',
+                      style: ts.labelSmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: levelInfo.progress,
+                    minHeight: 6,
+                    backgroundColor: cs.surfaceContainerHighest,
+                    valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // Stats row: coins, streak, bonus chores
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _StatChip(
+                  icon: '🪙',
+                  label: '${member.coins}',
+                  cs: cs,
+                  ts: ts,
+                ),
+                if (hasStreak)
+                  _StatChip(
+                    icon: '🔥',
+                    label: '${member.currentStreak} day streak',
+                    cs: cs,
+                    ts: ts,
+                    highlighted: true,
+                  ),
+                if (member.allowBonusChores)
+                  _StatChip(
+                    icon: '⭐',
+                    label: 'Bonus chores on',
+                    cs: cs,
+                    ts: ts,
+                  ),
+                if (member.badges.isNotEmpty)
+                  _StatChip(
+                    icon: '🏅',
+                    label: '${member.badges.length} badges',
+                    cs: cs,
+                    ts: ts,
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _initial(String name) {
+    final n = name.trim();
+    return n.isEmpty ? '?' : n.characters.first.toUpperCase();
+  }
+}
+
+class _LevelBadge extends StatelessWidget {
+  const _LevelBadge({
+    required this.level,
+    required this.cs,
+    required this.ts,
+  });
+
+  final int level;
+  final ColorScheme cs;
+  final TextTheme ts;
+
+  @override
+  Widget build(BuildContext context) {
+    final isHighLevel = level >= 10;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        gradient: isHighLevel
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFFFFB300),
+                  const Color(0xFFFF6F00),
+                ],
+              )
+            : null,
+        color: isHighLevel ? null : cs.primaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        'Lv $level',
+        style: ts.labelSmall?.copyWith(
+          color: isHighLevel ? Colors.white : cs.onPrimaryContainer,
+          fontWeight: FontWeight.w800,
+          fontSize: 10,
+        ),
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  const _StatChip({
+    required this.icon,
+    required this.label,
+    required this.cs,
+    required this.ts,
+    this.highlighted = false,
+  });
+
+  final String icon;
+  final String label;
+  final ColorScheme cs;
+  final TextTheme ts;
+  final bool highlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: highlighted
+            ? cs.errorContainer.withValues(alpha: 0.5)
+            : cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 12)),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: ts.labelSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: highlighted ? cs.error : cs.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionIconButton extends StatelessWidget {
+  const _ActionIconButton({
+    required this.tooltip,
+    required this.onPressed,
+    required this.icon,
+    required this.color,
+  });
+
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon, color: onPressed == null ? color.withValues(alpha: 0.4) : color, size: 20),
+    );
+  }
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+
+class _EmptyKidsState extends StatelessWidget {
+  const _EmptyKidsState({required this.cs, required this.ts});
+
+  final ColorScheme cs;
+  final TextTheme ts;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: cs.outlineVariant,
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        children: [
+          Image.asset(
+            'assets/mascot/grey-scale-mascot.png',
+            height: 72,
+            opacity: const AlwaysStoppedAnimation(0.5),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'No kids yet',
+            style: ts.titleSmall?.copyWith(
+              color: cs.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Add your first kid above to get started.',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -650,6 +1227,11 @@ class _AvatarPickerSheet extends StatefulWidget {
 class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
   late String _selected;
 
+  static final _defaultImageIds = CosmeticCatalog.avatars()
+      .where((a) => a.isDefault)
+      .map((a) => a.id)
+      .toList();
+
   @override
   void initState() {
     super.initState();
@@ -661,6 +1243,18 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
+
+    final isImageSelected = _selected.startsWith('avatar_');
+    final previewChild = isImageSelected
+        ? ClipOval(
+            child: Image.asset(
+              CosmeticCatalog.byId(_selected).assetKey,
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+            ),
+          )
+        : Text(_selected, style: const TextStyle(fontSize: 22));
 
     return Padding(
       padding: EdgeInsets.only(
@@ -678,7 +1272,7 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
               children: [
                 CircleAvatar(
                   backgroundColor: cs.tertiaryContainer,
-                  child: Text(_selected, style: const TextStyle(fontSize: 22)),
+                  child: previewChild,
                 ),
                 const SizedBox(width: 12),
                 Text('Pick an avatar', style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
@@ -698,10 +1292,16 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
                     crossAxisSpacing: 8,
                     children: [
                       for (final a in widget.avatars)
-                        _EmojiTile(
-                          emoji: a,
+                        _AvatarTile(
+                          avatarKey: a,
                           selected: a == _selected,
                           onTap: () => setState(() => _selected = a),
+                        ),
+                      for (final id in _defaultImageIds)
+                        _AvatarTile(
+                          avatarKey: id,
+                          selected: id == _selected,
+                          onTap: () => setState(() => _selected = id),
                         ),
                     ],
                   );
@@ -731,20 +1331,28 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
   }
 }
 
-class _EmojiTile extends StatelessWidget {
-  const _EmojiTile({
-    required this.emoji,
+class _AvatarTile extends StatelessWidget {
+  const _AvatarTile({
+    required this.avatarKey,
     required this.selected,
     required this.onTap,
   });
 
-  final String emoji;
+  final String avatarKey;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final isImage = avatarKey.startsWith('avatar_');
+    final child = isImage
+        ? Image.asset(
+            CosmeticCatalog.byId(avatarKey).assetKey,
+            fit: BoxFit.cover,
+          )
+        : Text(avatarKey, style: const TextStyle(fontSize: 24));
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -759,16 +1367,17 @@ class _EmojiTile extends StatelessWidget {
           ),
         ),
         alignment: Alignment.center,
-        child: Text(emoji, style: const TextStyle(fontSize: 24)),
+        child: isImage
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: child,
+              )
+            : child,
       ),
     );
   }
 }
 
 const _defaultAvatars = [
-  '🦖', '🦄', '🐱', '🐶', '🐵', '🐼', '🦊', '🐯',
-  '🐸', '🐨', '🐰', '🐮', '🐹', '🐻', '🐷', '🐭',
-  '🦁', '🐔', '🐥', '🦉', '🦋', '🐞', '🐙', '🐳',
-  '🚀', '⚽', '🎮', '🎲', '🎸', '🎯', '🌈', '🍕',
-  '🍩', '🍪', '🍎', '🧩',
+  '🦖', '🦄', '🐱', '🐶', '🐵', '🦊', '🐸', '🦁',
 ];

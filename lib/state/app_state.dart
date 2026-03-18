@@ -38,6 +38,8 @@ part 'ui_state.dart';
 part 'auth_state.dart';
 part 'cosmetic_state.dart';
 part 'badges_state.dart';
+part 'titles_state.dart';
+part 'away_state.dart';
 
 const String _viewModeKey = 'viewMode';
 

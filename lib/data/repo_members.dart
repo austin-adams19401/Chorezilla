@@ -29,6 +29,7 @@ extension MemberRepo on ChorezillaRepo {
       'xp': 0,
       'coins': 0,
       'badges': [],
+      'ownedCosmetics': ['title_level_1'],
       'createdAt': FieldValue.serverTimestamp(),
       'active': true,
       'allowanceEnabled': false,

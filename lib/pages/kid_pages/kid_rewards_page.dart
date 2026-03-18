@@ -9,6 +9,7 @@ import 'package:chorezilla/models/reward_redemption.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/components/loot_box_open_dialog.dart';
+import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 
 class KidRewardsPage extends StatefulWidget {
   const KidRewardsPage({super.key, this.memberId, this.initialTabIndex = 0 });
@@ -75,10 +76,18 @@ class _KidRewardsPageState extends State<KidRewardsPage>
       );
     }
 
+    final allRedemptions = app.rewardRedemptionsForKid(member.id);
+    final boughtRewardIds = allRedemptions
+        .where((r) => r.status != 'cancelled' && r.rewardId != null)
+        .map((r) => r.rewardId!)
+        .toSet();
+
     final rewards = [...app.rewards]
       ..sort((a, b) => a.coinCost.compareTo(b.coinCost));
 
-    final myRedemptions = app.rewardRedemptionsForKid(member.id);
+    final myRedemptions = allRedemptions
+        .where((r) => r.isPending)
+        .toList();
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
@@ -92,16 +101,7 @@ class _KidRewardsPageState extends State<KidRewardsPage>
       ),
       body: Stack(
         children: [
-          // background gradient
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [cs.secondary, cs.primary],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-          ),
+          Container(color: cs.secondary),
 
           Column(
             children: [
@@ -137,8 +137,8 @@ class _KidRewardsPageState extends State<KidRewardsPage>
                             unselectedLabelColor: cs.onSurface,
                             tabs: const [
                               Tab(text: 'Store'),
-                              Tab(text: 'My Rewards'),
                               Tab(text: 'Cosmetics'),
+                              Tab(text: 'My Rewards'),
                             ],
                           ),
                           Expanded(
@@ -148,10 +148,11 @@ class _KidRewardsPageState extends State<KidRewardsPage>
                                   member: member,
                                   rewards: rewards,
                                   busyRewardIds: _busyRewardIds,
+                                  boughtRewardIds: boughtRewardIds,
                                   onPurchase: _purchaseReward,
                                 ),
-                                _MyRewardsTab(redemptions: myRedemptions),
                                 _CosmeticsTab(member: member),
+                                _MyRewardsTab(redemptions: myRedemptions),
                               ],
                             ),
                           ),
@@ -316,17 +317,20 @@ class _RewardStoreTab extends StatelessWidget {
     required this.member,
     required this.rewards,
     required this.busyRewardIds,
+    required this.boughtRewardIds,
     required this.onPurchase,
   });
 
   final Member member;
   final List<Reward> rewards;
   final Set<String> busyRewardIds;
+  final Set<String> boughtRewardIds;
   final Future<void> Function(Member, Reward) onPurchase;
 
   @override
   Widget build(BuildContext context) {
-    if (rewards.isEmpty) {
+    final visibleRewards = rewards.where((r) => !boughtRewardIds.contains(r.id)).toList();
+    if (visibleRewards.isEmpty) {
       return const _EmptyStateKidRewards(
         emoji: '🛍️',
         title: 'No rewards yet',
@@ -359,9 +363,9 @@ class _RewardStoreTab extends StatelessWidget {
             mainAxisExtent:
                 tileHeight, 
           ),
-          itemCount: rewards.length,
+          itemCount: visibleRewards.length,
           itemBuilder: (context, index) {
-            final r = rewards[index];
+            final r = visibleRewards[index];
             final canAfford = member.coins >= r.coinCost;
             final soldOut = r.stock != null && r.stock! <= 0;
             final busy = busyRewardIds.contains(r.id);
@@ -528,10 +532,9 @@ class _MyRewardsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (redemptions.isEmpty) {
       return const _EmptyStateKidRewards(
-        emoji: '✨',
-        title: 'No rewards yet',
-        subtitle:
-            'When you buy rewards or earn allowance, they’ll show up here.',
+        emoji: "\u2728",
+        title: "No pending rewards",
+        subtitle: "Rewards you buy will show up here while you wait for a parent to give them.",
       );
     }
 
@@ -702,22 +705,6 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
     }
   }
 
-  Future<void> _equipItem(CosmeticItem item) async {
-    final app = context.read<AppState>();
-    try {
-      await app.equipCosmetic(widget.member.id, item);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Equipped "${item.name}"!')),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not equip: $e')),
-      );
-    }
-  }
-
   String? _equippedIdForType(CosmeticType type) {
     switch (type) {
       case CosmeticType.background:
@@ -728,6 +715,8 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
         return widget.member.equippedAvatarFrameId;
       case CosmeticType.title:
         return widget.member.equippedTitleId;
+      case CosmeticType.avatar:
+        return null;
     }
   }
 
@@ -748,7 +737,9 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
         const SizedBox(height: 8),
         // 2×2 grid of category boxes
         for (int row = 0; row < 2; row++) ...[
-          Row(
+          IntrinsicHeight(
+           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: LootBoxCatalog.boxes.skip(row * 2).take(2).map((box) {
               final busy = _busyIds.contains(box.id);
               final canAfford = member.coins >= box.costCoins;
@@ -765,64 +756,55 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
               );
             }).toList(),
           ),
+          ),
           if (row == 0) const SizedBox(height: 8),
         ],
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
 
         // ── Backgrounds ──────────────────────────────────────────────────────
-        _SectionHeader(title: 'Backgrounds', emoji: '🖼️'),
-        const SizedBox(height: 8),
-        _CosmeticGrid(
-          items: CosmeticCatalog.backgrounds().toList(),
-          member: member,
-          busyIds: _busyIds,
-          getEquippedId: () => _equippedIdForType(CosmeticType.background),
-          onBuy: _purchaseCosmetic,
-          onEquip: _equipItem,
+        _CollapsibleSection(
+          title: 'Backgrounds',
+          icon: Image.asset('assets/backgrounds/background-icon.png', width: 26, height: 26),
+          child: _CosmeticGrid(
+            items: CosmeticCatalog.backgrounds().toList(),
+            member: member,
+            busyIds: _busyIds,
+            getEquippedId: () => _equippedIdForType(CosmeticType.background),
+            onBuy: _purchaseCosmetic,
+          ),
         ),
-
-        const SizedBox(height: 20),
 
         // ── Zilla Skins ───────────────────────────────────────────────────────
-        _SectionHeader(title: 'Zilla Skins', emoji: '🦖'),
-        const SizedBox(height: 8),
-        _CosmeticGrid(
-          items: CosmeticCatalog.zillaSkins().toList(),
-          member: member,
-          busyIds: _busyIds,
-          getEquippedId: () => _equippedIdForType(CosmeticType.zillaSkin),
-          onBuy: _purchaseCosmetic,
-          onEquip: _equipItem,
+        _CollapsibleSection(
+          title: 'Zilla Skins',
+          icon: Image.asset(
+            'assets/mascot/mascot_plain.png',
+            width: 26,
+            height: 26,
+          ),
+          child: _CosmeticGrid(
+            items: CosmeticCatalog.zillaSkins().toList(),
+            member: member,
+            busyIds: _busyIds,
+            getEquippedId: () => _equippedIdForType(CosmeticType.zillaSkin),
+            onBuy: _purchaseCosmetic,
+          ),
         ),
-
-        const SizedBox(height: 20),
 
         // ── Avatar Frames ─────────────────────────────────────────────────────
-        _SectionHeader(title: 'Avatar Frames', emoji: '⭐'),
-        const SizedBox(height: 8),
-        _CosmeticGrid(
-          items: CosmeticCatalog.avatarFrames().toList(),
-          member: member,
-          busyIds: _busyIds,
-          getEquippedId: () => _equippedIdForType(CosmeticType.avatarFrame),
-          onBuy: _purchaseCosmetic,
-          onEquip: _equipItem,
+        _CollapsibleSection(
+          title: 'Avatar Frames',
+          icon: const Text('⭐', style: TextStyle(fontSize: 22)),
+          child: _CosmeticGrid(
+            items: CosmeticCatalog.avatarFrames().toList(),
+            member: member,
+            busyIds: _busyIds,
+            getEquippedId: () => _equippedIdForType(CosmeticType.avatarFrame),
+            onBuy: _purchaseCosmetic,
+          ),
         ),
 
-        const SizedBox(height: 20),
-
-        // ── Titles ────────────────────────────────────────────────────────────
-        _SectionHeader(title: 'Titles', emoji: '🏆'),
-        const SizedBox(height: 8),
-        _CosmeticGrid(
-          items: CosmeticCatalog.titles().toList(),
-          member: member,
-          busyIds: _busyIds,
-          getEquippedId: () => _equippedIdForType(CosmeticType.title),
-          onBuy: _purchaseCosmetic,
-          onEquip: _equipItem,
-        ),
       ],
     );
   }
@@ -838,12 +820,72 @@ class _SectionHeader extends StatelessWidget {
     final ts = Theme.of(context).textTheme;
     return Row(
       children: [
-        Text(emoji, style: const TextStyle(fontSize: 18)),
-        const SizedBox(width: 6),
+        Text(emoji, style: const TextStyle(fontSize: 22)),
+        const SizedBox(width: 8),
         Text(
           title,
-          style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+          style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
+      ],
+    );
+  }
+}
+
+class _CollapsibleSection extends StatefulWidget {
+  const _CollapsibleSection({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
+
+  final String title;
+  final Widget icon;
+  final Widget child;
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _expanded = !_expanded),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                widget.icon,
+                const SizedBox(width: 6),
+                Text(
+                  widget.title,
+                  style: ts.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: cs.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: 4),
+          widget.child,
+          const SizedBox(height: 16),
+        ] else
+          const SizedBox(height: 4),
       ],
     );
   }
@@ -862,60 +904,160 @@ class _LootBoxCard extends StatelessWidget {
   final bool busy;
   final VoidCallback onOpen;
 
+  static List<Color> _gradientFor(CosmeticType type) {
+    switch (type) {
+      case CosmeticType.background:
+        return [const Color(0xFF0D7377), const Color(0xFF5C35A0)];
+      case CosmeticType.zillaSkin:
+        return [const Color(0xFF1565C0), const Color(0xFF6A1B9A)];
+      case CosmeticType.avatarFrame:
+        return [const Color(0xFF7B1FA2), const Color(0xFFC2185B)];
+      case CosmeticType.title:
+        return [const Color(0xFFE65100), const Color(0xFFB71C1C)];
+      case CosmeticType.avatar:
+        return [const Color(0xFF00897B), const Color(0xFF00ACC1)];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
 
-    return Card(
-      elevation: 0,
-      color: canAfford ? cs.surface : cs.surfaceContainerHighest,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+    final activeGradient = _gradientFor(box.cosmeticType);
+    final glowColor = canAfford ? activeGradient.first : Colors.transparent;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: activeGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: glowColor.withValues(alpha: 0.45),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Stack(
           children: [
-            Text(box.categoryEmoji, style: const TextStyle(fontSize: 36)),
-            const SizedBox(height: 4),
-            Text(
-              box.name,
-              style: ts.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-              textAlign: TextAlign.center,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 2),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('🪙', style: TextStyle(fontSize: 12)),
-                const SizedBox(width: 2),
-                Text(
-                  '${box.costCoins}',
-                  style: ts.labelSmall?.copyWith(
-                    color: canAfford ? cs.primary : cs.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
+            // diagonal shine streak
+            Positioned(
+              top: -24,
+              left: -16,
+              child: Transform.rotate(
+                angle: -0.5,
+                child: Container(
+                  width: 60,
+                  height: 130,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.0),
+                        Colors.white.withValues(alpha: 0.14),
+                        Colors.white.withValues(alpha: 0.0),
+                      ],
+                    ),
                   ),
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: canAfford && !busy ? onOpen : null,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  textStyle: const TextStyle(fontSize: 12),
-                ),
-                child: busy
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Open'),
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (box.cosmeticType == CosmeticType.zillaSkin)
+                    Image.asset(
+                      'assets/mascot/mascot_plain.png',
+                      width: 60,
+                      height: 60,
+                      color: Colors.white,
+                      colorBlendMode: BlendMode.srcIn,
+                    )
+                  else if (box.cosmeticType == CosmeticType.background)
+                    Image.asset(
+                      'assets/backgrounds/background-icon.png',
+                      width: 60,
+                      height: 60,
+                    )
+                  else if (box.cosmeticType == CosmeticType.avatarFrame)
+                    Image.asset(
+                      'assets/frames/frame-icon.png',
+                      width: 60,
+                      height: 60,
+                    )
+                  else
+                    SizedBox(
+                      width: 60,
+                      height: 60,
+                      child: Center(
+                        child: Text(box.categoryEmoji, style: const TextStyle(fontSize: 46)),
+                      ),
+                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    box.name,
+                    style: ts.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('🪙', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${box.costCoins}',
+                        style: ts.labelSmall?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: canAfford && !busy ? onOpen : null,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        disabledForegroundColor: Colors.white.withValues(alpha: 0.35),
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: canAfford ? 0.65 : 0.25),
+                          width: 1.5,
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      child: busy
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Open'),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -932,7 +1074,6 @@ class _CosmeticGrid extends StatelessWidget {
     required this.busyIds,
     required this.getEquippedId,
     required this.onBuy,
-    required this.onEquip,
   });
 
   final List<CosmeticItem> items;
@@ -940,30 +1081,42 @@ class _CosmeticGrid extends StatelessWidget {
   final Set<String> busyIds;
   final String? Function() getEquippedId;
   final Future<void> Function(CosmeticItem) onBuy;
-  final Future<void> Function(CosmeticItem) onEquip;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: items.map((item) {
-        final owned = item.isDefault || member.ownsCosmetic(item.id);
-        final equipped = getEquippedId() == item.id ||
-            (item.isDefault && getEquippedId() == null);
-        final busy = busyIds.contains(item.id);
-        final canAfford = member.coins >= item.costCoins;
+    final visibleItems = items.where((i) => !i.isDefault).toList();
 
-        return _CosmeticTile(
-          item: item,
-          owned: owned,
-          equipped: equipped,
-          busy: busy,
-          canAfford: canAfford,
-          onBuy: () => onBuy(item),
-          onEquip: () => onEquip(item),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cols = constraints.maxWidth < 260 ? 2 : 3;
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: cols,
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            mainAxisExtent: 160,
+          ),
+          itemCount: visibleItems.length,
+          itemBuilder: (context, index) {
+            final item = visibleItems[index];
+            final owned = member.ownsCosmetic(item.id);
+            final equipped = getEquippedId() == item.id;
+            final busy = busyIds.contains(item.id);
+            final canAfford = member.coins >= item.costCoins;
+
+            return _CosmeticTile(
+              item: item,
+              owned: owned,
+              equipped: equipped,
+              busy: busy,
+              canAfford: canAfford,
+              onBuy: () => onBuy(item),
+            );
+          },
         );
-      }).toList(),
+      },
     );
   }
 }
@@ -976,7 +1129,6 @@ class _CosmeticTile extends StatelessWidget {
     required this.busy,
     required this.canAfford,
     required this.onBuy,
-    required this.onEquip,
   });
 
   final CosmeticItem item;
@@ -985,31 +1137,27 @@ class _CosmeticTile extends StatelessWidget {
   final bool busy;
   final bool canAfford;
   final VoidCallback onBuy;
-  final VoidCallback onEquip;
 
   @override
   Widget build(BuildContext context) {
+    switch (item.type) {
+      case CosmeticType.background:
+        return _buildBackgroundTile(context);
+      case CosmeticType.zillaSkin:
+        return _buildZillaSkinTile(context);
+      case CosmeticType.avatarFrame:
+        return _buildAvatarFrameTile(context);
+      default:
+        return _buildGenericTile(context);
+    }
+  }
+
+  // ── Generic tile (titles, fallback) ───────────────────────────────────────
+  Widget _buildGenericTile(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
 
-    final String emoji;
-    switch (item.type) {
-      case CosmeticType.background:
-        emoji = '🖼️';
-        break;
-      case CosmeticType.zillaSkin:
-        emoji = '🦖';
-        break;
-      case CosmeticType.avatarFrame:
-        emoji = '⭐';
-        break;
-      case CosmeticType.title:
-        emoji = '🏷️';
-        break;
-    }
-
     return Container(
-      width: 130,
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         color: equipped
@@ -1018,32 +1166,16 @@ class _CosmeticTile extends StatelessWidget {
             ? cs.secondaryContainer
             : cs.surfaceContainer,
         borderRadius: BorderRadius.circular(14),
-        border: equipped
-            ? Border.all(color: cs.primary, width: 2)
-            : null,
+        border: equipped ? Border.all(color: cs.primary, width: 2) : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(emoji, style: const TextStyle(fontSize: 20)),
+              const Text('🏷️', style: TextStyle(fontSize: 20)),
               const Spacer(),
-              if (equipped)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: cs.primary,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'On',
-                    style: ts.labelSmall?.copyWith(
-                      color: cs.onPrimary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
+              if (equipped) _equippedBadge(context),
             ],
           ),
           const SizedBox(height: 4),
@@ -1056,64 +1188,461 @@ class _CosmeticTile extends StatelessWidget {
           if (item.description.isNotEmpty)
             Text(
               item.description,
-              style: ts.bodySmall?.copyWith(
-                color: cs.onSurfaceVariant,
-                fontSize: 10,
-              ),
-              maxLines: 2,
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant, fontSize: 10),
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           const SizedBox(height: 6),
           if (!owned) ...[
-            Row(
-              children: [
-                const Text('🪙', style: TextStyle(fontSize: 12)),
-                const SizedBox(width: 2),
-                Text(
-                  '${item.costCoins}',
-                  style: ts.labelSmall?.copyWith(
-                    color: canAfford ? cs.primary : cs.error,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+            _coinRow(context),
             const SizedBox(height: 4),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: canAfford && !busy ? onBuy : null,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  textStyle: const TextStyle(fontSize: 11),
-                  minimumSize: const Size(0, 28),
-                ),
-                child: busy
-                    ? const SizedBox(
-                        width: 12,
-                        height: 12,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Buy'),
-              ),
-            ),
-          ] else if (!equipped) ...[
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: busy ? null : onEquip,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  textStyle: const TextStyle(fontSize: 11),
-                  minimumSize: const Size(0, 28),
-                ),
-                child: const Text('Equip'),
-              ),
-            ),
+            _buyButton(context, fullWidth: true),
           ],
         ],
       ),
     );
+  }
+
+  // ── Zilla Skin tile ────────────────────────────────────────────────────────
+  Widget _buildZillaSkinTile(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+    final color = item.colorValue != null ? Color(item.colorValue!) : cs.primary;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: equipped
+            ? cs.primaryContainer
+            : owned
+            ? cs.secondaryContainer
+            : cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        border: equipped ? Border.all(color: cs.primary, width: 2) : null,
+      ),
+      child: Column(
+        children: [
+          // Preview area
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: Center(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: color.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    Image.asset(
+                      'assets/mascot/mascot_plain.png',
+                      width: 46,
+                      height: 46,
+                      color: color,
+                      colorBlendMode: BlendMode.srcIn,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Info area
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: ts.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (equipped) _equippedBadge(context),
+                  ],
+                ),
+                if (!owned) ...[
+                  const SizedBox(height: 4),
+                  _coinAndBuyRow(context),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Avatar Frame tile ──────────────────────────────────────────────────────
+  Widget _buildAvatarFrameTile(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: equipped
+            ? cs.primaryContainer
+            : owned
+            ? cs.secondaryContainer
+            : cs.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        border: equipped ? Border.all(color: cs.primary, width: 2) : null,
+      ),
+      child: Column(
+        children: [
+          // Live frame preview
+          Expanded(
+            child: Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: cs.primaryContainer,
+                    child: const Text('😀', style: TextStyle(fontSize: 22)),
+                  ),
+                  FrameOverlay(frameId: item.id, radius: 26),
+                ],
+              ),
+            ),
+          ),
+          // Info area
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: ts.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (equipped) _equippedBadge(context),
+                  ],
+                ),
+                if (!owned) ...[
+                  const SizedBox(height: 4),
+                  _coinAndBuyRow(context),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Shared helpers ─────────────────────────────────────────────────────────
+
+  Widget _equippedBadge(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: cs.primary,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        'On',
+        style: ts.labelSmall?.copyWith(color: cs.onPrimary, fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  Widget _coinRow(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        const Text('🪙', style: TextStyle(fontSize: 12)),
+        const SizedBox(width: 2),
+        Text(
+          '${item.costCoins}',
+          style: ts.labelSmall?.copyWith(
+            color: canAfford ? cs.primary : cs.error,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buyButton(BuildContext context, {bool fullWidth = false}) {
+    final child = busy
+        ? const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 2))
+        : const Text('Buy');
+    final button = FilledButton(
+      onPressed: canAfford && !busy ? onBuy : null,
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        textStyle: const TextStyle(fontSize: 11),
+        minimumSize: const Size(0, 26),
+      ),
+      child: child,
+    );
+    return fullWidth ? SizedBox(width: double.infinity, child: button) : button;
+  }
+
+  Widget _coinAndBuyRow(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        const Text('🪙', style: TextStyle(fontSize: 12)),
+        const SizedBox(width: 2),
+        Text(
+          '${item.costCoins}',
+          style: ts.labelSmall?.copyWith(
+            color: canAfford ? cs.primary : cs.error,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const Spacer(),
+        _buyButton(context),
+      ],
+    );
+  }
+
+  Widget _buildBackgroundTile(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    return GestureDetector(
+      onTap: () => showDialog(
+        context: context,
+        builder: (_) => _BackgroundPreviewDialog(item: item),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Background image
+            Image.asset(item.assetKey, fit: BoxFit.cover),
+            // Gradient overlay for text readability
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xCC000000)],
+                  stops: [0.3, 1.0],
+                ),
+              ),
+            ),
+            // Equipped border
+            if (equipped)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: cs.primary, width: 2.5),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            // Content overlay
+            Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.zoom_in_rounded, size: 14, color: Colors.white70),
+                      const Spacer(),
+                      if (equipped)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: cs.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'On',
+                            style: ts.labelSmall?.copyWith(
+                              color: cs.onPrimary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    item.name,
+                    style: ts.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (!owned) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Text('🪙', style: TextStyle(fontSize: 12)),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${item.costCoins}',
+                          style: ts.labelSmall?.copyWith(
+                            color: canAfford ? Colors.greenAccent : Colors.redAccent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          height: 26,
+                          child: FilledButton(
+                            onPressed: canAfford && !busy ? onBuy : null,
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 10),
+                              textStyle: const TextStyle(fontSize: 11),
+                              minimumSize: const Size(0, 26),
+                            ),
+                            child: busy
+                                ? const SizedBox(
+                                    width: 10,
+                                    height: 10,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Buy'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BackgroundPreviewDialog extends StatelessWidget {
+  const _BackgroundPreviewDialog({required this.item});
+
+  final CosmeticItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final ts = Theme.of(context).textTheme;
+
+    return Dialog(
+      insetPadding: const EdgeInsets.all(24),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Stack(
+        children: [
+          // Background image
+          AspectRatio(
+            aspectRatio: 9 / 16,
+            child: Image.asset(item.assetKey, fit: BoxFit.cover),
+          ),
+          // Mascot centered
+          Positioned.fill(
+            child: Center(
+              child: Image.asset(
+                'assets/mascot/mascot_plain.png',
+                width: 110,
+              ),
+            ),
+          ),
+          // Bottom info bar
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xDD000000)],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    item.name,
+                    style: ts.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (item.rarity != null)
+                    Text(
+                      item.rarity!.displayName.toUpperCase(),
+                      style: ts.labelSmall?.copyWith(
+                        color: _rarityColor(item.rarity!),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  if (item.description.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      item.description,
+                      style: ts.bodySmall?.copyWith(color: Colors.white70),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          // Close button
+          Positioned(
+            top: 8,
+            right: 8,
+            child: IconButton.filled(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.close),
+              style: IconButton.styleFrom(
+                backgroundColor: Colors.black54,
+                foregroundColor: Colors.white,
+                iconSize: 18,
+                minimumSize: const Size(32, 32),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _rarityColor(CosmeticRarity rarity) {
+    switch (rarity) {
+      case CosmeticRarity.common:
+        return Colors.white70;
+      case CosmeticRarity.rare:
+        return Colors.lightBlueAccent;
+      case CosmeticRarity.epic:
+        return Colors.purpleAccent;
+    }
   }
 }
 

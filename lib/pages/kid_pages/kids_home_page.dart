@@ -1,3 +1,5 @@
+import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
+import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/pages/kid_pages/kid_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -48,7 +50,7 @@ class KidsHomePage extends StatelessWidget {
               }
 
               // Slightly different aspect ratio on bigger screens
-              final childAspectRatio = width < 600 ? 0.65 : 0.72;
+              final childAspectRatio = width < 600 ? 0.68 : 0.75;
 
               final theme = Theme.of(context);
               final cs = theme.colorScheme;
@@ -62,14 +64,7 @@ class KidsHomePage extends StatelessWidget {
                   Expanded(
                     child: Container(
                       width: double.infinity,
-                      decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                          colors: [cs.secondary, cs.secondary, cs.primary],
-                          stops: const [0.0, 0.65, 1.0],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
+                      color: cs.secondary,
                       padding: const EdgeInsets.all(16),
                       child: GridView.builder(
                         padding: EdgeInsets.zero,
@@ -355,6 +350,12 @@ class _ParentPinDialogState extends State<_ParentPinDialog> {
 // Kid cards + per-kid PIN dialog
 // ───────────────────────────────────────────────────────────────────────────
 
+String _streakLabel(int streak) {
+  if (streak >= 60) return '🔥🔥🔥 $streak';
+  if (streak >= 30) return '🔥🔥 $streak';
+  return '🔥 $streak';
+}
+
 class _KidCard extends StatelessWidget {
   const _KidCard({required this.member});
 
@@ -404,93 +405,149 @@ class _KidCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
+    final app = context.watch<AppState>();
+    final hasPin = app.kidRequiresPin(member.id);
 
-    final avatarKey = member.avatarKey;
+    // Resolve background asset
+    String bgAsset = 'assets/backgrounds/bg_kitchen.png';
+    final bgId = member.equippedBackgroundId;
+    if (bgId != null) {
+      try {
+        final item = CosmeticCatalog.byId(bgId);
+        if (item.assetKey.isNotEmpty) bgAsset = item.assetKey;
+      } catch (_) {}
+    }
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(40),
-      onTap: () => _handleTap(context),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // Make avatar size respond to card width
-            final avatarRadius = (constraints.maxWidth * 0.25).clamp(
-              48.0,
-              72.0,
-            );
-            final emojiSize = avatarRadius * 0.9;
+    // Resolve title display name
+    final titleId = member.equippedTitleId;
+    String? titleName;
+    if (titleId != null && titleId != 'title_none') {
+      try {
+        titleName = CosmeticCatalog.byId(titleId).name;
+      } catch (_) {}
+    }
 
-            // Tiny lock indicator if this kid has a PIN
-            final app = context.watch<AppState>();
-            final hasPin = app.kidRequiresPin(member.id);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final avatarRadius = (constraints.maxWidth * 0.22).clamp(26.0, 44.0);
 
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Stack(
-                  children: [
-                    CircleAvatar(
-                      radius: avatarRadius,
-                      backgroundColor: cs.secondaryContainer,
-                      child: avatarKey != null && avatarKey.isNotEmpty
-                          ? Text(
-                              avatarKey,
-                              style: TextStyle(
-                                fontSize: emojiSize,
-                                color: cs.onSecondaryContainer,
-                              ),
-                            )
-                          : Text(
-                              _initialsFor(member.displayName),
-                              style: TextStyle(
-                                fontSize: emojiSize * 0.7,
-                                color: cs.onPrimaryContainer,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                    ),
-                    if (hasPin)
-                      Positioned(
-                        right: 4,
-                        bottom: 4,
-                        child: CircleAvatar(
-                          radius: 12,
-                          backgroundColor: cs.surface,
-                          child: Icon(
-                            Icons.lock_rounded,
-                            size: 16,
-                            color: cs.primary,
-                          ),
+        return InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _handleTap(context),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  // Background image
+                  Positioned.fill(
+                    child: Image.asset(bgAsset, fit: BoxFit.cover),
+                  ),
+                  // Bottom scrim for text legibility
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: .65),
+                          ],
+                          stops: const [0.3, 1.0],
                         ),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  member.displayName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: ts.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w400,
-                    color: cs.onSecondary
+                    ),
                   ),
-                ),
-                if (member.currentStreak > 0) ...[
-                  const SizedBox(height: 4),
-                  _StreakChip(streak: member.currentStreak),
+                  // Content column — centered
+                  Positioned.fill(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Featured badges — always reserves space
+                        _BadgeRow(badgeIds: member.featuredBadgeIds),
+                        const SizedBox(height: 2),
+                        // Avatar with frame
+                        AvatarWithFrame(
+                          member: member,
+                          radius: avatarRadius,
+                        ),
+                        const SizedBox(height: 4),
+                        // Name / title / streak — frosted pill
+                        Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: .45),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Name
+                              Text(
+                                member.displayName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: ts.titleSmall?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (titleName != null)
+                                Text(
+                                  titleName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              if (member.currentStreak > 0)
+                                Text(
+                                  _streakLabel(member.currentStreak),
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Lock PIN indicator — top right
+                  if (hasPin)
+                    Positioned(
+                      top: 6,
+                      right: 6,
+                      child: CircleAvatar(
+                        radius: 11,
+                        backgroundColor: Colors.black45,
+                        child: const Icon(
+                          Icons.lock_rounded,
+                          size: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
                 ],
-                if (member.badges.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  _BadgeRow(badgeIds: member.badges),
-                ],
-              ],
-            );
-          },
-        ),
-      ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -557,50 +614,6 @@ Future<String?> _showKidPinDialog(BuildContext context, String kidName) async {
   return result;
 }
 
-String _initialsFor(String name) {
-  final parts = name.trim().split(RegExp(r'\s+'));
-  if (parts.isEmpty) return '?';
-  if (parts.length == 1) {
-    return parts.first.substring(0, 1).toUpperCase();
-  }
-  return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
-}
-
-class _StreakChip extends StatelessWidget {
-  const _StreakChip({required this.streak});
-  final int streak;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: .20),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        '🔥 $streak',
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: Colors.white,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-// Badge priority: most impressive badge first.
-const _badgePriority = [
-  'streak_30_days',
-  'streak_14_days',
-  'streak_7_days',
-  'streak_3_days',
-  'chores_100',
-  'chores_50',
-  'chores_25',
-  'chores_10',
-  'chores_1',
-];
 
 class _BadgeRow extends StatelessWidget {
   const _BadgeRow({required this.badgeIds});
@@ -608,24 +621,36 @@ class _BadgeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final earned = _badgePriority
-        .where((id) => badgeIds.contains(id))
+    final defs = badgeIds
         .map((id) => BadgeCatalog.byId(id))
         .whereType<BadgeDefinition>()
-        .take(3)
         .toList();
 
-    if (earned.isEmpty) return const SizedBox.shrink();
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: earned
-          .map((b) => Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Text(b.icon, style: const TextStyle(fontSize: 16)),
-              ))
-          .toList(),
+    // Always reserve the height so all cards stay the same size
+    return SizedBox(
+      height: 22,
+      child: defs.isEmpty
+          ? null
+          : Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: .45),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: defs
+                    .map((b) => Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: Text(
+                            b.icon,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ))
+                    .toList(),
+              ),
+            ),
     );
   }
 }

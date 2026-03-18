@@ -652,6 +652,7 @@ class _FeatureSummary extends StatelessWidget {
   static const _features = [
     ('Unlimited kids', '👨‍👩‍👧‍👦'),
     ('Unlimited custom chores & rewards', '✅'),
+    ('Custom level-up rewards', '🎁'),
     ('Allowance tracking', '💵'),
     ('Full assignment history', '📅'),
     ('Adds Zilla skins, frames & titles', '🦎'),
