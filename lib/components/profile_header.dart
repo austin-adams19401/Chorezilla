@@ -396,16 +396,12 @@ class _AvatarCircle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     final avatarKey = (member.avatarKey ?? '').trim();
     final frameId = member.equippedAvatarFrameId;
 
     final circle = CircleAvatar(
       radius: radius,
-      backgroundColor: member.role == FamilyRole.child
-          ? cs.primaryContainer
-          : cs.secondaryContainer,
+      backgroundColor: Colors.black,
       child: buildAvatarContent(avatarKey, radius * 0.95, _initials(member.displayName)),
     );
 

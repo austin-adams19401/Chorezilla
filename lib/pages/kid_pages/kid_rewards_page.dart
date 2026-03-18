@@ -716,7 +716,7 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
       case CosmeticType.title:
         return widget.member.equippedTitleId;
       case CosmeticType.avatar:
-        return null;
+        return widget.member.avatarKey;
     }
   }
 
@@ -801,6 +801,19 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
             member: member,
             busyIds: _busyIds,
             getEquippedId: () => _equippedIdForType(CosmeticType.avatarFrame),
+            onBuy: _purchaseCosmetic,
+          ),
+        ),
+
+        // ── Avatars ───────────────────────────────────────────────────────────
+        _CollapsibleSection(
+          title: 'Avatars',
+          icon: Image.asset('assets/avatars/avatar-icon.png', width: 26, height: 26),
+          child: _CosmeticGrid(
+            items: CosmeticCatalog.avatars().toList(),
+            member: member,
+            busyIds: _busyIds,
+            getEquippedId: () => _equippedIdForType(CosmeticType.avatar),
             onBuy: _purchaseCosmetic,
           ),
         ),
@@ -992,6 +1005,12 @@ class _LootBoxCard extends StatelessWidget {
                       width: 60,
                       height: 60,
                     )
+                  else if (box.cosmeticType == CosmeticType.avatar)
+                    Image.asset(
+                      'assets/avatars/avatar-icon.png',
+                      width: 60,
+                      height: 60,
+                    )
                   else
                     SizedBox(
                       width: 60,
@@ -1147,6 +1166,8 @@ class _CosmeticTile extends StatelessWidget {
         return _buildZillaSkinTile(context);
       case CosmeticType.avatarFrame:
         return _buildAvatarFrameTile(context);
+      case CosmeticType.avatar:
+        return _buildAvatarTile(context);
       default:
         return _buildGenericTile(context);
     }
@@ -1340,6 +1361,68 @@ class _CosmeticTile extends StatelessWidget {
                 if (!owned) ...[
                   const SizedBox(height: 4),
                   _coinAndBuyRow(context),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Avatar tile ────────────────────────────────────────────────────────────
+  Widget _buildAvatarTile(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(14),
+        border: equipped ? Border.all(color: cs.primary, width: 2) : null,
+      ),
+      child: Column(
+        children: [
+          Expanded(
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              child: item.assetKey.isNotEmpty
+                  ? Image.asset(item.assetKey, fit: BoxFit.contain, width: double.infinity)
+                  : const SizedBox(),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: ts.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (equipped) _equippedBadge(context),
+                  ],
+                ),
+                if (item.rarity != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    item.rarity!.displayName,
+                    style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+                if (owned && !equipped) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Owned',
+                    style: ts.labelSmall?.copyWith(color: cs.secondary, fontWeight: FontWeight.w600),
+                  ),
                 ],
               ],
             ),

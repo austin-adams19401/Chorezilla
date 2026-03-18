@@ -97,8 +97,11 @@ flutter:
     - assets/icons/
     - assets/mascot/
     - assets/mascot/sprite-sheets/
+    - assets/avatars/
     - assets/avatars/default/
+    - assets/avatars/common/
     - assets/avatars/rare/
+    - assets/avatars/epic/
     - assets/badges/one-time-badges/
     - assets/badges/tiered-badges/
 

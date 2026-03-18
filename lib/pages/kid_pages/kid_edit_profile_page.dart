@@ -27,18 +27,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
   bool _saving = false;
 
-  static const _defaultAvatar = '🦖';
-
-  static const List<String> _avatarChoices = [
-    '🦖',
-    '🦄',
-    '🐱',
-    '🐶',
-    '🐵',
-    '🦊',
-    '🐸',
-    '🦁',
-  ];
+  static const _defaultAvatar = 'avatar_default_1';
 
   @override
   void initState() {
@@ -68,9 +57,8 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
         _backgroundId == null &&
         _nameController.text.isEmpty) {
       _nameController.text = member.displayName;
-      _avatarEmoji = member.avatarKey?.isNotEmpty == true
-          ? member.avatarKey
-          : _defaultAvatar;
+      final key = member.avatarKey;
+      _avatarEmoji = (key != null && key.startsWith('avatar_')) ? key : _defaultAvatar;
       _backgroundId = member.equippedBackgroundId ?? 'bg_default';
       _avatarFrameId = member.equippedAvatarFrameId ?? 'frame_default';
       _zillaSkinId = member.equippedZillaSkinId ?? 'zilla_green_basic';
@@ -542,28 +530,19 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
       spacing: 8,
       runSpacing: 8,
       alignment: WrapAlignment.center,
-      children: [
-        // Emoji choices
-        ..._avatarChoices.map((emoji) => tile(
-              selected: emoji == _avatarEmoji,
-              onTap: () => setState(() => _avatarEmoji = emoji),
-              child: Text(emoji, style: const TextStyle(fontSize: 28)),
-            )),
-        // Image avatar choices
-        ...allImageIds.map((id) {
-          final item = CosmeticCatalog.byId(id);
-          return tile(
-            selected: id == _avatarEmoji,
-            onTap: () => setState(() => _avatarEmoji = id),
-            child: Image.asset(
-              item.assetKey,
-              width: 52,
-              height: 52,
-              fit: BoxFit.cover,
-            ),
-          );
-        }),
-      ],
+      children: allImageIds.map((id) {
+        final item = CosmeticCatalog.byId(id);
+        return tile(
+          selected: id == _avatarEmoji,
+          onTap: () => setState(() => _avatarEmoji = id),
+          child: Image.asset(
+            item.assetKey,
+            width: 52,
+            height: 52,
+            fit: BoxFit.cover,
+          ),
+        );
+      }).toList(),
     );
   }
 

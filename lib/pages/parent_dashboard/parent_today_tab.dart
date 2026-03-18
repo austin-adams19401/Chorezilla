@@ -1,3 +1,4 @@
+import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 import 'package:chorezilla/components/set_away_dialog.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/models/common.dart';
@@ -507,7 +508,6 @@ class _KidTodayCard extends StatelessWidget {
     final isAway = summary.isAway;
 
     final avatarRadius = 26.0;
-    final emojiSize = avatarRadius * 1.1;
 
     // Dynamic gradient + border + shadow based on status
     final List<Color> gradientColors;
@@ -647,21 +647,12 @@ class _KidTodayCard extends StatelessWidget {
                       ),
                       CircleAvatar(
                         radius: avatarRadius,
-                        backgroundColor: cs.primaryContainer,
-                        child: (summary.avatarKey != null &&
-                                summary.avatarKey!.isNotEmpty)
-                            ? Text(
-                                summary.avatarKey!,
-                                style: TextStyle(fontSize: emojiSize),
-                              )
-                            : Text(
-                                _initialsFor(summary.name),
-                                style: TextStyle(
-                                  fontSize: avatarRadius * 0.9,
-                                  fontWeight: FontWeight.bold,
-                                  color: cs.onPrimaryContainer,
-                                ),
-                              ),
+                        backgroundColor: Colors.black,
+                        child: buildAvatarContent(
+                          (summary.avatarKey ?? '').trim(),
+                          avatarRadius * 0.95,
+                          _initialsFor(summary.name),
+                        ),
                       ),
                       if (isAllDone)
                         Positioned(
@@ -950,21 +941,12 @@ class _KidTodayCard extends StatelessWidget {
                       children: [
                         CircleAvatar(
                           radius: 28,
-                          backgroundColor: Colors.white.withValues(alpha: 0.15),
-                          child: (summary.avatarKey != null &&
-                                  summary.avatarKey!.isNotEmpty)
-                              ? Text(
-                                  summary.avatarKey!,
-                                  style: const TextStyle(fontSize: 26),
-                                )
-                              : Text(
-                                  _initialsFor(summary.name),
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
+                          backgroundColor: Colors.black,
+                          child: buildAvatarContent(
+                            (summary.avatarKey ?? '').trim(),
+                            28 * 0.95,
+                            _initialsFor(summary.name),
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
