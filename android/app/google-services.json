@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "588085741239-c5qmf7hclg58rptlmoo76fqa5fn0m218.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chorezilla.chorezilla",
+            "certificate_hash": "358a4a8bdc2a6f9662ce52102bcd88c0b7b6e1cb"
+          }
+        },
+        {
           "client_id": "588085741239-tetqvu3rths6h7s5paoj2qvvham46sfg.apps.googleusercontent.com",
           "client_type": 3
         }
@@ -29,6 +37,13 @@
             {
               "client_id": "588085741239-tetqvu3rths6h7s5paoj2qvvham46sfg.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "588085741239-auq29s1kutqjjto23re395l76m8t1o9a.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.chorezilla.chorezilla"
+              }
             }
           ]
         }

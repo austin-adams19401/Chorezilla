@@ -195,6 +195,9 @@ extension AppStateFamilyStreams on AppState {
       if (cachedFamily != null) {
         _family = cachedFamily;
         _familyLoaded = true;
+        // Restore PIN state from cache so Gate 3.5 doesn't block on Firestore
+        _parentPinHash = cachedFamily.parentPinHash;
+        _parentPinKnown = true;
         changed = true;
       }
 

@@ -29,45 +29,38 @@ extension AppStateAuth on AppState {
   }
 
   Future<void> signInWithGoogle() async {
-    try {
-      await GoogleSignIn.instance.initialize();
+    await GoogleSignIn.instance.initialize(
+      serverClientId:
+          '588085741239-tetqvu3rths6h7s5paoj2qvvham46sfg.apps.googleusercontent.com',
+    );
 
-      if (kIsWeb || !GoogleSignIn.instance.supportsAuthenticate()) {
-        // Web or fallback path
-        final provider = GoogleAuthProvider();
-        final uc = await auth.signInWithPopup(provider);
-        debugPrint(
-          'GOOGLE SIGN IN: WEB user=${uc.user?.uid} - ${uc.user?.displayName}',
-        );
-        // No need to call _getDataForUser here; _onAuthChanged will fire.
-        return;
-      }
-
-      final account = await GoogleSignIn.instance.authenticate();
-
-      final authData = account.authentication;
-      final idToken = authData.idToken;
-
-      if (idToken == null) {
-        debugPrint(
-          'Google returned no idToken. Check client IDs / platform setup.',
-        );
-        return;
-      }
-
-      final credential = GoogleAuthProvider.credential(idToken: idToken);
-      final userCred = await auth.signInWithCredential(credential);
-
+    if (kIsWeb || !GoogleSignIn.instance.supportsAuthenticate()) {
+      // Web or fallback path
+      final provider = GoogleAuthProvider();
+      final uc = await auth.signInWithPopup(provider);
       debugPrint(
-        'GOOGLE SIGN IN: user=${userCred.user?.uid} - ${userCred.user?.displayName}',
+        'GOOGLE SIGN IN: WEB user=${uc.user?.uid} - ${uc.user?.displayName}',
       );
-    } on GoogleSignInException catch (e) {
-      debugPrint('Google Sign-In error: ${e.code} ${e.description}');
-    } on FirebaseAuthException catch (e) {
-      debugPrint('Firebase Auth error: ${e.code} ${e.message}');
-    } catch (e) {
-      debugPrint('Unexpected Google sign-in error: $e');
+      // No need to call _getDataForUser here; _onAuthChanged will fire.
+      return;
     }
+
+    final account = await GoogleSignIn.instance.authenticate();
+
+    final authData = account.authentication;
+    final idToken = authData.idToken;
+
+    if (idToken == null) {
+      debugPrint('Google returned no idToken. Check client IDs / platform setup.');
+      throw Exception('Google sign-in failed. Check your app configuration.');
+    }
+
+    final credential = GoogleAuthProvider.credential(idToken: idToken);
+    final userCred = await auth.signInWithCredential(credential);
+
+    debugPrint(
+      'GOOGLE SIGN IN: user=${userCred.user?.uid} - ${userCred.user?.displayName}',
+    );
   }
 
   Future<void> _getDataForUser(User u) async {

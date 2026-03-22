@@ -1,4 +1,5 @@
 import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
+import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/set_away_dialog.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/models/common.dart';
@@ -65,7 +66,6 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
 
     final app = context.watch<AppState>();
     final cs = Theme.of(context).colorScheme;
-    final membersById = {for (final m in app.members) m.id: m};
 
     return StreamBuilder<List<Assignment>>(
       stream: _todayStream,
@@ -95,10 +95,6 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        if (items.isEmpty) {
-          return const _EmptyToday();
-        }
-
         // Group assignments by memberId → kid summaries
         final byMember = <String, List<Assignment>>{};
         for (final a in items) {
@@ -107,18 +103,14 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
           byMember.putIfAbsent(id, () => <Assignment>[]).add(a);
         }
 
-final summaries = <_KidTodaySummary>[];
-        byMember.forEach((memberId, list) {
-          final memberModel = membersById[memberId];
-          final name =
-              memberModel?.displayName ??
-              (list.isNotEmpty && list.first.memberName.isNotEmpty
-                  ? list.first.memberName
-                  : 'Kid');
-          final avatarKey = memberModel?.avatarKey;
+        // Build a summary for every member, even those with no assignments today
+        final summaries = <_KidTodaySummary>[];
+        for (final memberModel in app.members.where((m) => m.role == FamilyRole.child)) {
+          final memberId = memberModel.id;
+          final list = byMember[memberId] ?? [];
 
-          final level = memberModel?.level ?? 1;
-          final coins = memberModel?.coins ?? 0;
+          final level = levelInfoForXp(memberModel.xp).level;
+          final coins = memberModel.coins;
 
           // Treat null as "not bonus"
           final requiredAssignments = list
@@ -154,8 +146,8 @@ final summaries = <_KidTodaySummary>[];
           summaries.add(
             _KidTodaySummary(
               memberId: memberId,
-              name: name,
-              avatarKey: avatarKey,
+              name: memberModel.displayName,
+              avatarKey: memberModel.avatarKey,
               total: total,
               completed: completed,
               pending: pending,
@@ -165,11 +157,15 @@ final summaries = <_KidTodaySummary>[];
               level: level,
               coins: coins,
               bonusCount: bonusCount,
-              isAway: memberModel?.isAwayOnDate(DateTime.now()) ?? false,
-              awayUntil: memberModel?.awayUntil,
+              isAway: memberModel.isAwayOnDate(DateTime.now()),
+              awayUntil: memberModel.awayUntil,
             ),
           );
-        });
+        }
+
+        if (summaries.isEmpty) {
+          return const _EmptyToday();
+        }
 
 
         summaries.sort((a, b) => a.name.compareTo(b.name));
@@ -201,75 +197,46 @@ final summaries = <_KidTodaySummary>[];
             ),
 
             Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  // Approximate how tall the grid wants to be
-                  double estimateGridHeight() {
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [cs.secondary, cs.secondary, cs.primary],
+                    stops: const [0.0, 0.55, 1.0],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                child: Builder(
+                  builder: (context) {
+                    const double hPad = 10;
+                    const double gap = 12;
+                    final screenWidth = MediaQuery.of(context).size.width;
+                    final availableWidth = screenWidth - hPad * 2;
+
+                    // Match original grid: 1 column if screen < 260px, else 2+
                     const double maxCrossAxisExtent = 260;
-                    const double mainAxisSpacing = 12;
-                    const double childAspectRatio = 0.8;
+                    int columns =
+                        (availableWidth / maxCrossAxisExtent).ceil().clamp(1, summaries.length);
+                    final itemWidth =
+                        (availableWidth - gap * (columns - 1)) / columns;
 
-                    final itemCount = summaries.length;
-                    if (itemCount == 0) return 0;
-
-                    // How many columns will we get at this width?
-                    int columns = (constraints.maxWidth / maxCrossAxisExtent)
-                        .floor();
-                    if (columns < 1) columns = 1;
-                    if (columns > itemCount) columns = itemCount;
-
-                    final tileWidth = constraints.maxWidth / columns;
-                    final tileHeight = tileWidth / childAspectRatio;
-
-                    final rows = (itemCount / columns).ceil();
-                    final totalHeight =
-                        rows * tileHeight + (rows - 1) * mainAxisSpacing;
-
-                    return totalHeight;
-                  }
-
-                  final gridHeight = estimateGridHeight();
-                  final availableHeight = constraints.maxHeight;
-                  final shouldCenter =
-                      gridHeight > 0 && gridHeight < availableHeight;
-
-                  final grid = GridView.builder(
-                    padding: EdgeInsets.zero,
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 260,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 0.8,
-                        ),
-                    itemCount: summaries.length,
-                    itemBuilder: (context, index) {
-                      final s = summaries[index];
-                      return _KidTodayCard(summary: s);
-                    },
-                  );
-
-                  return Padding(
-                    padding: const EdgeInsets.all(0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [cs.secondary, cs.secondary, cs.primary],
-                          stops: const [0.0, 0.55, 1.0],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                      padding: const EdgeInsets.fromLTRB(10, 30, 10, 12),
-                      child: shouldCenter
-                          ? Align(
-                              alignment: Alignment.center,
-                              child: SizedBox(height: gridHeight, child: grid),
+                    return SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(hPad, 30, hPad, 12),
+                      child: Wrap(
+                        spacing: gap,
+                        runSpacing: gap,
+                        children: summaries
+                            .map(
+                              (s) => SizedBox(
+                                width: itemWidth,
+                                child: _KidTodayCard(summary: s),
+                              ),
                             )
-                          : grid,
-                    ),
-                  );
-                },
+                            .toList(),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ],
@@ -331,11 +298,16 @@ class _TodayHero extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Expanded(
-                      child: Text(
-                        'Today at a glance',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Today at a glance',
+                          maxLines: 1,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -618,7 +590,7 @@ class _KidTodayCard extends StatelessWidget {
         ),
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
         child: Column(
-          mainAxisSize: MainAxisSize.max,
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Avatar with circular progress ring + name row
@@ -867,7 +839,7 @@ class _KidTodayCard extends StatelessWidget {
               ],
             ),
 
-            const Spacer(),
+            const SizedBox(height: 8),
 
             // Footer hint
             Row(

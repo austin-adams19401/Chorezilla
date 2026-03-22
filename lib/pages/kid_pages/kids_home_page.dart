@@ -1,18 +1,95 @@
 import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
+import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/pages/kid_pages/kid_dashboard.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/models/badge.dart';
 
-class KidsHomePage extends StatelessWidget {
+class KidsHomePage extends StatefulWidget {
   const KidsHomePage({super.key});
 
-    @override
+  @override
+  State<KidsHomePage> createState() => _KidsHomePageState();
+}
+
+class _KidsHomePageState extends State<KidsHomePage> {
+  static const _kidTutorialKey = 'showKidViewTutorial';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkKidTutorial());
+  }
+
+  Future<void> _checkKidTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final show = prefs.getBool(_kidTutorialKey) ?? false;
+    if (!show || !mounted) return;
+    await prefs.setBool(_kidTutorialKey, false);
+    if (!mounted) return;
+    await _showKidTutorialDialog();
+  }
+
+  Future<void> _showKidTutorialDialog() async {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+        contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: cs.primaryContainer,
+              child: Icon(Icons.child_care_rounded, color: cs.onPrimaryContainer),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Welcome to Kid View!',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'This is what your kids see when they open the app. Each kid taps their name to see their chores and rewards.\n\nTo get back to parent mode, tap the "Parents" button at the top and enter your parent PIN. Give it a try!',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: cs.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Try it now'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('showTutorialCongrats', true);
+      if (mounted) await _showAdultExitDialog(context);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
 
@@ -266,7 +343,7 @@ class _ParentPinDialogState extends State<_ParentPinDialog> {
     setState(() => _busy = false);
 
     if (!ok) {
-      setState(() => _error = 'Incorrect PIN. Try again.');
+      setState(() => _error = "Hmm, are you SURE you're the parent?");
       return;
     }
 
@@ -467,8 +544,8 @@ class _KidCard extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         // Featured badges — always reserves space
-                        _BadgeRow(badgeIds: member.featuredBadgeIds),
-                        const SizedBox(height: 2),
+                        _BadgeRow(badgeIds: member.featuredBadgeIds, member: member),
+                        const SizedBox(height: 4),
                         // Avatar with frame
                         AvatarWithFrame(
                           member: member,
@@ -512,9 +589,9 @@ class _KidCard extends StatelessWidget {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                              if (member.currentStreak > 0)
+                              if (member.effectiveStreak > 0)
                                 Text(
-                                  _streakLabel(member.currentStreak),
+                                  _streakLabel(member.effectiveStreak),
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: Colors.white,
@@ -525,6 +602,29 @@ class _KidCard extends StatelessWidget {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  // Level badge — top left
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: .45),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'Lvl ${levelInfoForXp(member.xp).level}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
                   // Lock PIN indicator — top right
@@ -570,10 +670,11 @@ Future<String?> _showKidPinDialog(BuildContext context, String kidName) async {
             fontWeight: FontWeight.w700,
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text(
               'Enter this kid’s 4-digit PIN.\nParents can also use the parent PIN.',
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -593,6 +694,7 @@ Future<String?> _showKidPinDialog(BuildContext context, String kidName) async {
               ),
             ),
           ],
+          ),
         ),
         actions: [
           TextButton(
@@ -616,8 +718,11 @@ Future<String?> _showKidPinDialog(BuildContext context, String kidName) async {
 
 
 class _BadgeRow extends StatelessWidget {
-  const _BadgeRow({required this.badgeIds});
+  const _BadgeRow({required this.badgeIds, required this.member});
   final List<String> badgeIds;
+  final Member member;
+
+  static const double _iconSize = 32;
 
   @override
   Widget build(BuildContext context) {
@@ -628,11 +733,11 @@ class _BadgeRow extends StatelessWidget {
 
     // Always reserve the height so all cards stay the same size
     return SizedBox(
-      height: 22,
+      height: _iconSize + 12, // icon + vertical padding
       child: defs.isEmpty
           ? null
           : Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: .45),
                 borderRadius: BorderRadius.circular(999),
@@ -640,15 +745,38 @@ class _BadgeRow extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
-                children: defs
-                    .map((b) => Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 3),
-                          child: Text(
-                            b.icon,
-                            style: const TextStyle(fontSize: 14),
-                          ),
-                        ))
-                    .toList(),
+                children: defs.map((b) {
+                  final currentTier = b.currentTierForMember(member.badges);
+                  final assetPath = b.isTiered
+                      ? b.assetPathForTier(
+                          currentTier == BadgeTier.locked
+                              ? BadgeTier.bronze
+                              : currentTier,
+                        )
+                      : b.assetPath;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: SizedBox(
+                      width: _iconSize,
+                      height: _iconSize,
+                      child: assetPath != null
+                          ? Image.asset(
+                              assetPath,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, _, _) => Text(
+                                b.icon,
+                                style: const TextStyle(fontSize: 22),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : Text(
+                              b.icon,
+                              style: const TextStyle(fontSize: 22),
+                              textAlign: TextAlign.center,
+                            ),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
     );

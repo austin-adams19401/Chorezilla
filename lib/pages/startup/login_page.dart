@@ -22,6 +22,8 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscure = true;
   bool _busy = false;
   String? _error;
+  bool _googleBusy = false;
+  String? _googleError;
 
   @override
   void dispose() {
@@ -29,6 +31,23 @@ class _LoginPageState extends State<LoginPage> {
     _password.dispose();
     _passwordFocus.dispose();
     super.dispose();
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() { _googleBusy = true; _googleError = null; });
+    try {
+      await context.read<AppState>().signInWithGoogle();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _googleError = e is Exception
+              ? e.toString().replaceFirst('Exception: ', '')
+              : 'Google sign-in failed. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() { _googleBusy = false; });
+    }
   }
 
   Future<void> _signIn() async {
@@ -68,7 +87,7 @@ class _LoginPageState extends State<LoginPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text('Sign in',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.black, fontWeight: FontWeight.w700)
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(color: cs.onSurface, fontWeight: FontWeight.w700)
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -94,7 +113,7 @@ class _LoginPageState extends State<LoginPage> {
                 onFieldSubmitted: (_) => _signIn(),
                 decoration: themedInput(context, 'Password',
                   suffix: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: cs.secondary),
+                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: cs.onSurfaceVariant),
                     onPressed: () => setState(() { _obscure = !_obscure; }),
                   ),
                 ),
@@ -109,7 +128,7 @@ class _LoginPageState extends State<LoginPage> {
                   },
                   child: Text('Forgot Password?',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: cs.secondary,
+                      color: cs.primary,
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -150,9 +169,14 @@ class _LoginPageState extends State<LoginPage> {
               SizedBox(
                 width: double.infinity,
                 child: GoogleSignInButton(
-                  onPressed: () => context.read<AppState>().signInWithGoogle(),
+                  isLoading: _googleBusy,
+                  onPressed: _googleBusy ? null : _signInWithGoogle,
                 ),
               ),
+              if (_googleError != null) ...[
+                const SizedBox(height: 8),
+                Text(_googleError!, style: TextStyle(color: cs.error)),
+              ],
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () {
@@ -170,7 +194,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     Text(
                       'Create one',
-                      style: TextStyle(color: cs.secondary, fontWeight: FontWeight.bold, fontSize: 16),
+                      style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                   ],
                 ),

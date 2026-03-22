@@ -38,8 +38,11 @@ if (isNewProfile) {
 
     if (updates.isNotEmpty) {
       await uRef.set(updates, SetOptions(merge: true));
-      snap = await uRef.get();
-      profile = UserProfile.fromDoc(snap);
+      if (isNewProfile) {
+        // New profile: re-read to get server-side timestamps (createdAt, etc.)
+        snap = await uRef.get();
+        profile = UserProfile.fromDoc(snap);
+      }
     }
 
     // Ensure they have a default family + owner membership

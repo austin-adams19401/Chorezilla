@@ -60,7 +60,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
       isScrollControlled: true,
       showDragHandle: true,
       builder: (ctx) =>
-          _AvatarPickerSheet(avatars: _defaultAvatars, initial: _avatarKey),
+          _AvatarPickerSheet(initial: _avatarKey),
     );
     if (!mounted) return;
     if (selected != null) setState(() => _avatarKey = selected);
@@ -702,21 +702,25 @@ class _FormCard extends StatelessWidget {
                           decoration: themedInput(context, 'Avatar'),
                           child: Row(
                             children: [
-                              Text(
-                                (avatarKey == null ||
-                                        avatarKey!.trim().isEmpty)
-                                    ? '🙂'
-                                    : (avatarKey!.startsWith('avatar_')
-                                        ? '🖼️'
-                                        : avatarKey!),
-                                style: const TextStyle(fontSize: 22),
-                              ),
+                              if (avatarKey?.startsWith('avatar_') == true)
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Image.asset(
+                                    CosmeticCatalog.byId(avatarKey!).assetKey,
+                                    width: 28,
+                                    height: 28,
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              else
+                                Icon(Icons.face_rounded,
+                                    size: 28, color: cs.onSurfaceVariant),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   avatarKey?.startsWith('avatar_') == true
                                       ? CosmeticCatalog.byId(avatarKey!).name
-                                      : 'Choose emoji',
+                                      : 'Choose avatar',
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodyMedium
@@ -837,7 +841,7 @@ class _KidCard extends StatelessWidget {
         (member.pinHash != null && member.pinHash!.trim().isNotEmpty);
     final isImageAvatar = member.avatarKey?.startsWith('avatar_') ?? false;
     final levelInfo = levelInfoForXp(member.xp);
-    final hasStreak = member.currentStreak > 1;
+    final hasStreak = member.effectiveStreak > 1;
 
     final title = member.equippedTitleId != null &&
             member.equippedTitleId!.isNotEmpty &&
@@ -1025,7 +1029,7 @@ class _KidCard extends StatelessWidget {
                 if (hasStreak)
                   _StatChip(
                     icon: '🔥',
-                    label: '${member.currentStreak} day streak',
+                    label: '${member.effectiveStreak} day streak',
                     cs: cs,
                     ts: ts,
                     highlighted: true,
@@ -1215,9 +1219,8 @@ class _EmptyKidsState extends StatelessWidget {
 // ── Avatar picker sheet ──────────────────────────────────────────────────────
 
 class _AvatarPickerSheet extends StatefulWidget {
-  const _AvatarPickerSheet({required this.avatars, this.initial});
+  const _AvatarPickerSheet({this.initial});
 
-  final List<String> avatars;
   final String? initial;
 
   @override
@@ -1235,8 +1238,11 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
   @override
   void initState() {
     super.initState();
-    _selected = widget.initial ??
-        (widget.avatars.isNotEmpty ? widget.avatars.first : '🙂');
+    final validInitial = widget.initial?.startsWith('avatar_') == true
+        ? widget.initial!
+        : null;
+    _selected = validInitial ??
+        (_defaultImageIds.isNotEmpty ? _defaultImageIds.first : '');
   }
 
   @override
@@ -1291,12 +1297,6 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
                     mainAxisSpacing: 8,
                     crossAxisSpacing: 8,
                     children: [
-                      for (final a in widget.avatars)
-                        _AvatarTile(
-                          avatarKey: a,
-                          selected: a == _selected,
-                          onTap: () => setState(() => _selected = a),
-                        ),
                       for (final id in _defaultImageIds)
                         _AvatarTile(
                           avatarKey: id,
@@ -1378,6 +1378,3 @@ class _AvatarTile extends StatelessWidget {
   }
 }
 
-const _defaultAvatars = [
-  '🦖', '🦄', '🐱', '🐶', '🐵', '🦊', '🐸', '🦁',
-];

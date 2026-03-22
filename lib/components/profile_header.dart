@@ -6,6 +6,7 @@ import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/pages/kid_pages/kid_edit_profile_page.dart';
+import 'package:chorezilla/services/sprite_cache_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -194,7 +195,7 @@ class _KidHeroHeader extends StatelessWidget {
               children: [
                 // Stats column
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                  padding: const EdgeInsets.fromLTRB(10, 2, 10, 2),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -703,8 +704,9 @@ class _CyclingMascotState extends State<_CyclingMascot>
   }
 
   static Future<ui.Image> _load(String asset) async {
-    final data = await rootBundle.load(asset);
-    return decodeImageFromList(data.buffer.asUint8List());
+    final filename = asset.split('/').last;
+    final bytes = await SpriteSheetCacheService.getBytes(filename);
+    return decodeImageFromList(bytes);
   }
 
   static const _pokePhases = [

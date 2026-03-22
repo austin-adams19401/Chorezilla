@@ -5,9 +5,51 @@ import 'dart:math' as math;
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 
+import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 import 'package:chorezilla/components/sprite_sheet_animation.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/models/cosmetics.dart';
+
+// ---------------------------------------------------------------------------
+// Top-level helpers
+// ---------------------------------------------------------------------------
+
+String _lootIconPath(CosmeticRarity r) {
+  switch (r) {
+    case CosmeticRarity.common:
+      return 'assets/icons/common-loot.png';
+    case CosmeticRarity.rare:
+      return 'assets/icons/rare-loot.png';
+    case CosmeticRarity.epic:
+      return 'assets/icons/epic-loot.png';
+  }
+}
+
+List<Color> _boxGradient(CosmeticType type) {
+  switch (type) {
+    case CosmeticType.background:
+      return [const Color(0xFF0D7377), const Color(0xFF5C35A0)];
+    case CosmeticType.zillaSkin:
+      return [const Color(0xFF1565C0), const Color(0xFF6A1B9A)];
+    case CosmeticType.avatarFrame:
+      return [const Color(0xFF7B1FA2), const Color(0xFFC2185B)];
+    case CosmeticType.title:
+      return [const Color(0xFFE65100), const Color(0xFFB71C1C)];
+    case CosmeticType.avatar:
+      return [const Color(0xFF00897B), const Color(0xFF00ACC1)];
+  }
+}
+
+Color _rarityGlowColor(CosmeticRarity r) {
+  switch (r) {
+    case CosmeticRarity.common:
+      return Colors.amber;
+    case CosmeticRarity.rare:
+      return Colors.lightBlueAccent;
+    case CosmeticRarity.epic:
+      return Colors.purpleAccent;
+  }
+}
 
 /// 3-click loot box opening dialog.
 ///
@@ -49,19 +91,16 @@ class _LootBoxOpenDialogState extends State<LootBoxOpenDialog>
 
     _confetti = ConfettiController(duration: const Duration(seconds: 2));
 
-    // Short shake played on each of the first two taps
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
 
-    // Elastic scale bounce on the rarity meter when rarity upgrades
     _upgradeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
 
-    // Full 2.2 s reveal animation triggered after the 3rd tap
     _revealController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2200),
@@ -69,7 +108,7 @@ class _LootBoxOpenDialogState extends State<LootBoxOpenDialog>
     _revealController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         _confetti.play();
-        setState(() {}); // enable the Nice! button
+        setState(() {});
       }
     });
   }
@@ -97,7 +136,6 @@ class _LootBoxOpenDialogState extends State<LootBoxOpenDialog>
       _revealController.forward();
     } else {
       _shakeController.forward(from: 0);
-      // Flash upgrade animation if rarity improved
       if (_previousRarity != null &&
           newState.currentRarity != null &&
           newState.currentRarity!.index > _previousRarity!.index) {
@@ -108,141 +146,262 @@ class _LootBoxOpenDialogState extends State<LootBoxOpenDialog>
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
     final box = widget.boxDefinition;
+    final gradient = _boxGradient(box.cosmeticType);
     final revealDone = _revealController.isCompleted;
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-        child: Stack(
-          alignment: Alignment.topCenter,
-          children: [
-            // Confetti emitter (active after reveal completes)
-            ConfettiWidget(
-              confettiController: _confetti,
-              blastDirectionality: BlastDirectionality.explosive,
-              numberOfParticles: 20,
-              maxBlastForce: 20,
-              minBlastForce: 5,
-              emissionFrequency: 0.4,
-              gravity: 0.2,
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 44, vertical: 56),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // ── Visual area ──────────────────────────────────────────────
-                SizedBox(
-                  height: 220,
-                  child: _clickState.isFinished
-                      ? _RevealAnimation(
-                          controller: _revealController,
-                          box: box,
-                          clickState: _clickState,
-                        )
-                      : _ClickingArea(
-                          box: box,
-                          clickState: _clickState,
-                          shakeController: _shakeController,
-                          upgradeController: _upgradeController,
-                          previousRarity: _previousRarity,
-                          onTap: _onBoxTap,
-                        ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // ── Title / item name ────────────────────────────────────────
-                if (!_clickState.isFinished) ...[
-                  Text(
-                    box.name,
-                    style: ts.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '🪙 ${box.costCoins} coins',
-                    style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                ] else if (_revealController.value >= _burstDuration) ...[
-                  Text(
-                    'You got...',
-                    style: ts.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _clickState.wonItem?.name ?? '',
-                    style: ts.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: cs.primary,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  if (_clickState.wonItem?.description.isNotEmpty ?? false) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      _clickState.wonItem!.description,
-                      style: ts.bodyMedium?.copyWith(
-                        color: cs.onSurfaceVariant,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ],
-                  if (_clickState.isDuplicate) ...[
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: cs.secondaryContainer,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text('🪙', style: TextStyle(fontSize: 16)),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Already owned — +${_clickState.coinRefund} coins refunded',
-                            style: ts.bodySmall?.copyWith(
-                              color: cs.onSecondaryContainer,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+          ),
+          child: Stack(
+            children: [
+              // Diagonal shine streak
+              Positioned(
+                top: -30,
+                left: -20,
+                child: Transform.rotate(
+                  angle: -0.5,
+                  child: Container(
+                    width: 80,
+                    height: 340,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withValues(alpha: 0.0),
+                          Colors.white.withValues(alpha: 0.12),
+                          Colors.white.withValues(alpha: 0.0),
                         ],
                       ),
                     ),
-                  ],
-                ],
-
-                const SizedBox(height: 20),
-
-                // ── Button ───────────────────────────────────────────────────
-                SizedBox(
-                  width: double.infinity,
-                  child: revealDone
-                      ? FilledButton(
-                          onPressed: () =>
-                              Navigator.of(context).pop(_clickState),
-                          child: const Text('Nice!'),
-                        )
-                      : FilledButton(
-                          onPressed: _clickState.isFinished ? null : _onBoxTap,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: cs.primaryContainer,
-                            foregroundColor: cs.onPrimaryContainer,
-                          ),
-                          child: Text(_tapPrompt),
-                        ),
+                  ),
                 ),
-              ],
-            ),
-          ],
+              ),
+
+              // Confetti emitter
+              Align(
+                alignment: Alignment.topCenter,
+                child: ConfettiWidget(
+                  confettiController: _confetti,
+                  blastDirectionality: BlastDirectionality.explosive,
+                  numberOfParticles: 25,
+                  maxBlastForce: 20,
+                  minBlastForce: 5,
+                  emissionFrequency: 0.4,
+                  gravity: 0.2,
+                ),
+              ),
+
+              // Close button — only visible before the reveal starts
+              if (!_clickState.isFinished)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close),
+                    iconSize: 20,
+                    style: IconButton.styleFrom(
+                      foregroundColor: Colors.white70,
+                    ),
+                  ),
+                ),
+
+              // Main content
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 28), // clearance for close button
+
+                    // ── Visual area ─────────────────────────────────────────
+                    SizedBox(
+                      height: 250,
+                      child: _clickState.isFinished
+                          ? _RevealAnimation(
+                              controller: _revealController,
+                              clickState: _clickState,
+                            )
+                          : _ClickingArea(
+                              clickState: _clickState,
+                              shakeController: _shakeController,
+                              upgradeController: _upgradeController,
+                              onTap: _onBoxTap,
+                            ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // ── Text / info ──────────────────────────────────────────
+                    AnimatedBuilder(
+                      animation: _revealController,
+                      builder: (context, _) {
+                        if (!_clickState.isFinished) {
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                box.name,
+                                style: ts.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    '🪙',
+                                    style: TextStyle(fontSize: 14),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${box.costCoins} coins',
+                                    style: ts.bodyMedium?.copyWith(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              _ClickDots(count: _clickState.clickCount),
+                            ],
+                          );
+                        } else if (_revealController.value >= _burstDuration) {
+                          return Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'You got...',
+                                style: ts.titleSmall?.copyWith(
+                                  color: Colors.white70,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _clickState.wonItem?.name ?? '',
+                                style: ts.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              if (_clickState.wonItem?.description.isNotEmpty ??
+                                  false) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  _clickState.wonItem!.description,
+                                  style: ts.bodySmall?.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                              if (_clickState.isDuplicate) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.15),
+                                    border: Border.all(
+                                      color:
+                                          Colors.white.withValues(alpha: 0.3),
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        '🪙',
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Already owned — +${_clickState.coinRefund} coins refunded',
+                                        style: ts.bodySmall?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          );
+                        } else {
+                          // Animation in progress — hold space so dialog
+                          // doesn't collapse
+                          return const SizedBox(height: 72);
+                        }
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // ── Button ───────────────────────────────────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      child: revealDone
+                          ? FilledButton(
+                              onPressed: () =>
+                                  Navigator.of(context).pop(_clickState),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: gradient.first,
+                                textStyle: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              child: const Text('Nice!'),
+                            )
+                          : OutlinedButton(
+                              onPressed:
+                                  _clickState.isFinished ? null : _onBoxTap,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                disabledForegroundColor:
+                                    Colors.white.withValues(alpha: 0.35),
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.65),
+                                  width: 1.5,
+                                ),
+                                textStyle: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              child: Text(_tapPrompt),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
       ),
     );
   }
@@ -265,60 +424,85 @@ class _LootBoxOpenDialogState extends State<LootBoxOpenDialog>
 
 class _ClickingArea extends StatelessWidget {
   const _ClickingArea({
-    required this.box,
     required this.clickState,
     required this.shakeController,
     required this.upgradeController,
-    required this.previousRarity,
     required this.onTap,
   });
 
-  final LootBoxDefinition box;
   final LootBoxClickState clickState;
   final AnimationController shakeController;
   final AnimationController upgradeController;
-  final CosmeticRarity? previousRarity;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final rarity = clickState.currentRarity ?? CosmeticRarity.common;
+    final glowColor = _rarityGlowColor(rarity);
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Box emoji with shake animation
+          // Icon with radial glow ring — shake + upgrade pulse both applied
           AnimatedBuilder(
-            animation: shakeController,
+            animation: Listenable.merge([shakeController, upgradeController]),
             builder: (context, child) {
               final angle = math.sin(shakeController.value * math.pi * 5) *
                   0.15 *
                   (1 - shakeController.value);
-              return Transform.rotate(angle: angle, child: child);
+              final pulse = 1.0 +
+                  0.15 *
+                      math
+                          .sin(upgradeController.value * math.pi)
+                          .clamp(0.0, 1.0);
+              return Transform.scale(
+                scale: pulse,
+                child: Transform.rotate(angle: angle, child: child),
+              );
             },
-            child: Text(
-              box.categoryEmoji,
-              style: const TextStyle(fontSize: 80),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    glowColor.withValues(alpha: 0.45),
+                    glowColor.withValues(alpha: 0.12),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Image.asset(
+                  _lootIconPath(rarity),
+                  width: 140,
+                  height: 140,
+                ),
+              ),
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
-          // Rarity meter (appears after first click)
+          // Rarity badge (appears after first click)
           if (clickState.clickCount > 0 && clickState.currentRarity != null)
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 300),
               transitionBuilder: (child, anim) =>
                   ScaleTransition(scale: anim, child: child),
-              child: _RarityMeter(
+              child: _RarityBadge(
                 key: ValueKey(clickState.currentRarity),
                 rarity: clickState.currentRarity!,
                 upgradeController: upgradeController,
               ),
             )
           else
-            const SizedBox(height: 52), // placeholder to keep height stable
+            const SizedBox(height: 28),
         ],
       ),
     );
@@ -326,18 +510,16 @@ class _ClickingArea extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Reveal animation phase (after 3rd tap — mirrors original dialog logic)
+// Reveal animation phase (after 3rd tap)
 // ---------------------------------------------------------------------------
 
 class _RevealAnimation extends StatelessWidget {
   const _RevealAnimation({
     required this.controller,
-    required this.box,
     required this.clickState,
   });
 
   final AnimationController controller;
-  final LootBoxDefinition box;
   final LootBoxClickState clickState;
 
   static const _shakeDuration = 0.35;
@@ -345,8 +527,9 @@ class _RevealAnimation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final item = clickState.wonItem;
+    final glowColor =
+        _rarityGlowColor(clickState.currentRarity ?? CosmeticRarity.common);
 
     return AnimatedBuilder(
       animation: controller,
@@ -383,14 +566,14 @@ class _RevealAnimation extends StatelessWidget {
             ? ((t - _shakeDuration) / (_burstDuration - _shakeDuration))
                 .clamp(0.0, 1.0)
             : 0.0;
-        final sparkleRadius = sparkleProgress * 80.0;
+        final sparkleRadius = sparkleProgress * 88.0;
         final sparkleOpacity =
             (sparkleProgress * (1 - sparkleProgress) * 4).clamp(0.0, 1.0);
 
         return Stack(
           alignment: Alignment.center,
           children: [
-            // Sparkles burst
+            // Sparkles burst — white + rarity color alternating
             if (sparkleOpacity > 0)
               ...List.generate(8, (i) {
                 final angle = (i * 2 * math.pi) / 8;
@@ -403,21 +586,24 @@ class _RevealAnimation extends StatelessWidget {
                     ),
                     child: Icon(
                       Icons.star,
-                      size: 16,
-                      color: i.isEven ? cs.primary : cs.secondary,
+                      size: 18,
+                      color: i.isEven ? Colors.white : glowColor,
                     ),
                   ),
                 );
               }),
 
-            // Box (shakes then fades)
+            // Box icon — shakes then fades
             Opacity(
               opacity: boxOpacity,
               child: Transform.rotate(
                 angle: shakeAngle,
-                child: Text(
-                  box.categoryEmoji,
-                  style: const TextStyle(fontSize: 72),
+                child: Image.asset(
+                  _lootIconPath(
+                    clickState.currentRarity ?? CosmeticRarity.common,
+                  ),
+                  width: 120,
+                  height: 120,
                 ),
               ),
             ),
@@ -434,7 +620,7 @@ class _RevealAnimation extends StatelessWidget {
                       const SpriteSheetAnimation(
                         assetPath:
                             'assets/mascot/sprite-sheets/celebrate.png',
-                        size: 64,
+                        size: 72,
                         columns: 6,
                         rows: 6,
                         totalDuration: Duration(milliseconds: 1800),
@@ -454,11 +640,11 @@ class _RevealAnimation extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Rarity meter widget
+// Rarity badge
 // ---------------------------------------------------------------------------
 
-class _RarityMeter extends StatelessWidget {
-  const _RarityMeter({
+class _RarityBadge extends StatelessWidget {
+  const _RarityBadge({
     super.key,
     required this.rarity,
     required this.upgradeController,
@@ -467,60 +653,81 @@ class _RarityMeter extends StatelessWidget {
   final CosmeticRarity rarity;
   final AnimationController upgradeController;
 
-  static String _rarityIconPath(CosmeticRarity r) {
-    switch (r) {
-      case CosmeticRarity.common:
-        return 'assets/icons/common-loot.png';
-      case CosmeticRarity.rare:
-        return 'assets/icons/rare-loot.png';
-      case CosmeticRarity.epic:
-        return 'assets/icons/epic-loot.png';
-    }
-  }
-
-  static Color _rarityColor(CosmeticRarity r) {
-    switch (r) {
-      case CosmeticRarity.common:
-        return Colors.amber;
-      case CosmeticRarity.rare:
-        return Colors.blue;
-      case CosmeticRarity.epic:
-        return Colors.purple;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final ts = Theme.of(context).textTheme;
-    final color = _rarityColor(rarity);
+    final color = _rarityGlowColor(rarity);
 
     return AnimatedBuilder(
       animation: upgradeController,
       builder: (context, child) {
         final scale = 1.0 +
-            0.25 *
+            0.2 *
                 math.sin(upgradeController.value * math.pi).clamp(0.0, 1.0);
         return Transform.scale(scale: scale, child: child);
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            _rarityIconPath(rarity),
-            width: 64,
-            height: 64,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            rarity.displayName,
-            style: ts.labelLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.2),
+          border: Border.all(color: color.withValues(alpha: 0.8), width: 1.5),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.5),
+              blurRadius: 14,
             ),
+          ],
+        ),
+        child: Text(
+          rarity.displayName.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 2.0,
+            fontSize: 11,
           ),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Click progress dots
+// ---------------------------------------------------------------------------
+
+class _ClickDots extends StatelessWidget {
+  const _ClickDots({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(3, (i) {
+        final filled = i < count;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          width: filled ? 12 : 8,
+          height: filled ? 12 : 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: filled
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.3),
+            boxShadow: filled
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      blurRadius: 6,
+                    ),
+                  ]
+                : null,
+          ),
+        );
+      }),
     );
   }
 }
@@ -536,45 +743,82 @@ class _ItemReveal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    final Widget typeIcon;
+    final Widget icon;
     switch (item.type) {
       case CosmeticType.background:
-        typeIcon = Image.asset('assets/backgrounds/background-icon.png', width: 32, height: 32);
+        icon = ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.asset(
+            item.assetKey,
+            width: 80,
+            height: 80,
+            fit: BoxFit.cover,
+          ),
+        );
         break;
       case CosmeticType.zillaSkin:
-        typeIcon = const Text('🦖', style: TextStyle(fontSize: 32));
+        icon = Image.asset(
+          'assets/mascot/mascot_plain.png',
+          width: 80,
+          height: 80,
+          color: item.colorValue != null ? Color(item.colorValue!) : null,
+          colorBlendMode: item.colorValue != null ? BlendMode.srcIn : null,
+        );
         break;
       case CosmeticType.avatarFrame:
-        typeIcon = const Text('⭐', style: TextStyle(fontSize: 32));
-        break;
-      case CosmeticType.title:
-        typeIcon = const Text('🏆', style: TextStyle(fontSize: 32));
+        icon = SizedBox(
+          width: 80,
+          height: 80,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              CircleAvatar(
+                radius: 32,
+                backgroundColor: Colors.white.withValues(alpha: 0.25),
+              ),
+              FrameOverlay(frameId: item.id, radius: 32),
+            ],
+          ),
+        );
         break;
       case CosmeticType.avatar:
-        typeIcon = const Text('🧑', style: TextStyle(fontSize: 32));
+        icon = ClipOval(
+          child: Image.asset(
+            item.assetKey,
+            width: 80,
+            height: 80,
+            fit: BoxFit.cover,
+          ),
+        );
+        break;
+      case CosmeticType.title:
+        icon = const Text('🏆', style: TextStyle(fontSize: 56));
         break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
       decoration: BoxDecoration(
-        color: cs.primaryContainer,
+        color: Colors.white.withValues(alpha: 0.2),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.45),
+          width: 1,
+        ),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          typeIcon,
-          const SizedBox(width: 12),
+          icon,
+          const SizedBox(height: 10),
           Text(
             item.name,
-            style: TextStyle(
-              fontSize: 18,
+            style: const TextStyle(
+              fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: cs.onPrimaryContainer,
+              color: Colors.white,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

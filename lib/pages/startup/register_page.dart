@@ -76,7 +76,7 @@ class _RegisterPageState extends State<RegisterPage> {
             children: [
               Text('Register',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: cs.secondary, fontWeight: FontWeight.w700)),
+                  color: cs.onSurface, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _name,
@@ -113,7 +113,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   context,
                   'Password',
                   suffix: IconButton(
-                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: cs.secondary),
+                    icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility, color: cs.onSurfaceVariant),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                 ),
@@ -131,7 +131,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   context,
                   'Confirm password',
                   suffix: IconButton(
-                    icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility, color: cs.secondary),
+                    icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility, color: cs.onSurfaceVariant),
                     onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                   ),
                 ),
@@ -182,7 +182,7 @@ class _RegisterPageState extends State<RegisterPage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    Text('Sign in!', style: TextStyle(color: cs.secondary, fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text('Sign in!', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
               ),

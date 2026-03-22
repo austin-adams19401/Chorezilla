@@ -214,6 +214,10 @@ extension AppStateWrites on AppState {
         fallbackMemberId: fallbackMemberId,
       );
     }
+
+    // Re-generate today's assignments so the parent today page reflects
+    // the new/updated schedule immediately.
+    await ensureAssignmentsForTodayCached(force: true);
   }
 
   /// Hard-delete a schedule row (used by the “Remove” button

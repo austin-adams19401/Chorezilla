@@ -29,6 +29,7 @@ import 'package:chorezilla/models/cosmetics.dart';
 
 import 'package:chorezilla/pages/kid_pages/kid_rewards_page.dart';
 import 'package:chorezilla/pages/kid_pages/kid_activity_page.dart';
+import 'package:chorezilla/pages/kid_pages/kid_level_rewards_page.dart';
 
 class KidDashboardPage extends StatefulWidget {
   const KidDashboardPage({super.key, this.memberId});
@@ -383,6 +384,17 @@ class _KidDashboardPageState extends State<KidDashboardPage>
               );
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.military_tech_rounded, size: 28),
+            tooltip: 'Level Rewards',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => KidLevelRewardsPage(memberId: member.id),
+                ),
+              );
+            },
+          ),
         ],
       ),
             body: Stack(
@@ -459,7 +471,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                         MaterialPageRoute(
                           builder: (_) => KidRewardsPage(
                             memberId: member.id,
-                            initialTabIndex: 1,
+                            initialTabIndex: 2,
                           ),
                         ),
                       );
@@ -573,6 +585,8 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                   ),
                 ),
               ),
+
+              _EarnedBadgesStrip(member: member),
             ],
           ),
 
@@ -1774,13 +1788,13 @@ class _KidStatsBar extends StatelessWidget {
               ),
 
               // Streak (only if active)
-              if (member.currentStreak > 0) ...[
+              if (member.effectiveStreak > 0) ...[
                 const SizedBox(width: 20),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '🔥 ${member.currentStreak}',
+                      '🔥 ${member.effectiveStreak}',
                       style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     Text(
@@ -1944,6 +1958,131 @@ class _RewardChip extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ============================================================================
+// Earned badges strip — dashboard shortcut to badges page
+// ============================================================================
+
+class _EarnedBadgesStrip extends StatelessWidget {
+  const _EarnedBadgesStrip({required this.member});
+  final Member member;
+
+  static const _iconSize = 36.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    // Resolve (assetPath, icon) for every earned badge ID.
+    final items = <({String? assetPath, String icon})>[];
+    for (final id in member.badges) {
+      final def = BadgeCatalog.byId(id);
+      if (def != null && !def.isTiered) {
+        items.add((assetPath: def.assetPath, icon: def.icon));
+      } else {
+        final tieredDef = BadgeCatalog.byTieredId(id);
+        if (tieredDef != null) {
+          final tier = id.endsWith('_gold')
+              ? BadgeTier.gold
+              : id.endsWith('_silver')
+                  ? BadgeTier.silver
+                  : BadgeTier.bronze;
+          items.add((
+            assetPath: tieredDef.assetPathForTier(tier),
+            icon: tieredDef.icon,
+          ));
+        }
+      }
+    }
+
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    void goToBadges() => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => KidBadgesPage(memberId: member.id),
+          ),
+        );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+      child: GestureDetector(
+        onTap: goToBadges,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: .05),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    'My Badges',
+                    style: ts.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${items.length}',
+                    style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 16,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: _iconSize,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (_, i) {
+                    final item = items[i];
+                    return SizedBox(
+                      width: _iconSize,
+                      height: _iconSize,
+                      child: item.assetPath != null
+                          ? Image.asset(
+                              item.assetPath!,
+                              fit: BoxFit.contain,
+                              errorBuilder: (_, _, _) => Text(
+                                item.icon,
+                                style: const TextStyle(fontSize: 22),
+                                textAlign: TextAlign.center,
+                              ),
+                            )
+                          : Text(
+                              item.icon,
+                              style: const TextStyle(fontSize: 22),
+                              textAlign: TextAlign.center,
+                            ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

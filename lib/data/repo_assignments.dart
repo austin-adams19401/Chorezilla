@@ -325,11 +325,23 @@ Future<void> completeAssignment(
           memSnap.exists
               ? (memSnap.data() as Map<String, dynamic>)
               : <String, dynamic>{};
+
+      final String? dayKey = data['dayKey'] as String?;
+      final bool allDone =
+          dayKey != null
+              ? await _allNonBonusChoresDone(
+                familyId,
+                memberId,
+                dayKey,
+                assignmentId,
+              )
+              : false;
+
       tx.update(memberRef, {
         'xp': FieldValue.increment(xp),
         'coins': FieldValue.increment(coins),
         'totalChoresCompleted': FieldValue.increment(1),
-        ..._streakUpdate(memData, DateTime.now()),
+        if (allDone) ..._streakUpdate(memData, DateTime.now()),
       });
     });
   }
@@ -370,11 +382,23 @@ Future<void> completeAssignment(
       });
 
       final memData = memSnap.data() as Map<String, dynamic>;
+
+      final String? dayKey = asn.due != null ? _dayKeyFor(asn.due!) : null;
+      final bool allDone =
+          dayKey != null
+              ? await _allNonBonusChoresDone(
+                familyId,
+                asn.memberId,
+                dayKey,
+                assignmentId,
+              )
+              : false;
+
       tx.update(memberRef, {
         'xp': FieldValue.increment(asn.xp),
         'coins': FieldValue.increment(coins),
         'totalChoresCompleted': FieldValue.increment(1),
-        ..._streakUpdate(memData, DateTime.now()),
+        if (allDone) ..._streakUpdate(memData, DateTime.now()),
       });
 
       final evRef = eventsColl(firebaseDB, familyId).doc();
@@ -492,6 +516,33 @@ Future<void> undoAssignmentCompletion(
         'createdAt': FieldValue.serverTimestamp(),
       });
     });
+  }
+
+  /// Returns true if every non-bonus assignment for [memberId] on [dayKey]
+  /// is completed — treating [completingAssignmentId] as completed regardless
+  /// of its current Firestore status (it is being completed right now).
+  Future<bool> _allNonBonusChoresDone(
+    String familyId,
+    String memberId,
+    String dayKey,
+    String completingAssignmentId,
+  ) async {
+    final snap =
+        await assignmentsColl(firebaseDB, familyId)
+            .where('memberId', isEqualTo: memberId)
+            .where('dayKey', isEqualTo: dayKey)
+            .where('bonus', isEqualTo: false)
+            .get();
+
+    if (snap.docs.isEmpty) return false;
+
+    for (final doc in snap.docs) {
+      if (doc.id == completingAssignmentId) continue;
+      final s = (doc.data() as Map<String, dynamic>)['status'] as String?;
+      if (s != 'completed') return false;
+    }
+
+    return true;
   }
 
   /// Returns Firestore field updates for streak progression.

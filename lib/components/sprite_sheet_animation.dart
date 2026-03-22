@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
+import 'package:chorezilla/services/sprite_cache_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 /// A widget that plays a sprite sheet animation frame-by-frame.
 ///
@@ -60,8 +60,8 @@ class _SpriteSheetAnimationState extends State<SpriteSheetAnimation>
   }
 
   Future<void> _loadImage() async {
-    final data = await rootBundle.load(widget.assetPath);
-    final bytes = data.buffer.asUint8List();
+    final filename = widget.assetPath.split('/').last;
+    final bytes = await SpriteSheetCacheService.getBytes(filename);
     final image = await decodeImageFromList(bytes);
     if (mounted) {
       setState(() => _image = image);

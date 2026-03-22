@@ -478,6 +478,21 @@ class Member {
     return a;
   }
 
+  /// Returns [currentStreak] only if [lastActiveDate] was today or yesterday.
+  /// If the kid missed more than one day, the streak has lapsed and this returns 0.
+  int get effectiveStreak {
+    if (currentStreak == 0 || lastActiveDate == null) return 0;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastDay = DateTime(
+      lastActiveDate!.year,
+      lastActiveDate!.month,
+      lastActiveDate!.day,
+    );
+    final yesterday = today.subtract(const Duration(days: 1));
+    return (lastDay == today || lastDay == yesterday) ? currentStreak : 0;
+  }
+
   bool ownsCosmetic(String cosmeticId) => ownedCosmetics.contains(cosmeticId);
 
   bool hasBadge(String badgeId) => badges.contains(badgeId);

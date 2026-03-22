@@ -110,7 +110,7 @@ class _ParentPinSetupPageState extends State<ParentPinSetupPage> {
                   suffix: IconButton(
                     icon: Icon(
                       _obscurePin ? Icons.visibility_off : Icons.visibility,
-                      color: cs.secondary,
+                      color: cs.onSurfaceVariant,
                     ),
                     onPressed: () => setState(() => _obscurePin = !_obscurePin),
                   ),
@@ -134,7 +134,7 @@ class _ParentPinSetupPageState extends State<ParentPinSetupPage> {
                   suffix: IconButton(
                     icon: Icon(
                       _obscureConfirm ? Icons.visibility_off : Icons.visibility,
-                      color: cs.secondary,
+                      color: cs.onSurfaceVariant,
                     ),
                     onPressed: () =>
                         setState(() => _obscureConfirm = !_obscureConfirm),

@@ -82,19 +82,19 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
           final double childAspectRatio = tileWidth / targetCardHeight;
 
 
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Hero/header (styled like Today / Chore tabs) ────────────
-              _RewardsHero(
-                activeCount: activeCount,
-                hiddenCount: hiddenCount,
-                rewardsBootstrapped: rewardsBootstrapped,
-              ),
+          return SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Hero/header scrolls with content ───────────────────────
+                _RewardsHero(
+                  activeCount: activeCount,
+                  hiddenCount: hiddenCount,
+                  rewardsBootstrapped: rewardsBootstrapped,
+                ),
 
-              // The rest of the content sits on a soft “canvas” card
-              Expanded(
-                child: Padding(
+                // The rest of the content sits on a soft “canvas” card
+                Padding(
                   padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
                   child: Container(
                     width: double.infinity,
@@ -105,12 +105,10 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                         topRight: Radius.circular(24),
                       ),
                     ),
-                    // keep padding on the scroll view instead of the column
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(6, 16, 6, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                    padding: const EdgeInsets.fromLTRB(6, 16, 6, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                           // ── Filters ────────────────────────────────────────
                           _RewardsFilters(
                             categoryFilter: _categoryFilter,
@@ -319,10 +317,9 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
-            ],
-          );
+            );
         },
       ),
       floatingActionButton: FloatingActionButton.extended(
@@ -377,10 +374,16 @@ class _RewardsHero extends StatelessWidget {
 
     final media = MediaQuery.of(context);
     final double topInset = media.padding.top;
+    final bool isLandscape = media.orientation == Orientation.landscape;
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, topInset + 4, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        isLandscape ? topInset + 2 : topInset + 4,
+        20,
+        isLandscape ? 6 : 8,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [cs.secondary, cs.secondary, cs.secondary],
@@ -395,23 +398,19 @@ class _RewardsHero extends StatelessWidget {
           // Text + stats
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(0,20,0,0),
+              padding: EdgeInsets.fromLTRB(0, isLandscape ? 4 : 6, 0, 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Rewards & store',
-                    style: ts.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: (isLandscape ? ts.titleMedium : ts.headlineSmall)
+                        ?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    'Set up the store where kids spend their chore coins.',
-                    style: ts.bodyMedium?.copyWith(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 10),
                   Row(
                     children: [
                       Container(
@@ -433,19 +432,6 @@ class _RewardsHero extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                        ),
-                        onPressed: () => _showStoreHelpDialog(context),
-                        icon: const Icon(Icons.help_outline_rounded, size: 18),
-                        label: const Text('How it works'),
-                      ),
                     ],
                   ),
                 ],
@@ -455,8 +441,8 @@ class _RewardsHero extends StatelessWidget {
           const SizedBox(width: 12),
           // Rounded gift icon “badge”
           Container(
-            height: 80,
-            width: 80,
+            height: isLandscape ? 48 : 64,
+            width: isLandscape ? 48 : 64,
             decoration: BoxDecoration(
               color: cs.secondary,
               shape: BoxShape.circle,
@@ -471,63 +457,13 @@ class _RewardsHero extends StatelessWidget {
             child: Icon(
               Icons.card_giftcard_rounded,
               color: Colors.white,
-              size: 40,
+              size: isLandscape ? 24 : 32,
             ),
           ),
         ],
       ),
     );
   }
-}
-
-Future<void> _showStoreHelpDialog(BuildContext context) {
-  final theme = Theme.of(context);
-  final ts = theme.textTheme;
-  final cs = theme.colorScheme;
-
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('How rewards & coins work'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Use this page to set up the family reward store.',
-            style: ts.bodyMedium,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '• Kids earn coins by completing chores.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          Text(
-            '• Active rewards show up in each kid\'s store.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          Text(
-            '• Disabled rewards are hidden from kids but kept for later.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          Text(
-            '• Categories and coin cost help you balance fun vs effort.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          Text(
-            '• When kids buy a reward, it will appear in "Rewards to give".',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Got it'),
-        ),
-      ],
-    ),
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -641,10 +577,12 @@ class _EmptyRewards extends StatelessWidget {
     final cs = theme.colorScheme;
     final ts = theme.textTheme;
 
-    return Padding(
+    return Center(
+      child: Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text('🎁', style: ts.displaySmall),
           const SizedBox(height: 8),
@@ -672,6 +610,7 @@ class _EmptyRewards extends StatelessWidget {
             label: const Text('Create custom reward'),
           ),
         ],
+      ),
       ),
     );
   }

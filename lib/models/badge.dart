@@ -192,6 +192,7 @@ class BadgeCatalog {
       unlockHint: 'Complete chores 1 day in a row.',
       icon: '🔥',
       type: BadgeType.streak,
+      assetPath: 'assets/badges/one-time-badges/day-one-done.png',
     ),
     BadgeDefinition(
       id: 'streak_3',
@@ -200,6 +201,7 @@ class BadgeCatalog {
       unlockHint: 'Complete chores 3 days in a row.',
       icon: '🔥',
       type: BadgeType.streak,
+      assetPath: 'assets/badges/one-time-badges/3-day-streaker.png',
     ),
     BadgeDefinition(
       id: 'streak_7',
@@ -208,6 +210,7 @@ class BadgeCatalog {
       unlockHint: 'Complete chores 7 days in a row.',
       icon: '🔥',
       type: BadgeType.streak,
+      assetPath: 'assets/badges/one-time-badges/week-warrior.png',
     ),
     BadgeDefinition(
       id: 'streak_15',
@@ -216,6 +219,7 @@ class BadgeCatalog {
       unlockHint: 'Complete chores 15 days in a row.',
       icon: '🔥',
       type: BadgeType.streak,
+      assetPath: 'assets/badges/one-time-badges/15-day-machine.png',
     ),
     BadgeDefinition(
       id: 'streak_30',
@@ -224,6 +228,7 @@ class BadgeCatalog {
       unlockHint: 'Complete chores 30 days in a row.',
       icon: '🔥🔥',
       type: BadgeType.streak,
+      assetPath: 'assets/badges/one-time-badges/monthly-master.png',
     ),
     BadgeDefinition(
       id: 'streak_60',
@@ -232,6 +237,7 @@ class BadgeCatalog {
       unlockHint: 'Complete chores 60 days in a row.',
       icon: '🔥🔥🔥',
       type: BadgeType.streak,
+      assetPath: 'assets/badges/one-time-badges/unstoppable-legend.png',
     ),
 
     // ── One-time badges ──────────────────────────────────────────────────────
@@ -269,6 +275,7 @@ class BadgeCatalog {
       unlockHint: 'Complete all assigned tasks in a single day.',
       icon: '📋',
       type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/getting-started.png',
     ),
     BadgeDefinition(
       id: 'bonus_boss',
@@ -277,6 +284,7 @@ class BadgeCatalog {
       unlockHint: 'Complete a bonus task.',
       icon: '🎯',
       type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/bonus-boss.png',
     ),
     BadgeDefinition(
       id: 'weekend_warrior',
@@ -285,6 +293,7 @@ class BadgeCatalog {
       unlockHint: 'Complete at least 1 task on Saturday AND Sunday in the same weekend.',
       icon: '🏕️',
       type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/weekend-warrior.png',
     ),
     BadgeDefinition(
       id: 'sunrise_starter',
@@ -293,6 +302,7 @@ class BadgeCatalog {
       unlockHint: 'Complete a task before 7 AM.',
       icon: '🌅',
       type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/sunrise-starter.png',
     ),
     BadgeDefinition(
       id: 'night_owl',
@@ -301,6 +311,7 @@ class BadgeCatalog {
       unlockHint: 'Complete a task after 8 PM.',
       icon: '🦉',
       type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/night-owl.png',
     ),
     BadgeDefinition(
       id: 'perfect_day',
@@ -309,6 +320,7 @@ class BadgeCatalog {
       unlockHint: 'Complete all tasks AND a bonus task in the same day.',
       icon: '⭐',
       type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/perfect-day.png',
     ),
     BadgeDefinition(
       id: 'mix_master',
@@ -317,6 +329,7 @@ class BadgeCatalog {
       unlockHint: 'Complete 3 different chore types in one day.',
       icon: '🎨',
       type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/mix-master.png',
     ),
     BadgeDefinition(
       id: 'overachiever',
@@ -325,6 +338,25 @@ class BadgeCatalog {
       unlockHint: 'Complete 2 or more bonus tasks in a single day.',
       icon: '🚀',
       type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/overachiever.png',
+    ),
+    BadgeDefinition(
+      id: 'trash_trooper_daily',
+      name: 'Trash Trooper',
+      description: 'You knocked out 3 trash chores in a single day!',
+      unlockHint: 'Complete 3 trash chores in one day.',
+      icon: '🗑️',
+      type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/trash-trooper.png',
+    ),
+    BadgeDefinition(
+      id: 'task_crusher',
+      name: 'Task Crusher',
+      description: 'You crushed 10 chores in a single day — that\'s incredible!',
+      unlockHint: 'Complete 10 chores in one day.',
+      icon: '💪',
+      type: BadgeType.oneTime,
+      assetPath: 'assets/badges/one-time-badges/task-crusher.png',
     ),
 
     // ── Tiered badges ────────────────────────────────────────────────────────
@@ -377,7 +409,7 @@ class BadgeCatalog {
       tiers: [
         TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/tiered-badges/bronze-dish.png'),
         TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/tiered-badges/silver-dish.png'),
-        TierDef(tier: BadgeTier.gold,   threshold: 30), // no gold asset yet
+        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/one-time-badges/dish-destroyer.png'),
       ],
     ),
     BadgeDefinition(
@@ -401,9 +433,9 @@ class BadgeCatalog {
       icon: '🐾',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5),
-        TierDef(tier: BadgeTier.silver, threshold: 15),
-        TierDef(tier: BadgeTier.gold,   threshold: 30),
+        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/one-time-badges/pet-pal.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/one-time-badges/pet-pal.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/one-time-badges/pet-pal.png'),
       ],
     ),
     BadgeDefinition(
@@ -427,9 +459,9 @@ class BadgeCatalog {
       icon: '🔁',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5),
-        TierDef(tier: BadgeTier.silver, threshold: 15),
-        TierDef(tier: BadgeTier.gold,   threshold: 30),
+        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/one-time-badges/chore-machine.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/one-time-badges/chore-machine.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/one-time-badges/chore-machine.png'),
       ],
     ),
     BadgeDefinition(

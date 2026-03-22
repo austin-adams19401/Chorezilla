@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 
 import 'edit_family_page.dart';
 import 'add_kids_page.dart';
@@ -32,9 +33,10 @@ class ParentSetupPage extends StatelessWidget {
         backgroundColor: cs.secondary,
         foregroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Welcome banner ───────────────────────────────────────────────
@@ -154,11 +156,10 @@ class ParentSetupPage extends StatelessWidget {
                           child: ListTile(
                             leading: CircleAvatar(
                               backgroundColor: cs.tertiaryContainer,
-                              child: Text(
-                                (m.avatarKey == null || m.avatarKey!.trim().isEmpty)
-                                    ? _initial(m.displayName)
-                                    : m.avatarKey!,
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                              child: buildAvatarContent(
+                                m.avatarKey ?? '',
+                                16,
+                                _initial(m.displayName),
                               ),
                             ),
                             title: Text(m.displayName),
@@ -229,6 +230,7 @@ class ParentSetupPage extends StatelessWidget {
 
             const SizedBox(height: 16),
           ],
+        ),
         ),
       ),
     );

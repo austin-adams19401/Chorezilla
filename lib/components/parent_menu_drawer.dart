@@ -348,7 +348,7 @@ class _SubscriptionTile extends StatelessWidget {
       leading: const Text('👑', style: TextStyle(fontSize: 22)),
       title: Row(
         children: [
-          const Text('Manage subscription'),
+          const Flexible(child: Text('Manage subscription', overflow: TextOverflow.ellipsis)),
           const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),

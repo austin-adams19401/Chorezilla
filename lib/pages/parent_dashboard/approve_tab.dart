@@ -24,83 +24,82 @@ class _ApproveTabState extends State<ApproveTab> {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-        child: ValueListenableBuilder<List<Assignment>>(
-          valueListenable: app.reviewQueueVN,
-          builder: (_, queue, _) {
-            final items = queue;
+      primary: false,
+      body: ValueListenableBuilder<List<Assignment>>(
+        valueListenable: app.reviewQueueVN,
+        builder: (_, queue, _) {
+          final items = queue;
 
-            if (items.isEmpty) {
-              return const _EmptyReview();
-            }
+          if (items.isEmpty) {
+            return const CustomScrollView(
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: _EmptyReview(),
+                ),
+              ],
+            );
+          }
 
-            return Column(
-              children: [
-                // Header card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.fact_check_rounded,
-                        color: cs.onPrimaryContainer,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Chores to review',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: cs.onPrimaryContainer,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Check photos and notes, then approve or reject in one tap.',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: cs.onPrimaryContainer.withValues(
-                                  alpha: .85,
+          return CustomScrollView(
+            slivers: [
+              // ── Header info card — scrolls with content ─────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                    decoration: BoxDecoration(
+                      color: cs.primaryContainer,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.fact_check_rounded,
+                          color: cs.onPrimaryContainer,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Chores to review',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  color: cs.onPrimaryContainer,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 2),
+                              Text(
+                                'Check photos and notes, then approve or reject in one tap.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: cs.onPrimaryContainer.withValues(
+                                    alpha: .85,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
+              ),
 
-                const SizedBox(height: 12),
+              const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-                // Gradient panel with the review cards
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [cs.secondary, cs.secondary, cs.primary],
-                        stops: const [0.0, 0.55, 1.0],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
-                        itemCount: items.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 10),
-                        itemBuilder: (_, i) {
+              // ── Review cards ─────────────────────────────────────────────
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
+                sliver: SliverList.separated(
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (_, i) {
                           final a = items[i];
                           final chore = _findChore(app, a);
                           final kid = _findMember(app, a);
@@ -320,15 +319,12 @@ class _ApproveTabState extends State<ApproveTab> {
                               ),
                             ),
                           );
-                        },
-                      ),
-                    ),
-                  ),
+                  },
                 ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

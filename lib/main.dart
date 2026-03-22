@@ -26,6 +26,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 //App State
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/services/purchase_service.dart';
+import 'package:chorezilla/services/sprite_cache_service.dart';
 
 /// 🔔 FCM background handler
 /// Must be a top-level function.
@@ -44,6 +45,10 @@ Future<void> main() async {
 
   // Initialize RevenueCat (anonymous until user signs in)
   await PurchaseService.init();
+
+  // Set up local cache directory for sprite sheets, then download in background
+  await SpriteSheetCacheService.init();
+  SpriteSheetCacheService.startBackgroundDownload();
 
   final repo = ChorezillaRepo(firebaseDB: FirebaseFirestore.instance);
   final auth = FirebaseAuth.instance;

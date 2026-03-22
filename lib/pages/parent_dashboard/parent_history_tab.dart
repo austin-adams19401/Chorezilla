@@ -153,6 +153,7 @@ class _HistoryHero extends StatelessWidget {
 
     final media = MediaQuery.of(context);
     final double topInset = media.padding.top;
+    final bool isLandscape = media.orientation == Orientation.landscape;
 
     final fmt = DateFormat.MMMd();
     final weekLabel = isCurrentWeek
@@ -166,7 +167,12 @@ class _HistoryHero extends StatelessWidget {
 
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.fromLTRB(20, topInset + 4, 20, 16),
+      padding: EdgeInsets.fromLTRB(
+        20,
+        isLandscape ? topInset + 2 : topInset + 4,
+        20,
+        isLandscape ? 6 : 8,
+      ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [cs.secondary, cs.secondary, cs.primary],
@@ -181,23 +187,19 @@ class _HistoryHero extends StatelessWidget {
           // Text + stats
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(top: 16),
+              padding: EdgeInsets.only(top: isLandscape ? 4 : 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Weekly check-in',
-                    style: ts.headlineSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: (isLandscape ? ts.titleMedium : ts.headlineSmall)
+                        ?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'See how the week went and what each kid earned.',
-                    style: ts.bodyMedium?.copyWith(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: isLandscape ? 4 : 6),
 
                   // Week selector row
                   Row(
@@ -205,6 +207,10 @@ class _HistoryHero extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.chevron_left),
                         color: Colors.white,
+                        padding: isLandscape ? EdgeInsets.zero : null,
+                        constraints: isLandscape
+                            ? const BoxConstraints(minWidth: 32, minHeight: 32)
+                            : null,
                         onPressed: onPrevWeek,
                       ),
                       Expanded(
@@ -236,11 +242,15 @@ class _HistoryHero extends StatelessWidget {
                       IconButton(
                         icon: const Icon(Icons.chevron_right),
                         color: Colors.white,
+                        padding: isLandscape ? EdgeInsets.zero : null,
+                        constraints: isLandscape
+                            ? const BoxConstraints(minWidth: 32, minHeight: 32)
+                            : null,
                         onPressed: isCurrentWeek ? null : onNextWeek,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: isLandscape ? 4 : 4),
 
                   // Kids + weekly completion bar
                   Row(
@@ -289,19 +299,6 @@ class _HistoryHero extends StatelessWidget {
                           ),
                         ),
                     ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                    ),
-                    onPressed: () => _showHistoryHelpDialog(context),
-                    icon: const Icon(Icons.help_outline_rounded, size: 18),
-                    label: const Text('How this works'),
                   ),
                 ],
               ),
@@ -913,56 +910,3 @@ class _AllowanceSummary extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Help dialog for history / allowance (unchanged logic)
-// ─────────────────────────────────────────────────────────────────────────────
-
-Future<void> _showHistoryHelpDialog(BuildContext context) {
-  final theme = Theme.of(context);
-  final ts = theme.textTheme;
-  final cs = theme.colorScheme;
-
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Weekly history & allowance'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Each card shows one kid’s week at a glance.',
-            style: ts.bodyMedium,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '• Tap a day to mark it as completed, missed, or excused.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          Text(
-            '• Icons: check = good day, X = missed, calendar with dash = excused, hollow circle = no chores.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          Text(
-            '• The green bar at the bottom shows how much allowance they earned for this week.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          Text(
-            '• Turn allowance on/off and edit the rules with the toggle on the right.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          Text(
-            '• For past weeks where allowance is enabled, the app can create a “weekly allowance” reward in the Rewards tab.',
-            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Got it'),
-        ),
-      ],
-    ),
-  );
-}

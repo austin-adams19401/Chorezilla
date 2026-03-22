@@ -19,6 +19,8 @@ const _badgeCoinBonuses = <String, int>{
   'perfect_day': 20,
   'mix_master': 15,
   'overachiever': 20,
+  'trash_trooper_daily': 15,
+  'task_crusher': 25,
 };
 
 const _tieredBadgeCoinBonuses = <BadgeTier, int>{
@@ -203,6 +205,15 @@ extension BadgeStateAuth on AppState {
 
     maybeUnlock('mix_master', categoriesCompletedToday.length >= 3);
     maybeUnlock('overachiever', completedBonusToday.length >= 2);
+
+    final trashDoneToday = todaysAssignments
+        .where((a) =>
+            a.choreCategory == ChoreCategory.trash && isEffectivelyDone(a))
+        .length;
+    maybeUnlock('trash_trooper_daily', trashDoneToday >= 3);
+
+    final totalDoneToday = todaysAssignments.where(isEffectivelyDone).length;
+    maybeUnlock('task_crusher', totalDoneToday >= 10);
 
     // ── Tiered badge upgrades ─────────────────────────────────────────────────
     void maybeUpgradeTier(String baseId, int value,
