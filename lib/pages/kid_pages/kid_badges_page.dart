@@ -69,7 +69,7 @@ class KidBadgesPage extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
 
             // ── Featured slots ────────────────────────────────────────────
             _SectionLabel(text: 'FEATURED', cs: cs, ts: ts),
@@ -101,9 +101,9 @@ class KidBadgesPage extends StatelessWidget {
 
             // ── Earned ───────────────────────────────────────────────────
             if (earnedBadges.isNotEmpty) ...[
-              const SizedBox(height: 28),
+              const SizedBox(height: 16),
               _SectionLabel(text: 'EARNED', cs: cs, ts: ts),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               _CompactBadgeGrid(
                 badges: earnedBadges,
                 member: member,
@@ -114,9 +114,9 @@ class KidBadgesPage extends StatelessWidget {
 
             // ── Locked ───────────────────────────────────────────────────
             if (lockedBadges.isNotEmpty) ...[
-              const SizedBox(height: 28),
+              const SizedBox(height: 16),
               _SectionLabel(text: 'LOCKED', cs: cs, ts: ts),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               _CompactBadgeGrid(
                 badges: lockedBadges,
                 member: member,
@@ -372,7 +372,7 @@ class _CompactBadgeGrid extends StatelessWidget {
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: cols,
             crossAxisSpacing: 8,
-            mainAxisSpacing: 12,
+            mainAxisSpacing: 8,
             childAspectRatio: 0.82,
           ),
           itemBuilder: (context, i) => _CompactBadgeItem(
@@ -427,8 +427,8 @@ class _CompactBadgeItem extends StatelessWidget {
           children: [
             Center(
               child: SizedBox(
-                width: 60,
-                height: 60,
+                width: 70,
+                height: 70,
                 child: Stack(
                   children: [
                     Positioned.fill(
@@ -442,16 +442,16 @@ class _CompactBadgeItem extends StatelessWidget {
                     ),
                     Center(
                       child: SizedBox(
-                        width: 40,
-                        height: 40,
+                        width: 48,
+                        height: 48,
                         child: assetPath != null
                             ? Image.asset(
                                 assetPath,
                                 fit: BoxFit.contain,
                                 errorBuilder: (_, _, _) =>
-                                    _EmojiIcon(badge.icon, size: 22),
+                                    _EmojiIcon(badge.icon, size: 28),
                               )
-                            : _EmojiIcon(badge.icon, size: 22),
+                            : _EmojiIcon(badge.icon, size: 28),
                       ),
                     ),
                     if (isFeatured && !dimmed)

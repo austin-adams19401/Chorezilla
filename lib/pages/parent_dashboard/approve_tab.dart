@@ -347,10 +347,15 @@ class _ApproveTabState extends State<ApproveTab> {
 
   Future<void> _approveAssignment(Assignment a) async {
     if (_busyIds.contains(a.id)) return;
-    setState(() => _busyIds.add(a.id));
 
     final app = context.read<AppState>();
 
+    // Optimistic update — remove card immediately
+    final previousQueue = List<Assignment>.from(app.reviewQueueVN.value);
+    app.reviewQueueVN.value =
+        previousQueue.where((x) => x.id != a.id).toList();
+
+    setState(() => _busyIds.add(a.id));
     try {
       await app.approveAssignment(a.id, parentMemberId: app.currentMember?.id);
       if (!mounted) return;
@@ -364,11 +369,13 @@ class _ApproveTabState extends State<ApproveTab> {
       );
     } catch (e) {
       if (!mounted) return;
+      // Revert optimistic update on failure
+      app.reviewQueueVN.value = previousQueue;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error approving chore: $e')));
     } finally {
-      setState(() => _busyIds.remove(a.id));
+      if (mounted) setState(() => _busyIds.remove(a.id));
     }
   }
 
@@ -404,9 +411,14 @@ class _ApproveTabState extends State<ApproveTab> {
     if (reason == null) return; // user cancelled
     if (!mounted) return;
 
-    setState(() => _busyIds.add(a.id));
     final app = context.read<AppState>();
 
+    // Optimistic update — remove card immediately after dialog confirms
+    final previousQueue = List<Assignment>.from(app.reviewQueueVN.value);
+    app.reviewQueueVN.value =
+        previousQueue.where((x) => x.id != a.id).toList();
+
+    setState(() => _busyIds.add(a.id));
     try {
       await app.rejectAssignment(a.id, reason: reason);
       if (!mounted) return;
@@ -420,11 +432,13 @@ class _ApproveTabState extends State<ApproveTab> {
       );
     } catch (e) {
       if (!mounted) return;
+      // Revert optimistic update on failure
+      app.reviewQueueVN.value = previousQueue;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error rejecting chore: $e')));
     } finally {
-      setState(() => _busyIds.remove(a.id));
+      if (mounted) setState(() => _busyIds.remove(a.id));
     }
   }
 
