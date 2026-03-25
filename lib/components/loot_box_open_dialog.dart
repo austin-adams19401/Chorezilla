@@ -618,9 +618,12 @@ class _RevealAnimation extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const SpriteSheetAnimation(
-                        assetPath:
-                            'assets/mascot/sprite-sheets/celebrate.png',
+                        bodyAssetPath:
+                            'assets/mascot/sprite-sheets/celebrate_body.png',
+                        detailsAssetPath:
+                            'assets/mascot/sprite-sheets/celebrate_details.png',
                         size: 72,
+                        tintColor: Color(0xFF2ECC71),
                         columns: 6,
                         rows: 6,
                         totalDuration: Duration(milliseconds: 1800),

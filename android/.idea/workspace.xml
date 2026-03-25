@@ -5,47 +5,42 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="b84a41e4-fb7a-43c9-b1ed-6ac5f59ec7f9" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/compiler.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/compiler.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/gradle.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/gradle.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/one-time-badges/chore-machine.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/one-time-badges/dish-destroyer.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/one-time-badges/early-bird.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/badges/one-time-badges/early-bird.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/one-time-badges/fast-finisher.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/one-time-badges/first-win.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/badges/one-time-badges/first-win.png" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/one-time-badges/getting-started.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/one-time-badges/pet-pal.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/one-time-badges/trash-trooper.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/tiered-badges/bronze-dish.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/tiered-badges/bronze-laundry.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/tiered-badges/bronze-trash.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/tiered-badges/gold-laundry.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/tiered-badges/silver-dish.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../assets/badges/tiered-badges/silver-laundry.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/../functions/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/../functions/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/components/badge_unlock_dialog.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/components/badge_unlock_dialog.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/components/profile_header.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/components/profile_header.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/constants/default_rewards.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/constants/default_rewards.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/data/repo_rewards.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/data/repo_rewards.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/main.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/main.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/models/badge.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/models/badge.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/models/common.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/models/common.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/models/reward.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/models/reward.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_activity_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_activity_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_badges_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_badges_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_dashboard.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_dashboard.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_edit_profile_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_edit_profile_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_rewards_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/kid_pages/kid_rewards_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_rewards_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_rewards_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_today_tab.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/parent_today_tab.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/pages/parent_dashboard/settings/coin_economy_page.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/pages/parent_dashboard/settings/coin_economy_page.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/state/badges_state.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/state/badges_state.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../lib/state/chore_rewards_state.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../lib/state/chore_rewards_state.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../macos/Flutter/GeneratedPluginRegistrant.swift" beforeDir="false" afterPath="$PROJECT_DIR$/../macos/Flutter/GeneratedPluginRegistrant.swift" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../pubspec.lock" beforeDir="false" afterPath="$PROJECT_DIR$/../pubspec.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../pubspec.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/../pubspec.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.kotlin/sessions/kotlin-compiler-7569129566388271392.salive" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/angry_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/angry_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/angry_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/angry_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/celebrate_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/celebrate_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/celebrate_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/celebrate_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/dance_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/dance_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/dance_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/dance_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/dusting_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/dusting_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/dusting_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/dusting_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/eating_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/eating_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/eating_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/eating_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/going-to-sleep2.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/going-to-sleep_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/going-to-sleep_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/going-to-sleep_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/going-to-sleep_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/grumpy_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/grumpy_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/grumpy_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/grumpy_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/idle2_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/idle2_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/idle2_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/idle2_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/idle_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/idle_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/idle_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/idle_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/pick-up-trash_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/pick-up-trash_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/pick-up-trash_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/pick-up-trash_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/sleeping_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/sleeping_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/sleeping_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/sleeping_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/surprised_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/surprised_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/surprised_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/surprised_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/sweeping_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/sweeping_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/sweeping_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/sweeping_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/vacuuming_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/vacuuming_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/vacuuming_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/vacuuming_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wake-up2.png" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wake-up_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wake-up_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wake-up_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wake-up_details.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wave_body.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wave_body.png" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wave_details.png" beforeDir="false" afterPath="$PROJECT_DIR$/../assets/mascot/sprite-sheets/wave_details.png" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,7 +50,7 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=G122024090001459)]" />
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=LocalEmulator, isTemplate=false, identifier=path=C:\Users\austina\.android\avd\Medium_Phone.avd)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />

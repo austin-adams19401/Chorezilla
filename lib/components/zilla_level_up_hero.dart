@@ -79,9 +79,12 @@ class ZillaLevelUpHero extends StatelessWidget {
                 ...sparkles,
                 // Zilla celebrate sprite
                 SpriteSheetAnimation(
-                  assetPath:
-                      'assets/mascot/sprite-sheets/celebrate.png',
+                  bodyAssetPath:
+                      'assets/mascot/sprite-sheets/celebrate_body.png',
+                  detailsAssetPath:
+                      'assets/mascot/sprite-sheets/celebrate_details.png',
                   size: size,
+                  tintColor: const Color(0xFF2ECC71),
                   columns: 6,
                   rows: 6,
                   totalDuration: const Duration(milliseconds: 1800),

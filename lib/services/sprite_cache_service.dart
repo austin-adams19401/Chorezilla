@@ -8,8 +8,38 @@ import 'package:path_provider/path_provider.dart';
 /// Call [init] once at startup, then [downloadAll] on first launch before
 /// showing any mascot animations.
 class SpriteSheetCacheService {
-  /// All sprite sheet filenames used by the app.
+  /// All sprite sheet filenames used by the app (body + details per animation).
   static const List<String> allFilenames = [
+    // Walking
+    'walking_body.png', 'walking_details.png',
+    // Idle
+    'idle_body.png', 'idle_details.png',
+    // Looking (idle2)
+    'idle2_body.png', 'idle2_details.png',
+    // Going to sleep
+    'going-to-sleep_body.png', 'going-to-sleep_details.png',
+    // Sleeping
+    'sleeping_body.png', 'sleeping_details.png',
+    // Wake up
+    'wake-up_body.png', 'wake-up_details.png',
+    // Wave
+    'wave_body.png', 'wave_details.png',
+    // Sweeping
+    'sweeping_body.png', 'sweeping_details.png',
+    // Wiping
+    'wiping_body.png', 'wiping_details.png',
+    // Dance
+    'dance_body.png', 'dance_details.png',
+    // Grumpy
+    'grumpy_body.png', 'grumpy_details.png',
+    // Grrr
+    'grrr_body.png', 'grrr_details.png',
+    // Celebrate
+    'celebrate_body.png', 'celebrate_details.png',
+  ];
+
+  /// Legacy single-layer filenames to clean up from existing caches.
+  static const _legacyFilenames = [
     'walking.png',
     'idle.png',
     'idle2.png',
@@ -32,6 +62,12 @@ class SpriteSheetCacheService {
     final appDir = await getApplicationDocumentsDirectory();
     _cacheDir = Directory('${appDir.path}/sprite_sheets');
     await _cacheDir.create(recursive: true);
+
+    // Remove legacy single-layer sprite sheets from existing caches.
+    for (final name in _legacyFilenames) {
+      final f = File('${_cacheDir.path}/$name');
+      if (f.existsSync()) f.deleteSync();
+    }
   }
 
   static bool isDownloaded(String filename) =>

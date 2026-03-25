@@ -593,8 +593,9 @@ class _CyclingMascot extends StatefulWidget {
 
 class _CyclingMascotState extends State<_CyclingMascot>
     with TickerProviderStateMixin {
-  // Loaded images keyed by phase
-  final _images = <_MascotPhase, ui.Image>{};
+  // Loaded image pairs (body + details) keyed by phase
+  final _bodyImages = <_MascotPhase, ui.Image>{};
+  final _detailsImages = <_MascotPhase, ui.Image>{};
 
   _MascotPhase _phase = _MascotPhase.idle;
   bool _facingRight = true;
@@ -667,18 +668,18 @@ class _CyclingMascotState extends State<_CyclingMascot>
   Timer? _inactivityTimer;
   _SleepState _sleepState = _SleepState.awake;
 
-  static const _assetPaths = <_MascotPhase, String>{
-    _MascotPhase.idle:          'assets/mascot/sprite-sheets/idle.png',
-    _MascotPhase.walking:       'assets/mascot/sprite-sheets/walking.png',
-    _MascotPhase.sweeping:      'assets/mascot/sprite-sheets/sweeping.png',
-    _MascotPhase.looking:       'assets/mascot/sprite-sheets/idle2.png',
-    _MascotPhase.wiping:        'assets/mascot/sprite-sheets/wiping.png',
-    _MascotPhase.wave:          'assets/mascot/sprite-sheets/wave.png',
-    _MascotPhase.grumpy:        'assets/mascot/sprite-sheets/grumpy.png',
-    _MascotPhase.grrr:          'assets/mascot/sprite-sheets/grrr.png',
-    _MascotPhase.goingToSleep:  'assets/mascot/sprite-sheets/going-to-sleep.png',
-    _MascotPhase.sleepingLoop:  'assets/mascot/sprite-sheets/sleeping.png',
-    _MascotPhase.wakingUp:      'assets/mascot/sprite-sheets/wake-up.png',
+  static const _assetPaths = <_MascotPhase, ({String body, String details})>{
+    _MascotPhase.idle:          (body: 'assets/mascot/sprite-sheets/idle_body.png',          details: 'assets/mascot/sprite-sheets/idle_details.png'),
+    _MascotPhase.walking:       (body: 'assets/mascot/sprite-sheets/walking_body.png',       details: 'assets/mascot/sprite-sheets/walking_details.png'),
+    _MascotPhase.sweeping:      (body: 'assets/mascot/sprite-sheets/sweeping_body.png',      details: 'assets/mascot/sprite-sheets/sweeping_details.png'),
+    _MascotPhase.looking:       (body: 'assets/mascot/sprite-sheets/idle2_body.png',         details: 'assets/mascot/sprite-sheets/idle2_details.png'),
+    _MascotPhase.wiping:        (body: 'assets/mascot/sprite-sheets/wiping_body.png',        details: 'assets/mascot/sprite-sheets/wiping_details.png'),
+    _MascotPhase.wave:          (body: 'assets/mascot/sprite-sheets/wave_body.png',          details: 'assets/mascot/sprite-sheets/wave_details.png'),
+    _MascotPhase.grumpy:        (body: 'assets/mascot/sprite-sheets/grumpy_body.png',        details: 'assets/mascot/sprite-sheets/grumpy_details.png'),
+    _MascotPhase.grrr:          (body: 'assets/mascot/sprite-sheets/grrr_body.png',          details: 'assets/mascot/sprite-sheets/grrr_details.png'),
+    _MascotPhase.goingToSleep:  (body: 'assets/mascot/sprite-sheets/going-to-sleep_body.png', details: 'assets/mascot/sprite-sheets/going-to-sleep_details.png'),
+    _MascotPhase.sleepingLoop:  (body: 'assets/mascot/sprite-sheets/sleeping_body.png',      details: 'assets/mascot/sprite-sheets/sleeping_details.png'),
+    _MascotPhase.wakingUp:      (body: 'assets/mascot/sprite-sheets/wake-up_body.png',       details: 'assets/mascot/sprite-sheets/wake-up_details.png'),
   };
 
   @override
@@ -693,11 +694,18 @@ class _CyclingMascotState extends State<_CyclingMascot>
 
   Future<void> _loadImages() async {
     final entries = _assetPaths.entries.toList();
-    final loaded = await Future.wait(entries.map((e) => _load(e.value)));
+    final loaded = await Future.wait(
+      entries.map((e) async {
+        final body = await _load(e.value.body);
+        final details = await _load(e.value.details);
+        return (body: body, details: details);
+      }),
+    );
     if (!mounted) return;
     setState(() {
       for (var i = 0; i < entries.length; i++) {
-        _images[entries[i].key] = loaded[i];
+        _bodyImages[entries[i].key] = loaded[i].body;
+        _detailsImages[entries[i].key] = loaded[i].details;
       }
     });
     // Defer to next frame so the rebuild from setState above completes first.
@@ -845,9 +853,10 @@ class _CyclingMascotState extends State<_CyclingMascot>
 
   @override
   Widget build(BuildContext context) {
-    final image = _images[_phase];
+    final bodyImage = _bodyImages[_phase];
+    final detailsImage = _detailsImages[_phase];
 
-    if (image == null) {
+    if (bodyImage == null || detailsImage == null) {
       return const SizedBox.expand();
     }
 
@@ -872,24 +881,16 @@ class _CyclingMascotState extends State<_CyclingMascot>
             final maxTravel = (panelWidth - spriteSize).clamp(0.0, double.infinity);
             final xOffset = _posCtrl.value * maxTravel;
 
-            Widget painter = CustomPaint(
+            final painter = CustomPaint(
               size: Size(spriteSize, spriteSize),
               painter: _MascotFramePainter(
-                image: image,
+                bodyImage: bodyImage,
+                detailsImage: detailsImage,
+                tintColor: tintColor,
                 frameIndex: frameIndex,
                 flipHorizontal: !_facingRight,
               ),
             );
-
-            if (tintColor != null) {
-              painter = ColorFiltered(
-                colorFilter: ColorFilter.mode(
-                  tintColor.withValues(alpha: 0.30),
-                  BlendMode.srcATop,
-                ),
-                child: painter,
-              );
-            }
 
             return SizedBox(
               width: panelWidth,
@@ -911,12 +912,16 @@ class _CyclingMascotState extends State<_CyclingMascot>
 
 class _MascotFramePainter extends CustomPainter {
   const _MascotFramePainter({
-    required this.image,
+    required this.bodyImage,
+    required this.detailsImage,
+    required this.tintColor,
     required this.frameIndex,
     this.flipHorizontal = false,
   });
 
-  final ui.Image image;
+  final ui.Image bodyImage;
+  final ui.Image detailsImage;
+  final Color? tintColor;
   final int frameIndex;
   final bool flipHorizontal;
 
@@ -925,12 +930,17 @@ class _MascotFramePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final frameW = image.width / _columns;
-    final frameH = image.height / _rows;
     final col = frameIndex % _columns;
     final row = frameIndex ~/ _columns;
 
-    final src = Rect.fromLTWH(col * frameW, row * frameH, frameW, frameH);
+    final bodyFrameW = bodyImage.width / _columns;
+    final bodyFrameH = bodyImage.height / _rows;
+    final bodySrc = Rect.fromLTWH(col * bodyFrameW, row * bodyFrameH, bodyFrameW, bodyFrameH);
+
+    final detFrameW = detailsImage.width / _columns;
+    final detFrameH = detailsImage.height / _rows;
+    final detSrc = Rect.fromLTWH(col * detFrameW, row * detFrameH, detFrameW, detFrameH);
+
     final dst = Rect.fromLTWH(0, 0, size.width, size.height);
 
     if (flipHorizontal) {
@@ -938,13 +948,25 @@ class _MascotFramePainter extends CustomPainter {
       canvas.translate(size.width, 0);
       canvas.scale(-1, 1);
     }
-    canvas.drawImageRect(image, src, dst, Paint());
+
+    // Body layer with optional tint
+    final bodyPaint = Paint();
+    if (tintColor != null) {
+      bodyPaint.colorFilter = ColorFilter.mode(tintColor!, BlendMode.srcIn);
+    }
+    canvas.drawImageRect(bodyImage, bodySrc, dst, bodyPaint);
+
+    // Details layer on top (no tint)
+    canvas.drawImageRect(detailsImage, detSrc, dst, Paint());
+
     if (flipHorizontal) canvas.restore();
   }
 
   @override
   bool shouldRepaint(_MascotFramePainter old) =>
       old.frameIndex != frameIndex ||
-      old.image != image ||
+      old.bodyImage != bodyImage ||
+      old.detailsImage != detailsImage ||
+      old.tintColor != tintColor ||
       old.flipHorizontal != flipHorizontal;
 }

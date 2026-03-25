@@ -12,7 +12,7 @@ import 'package:chorezilla/models/zilla_animations.dart';
 ///
 /// Cycles through [availableAnimations] (defaults to the free set if omitted).
 /// Tapping triggers a quick pop/scale animation.
-/// Pass [skinId] to tint the mascot based on the equipped Zilla skin.
+/// Pass [skinId] to tint the mascot's body based on the equipped Zilla skin.
 class ZillaMascot extends StatefulWidget {
   const ZillaMascot({
     super.key,
@@ -89,28 +89,21 @@ class _ZillaMascotState extends State<ZillaMascot>
   Widget build(BuildContext context) {
     final anim = _current;
     final colorValue = CosmeticCatalog.tintColorValueForSkin(widget.skinId);
-    final tintColor = colorValue != null ? Color(colorValue) : null;
+    final tintColor =
+        colorValue != null ? Color(colorValue) : const Color(0xFF2ECC71);
 
-    Widget sprite = SpriteSheetAnimation(
+    final sprite = SpriteSheetAnimation(
       key: ValueKey(anim.id),
-      assetPath: anim.assetPath,
+      bodyAssetPath: anim.bodyAssetPath,
+      detailsAssetPath: anim.detailsAssetPath,
       size: widget.size,
+      tintColor: tintColor,
       columns: anim.columns,
       rows: anim.rows,
       totalDuration: anim.duration,
       loop: false,
       onComplete: widget.animate ? _onAnimationComplete : null,
     );
-
-    if (tintColor != null) {
-      sprite = ColorFiltered(
-        colorFilter: ColorFilter.mode(
-          tintColor.withValues(alpha: 0.30),
-          BlendMode.srcATop,
-        ),
-        child: sprite,
-      );
-    }
 
     return GestureDetector(
       onTap: widget.onTap != null ? _handleTap : null,

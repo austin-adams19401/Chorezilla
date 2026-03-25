@@ -3,14 +3,16 @@
 /// unlocked one per level-up for premium subscribers.
 class ZillaAnimationDef {
   final String id;
-  final String assetPath;
+  final String bodyAssetPath;
+  final String detailsAssetPath;
   final int columns;
   final int rows;
   final Duration duration;
 
   const ZillaAnimationDef({
     required this.id,
-    required this.assetPath,
+    required this.bodyAssetPath,
+    required this.detailsAssetPath,
     required this.columns,
     required this.rows,
     required this.duration,
@@ -23,7 +25,8 @@ class ZillaAnimations {
   // ── Free tier ────────────────────────────────────────────────────────────────
   static const walking = ZillaAnimationDef(
     id: 'walking',
-    assetPath: 'assets/mascot/sprite-sheets/walking.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/walking_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/walking_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1200),
@@ -31,7 +34,8 @@ class ZillaAnimations {
 
   static const idle = ZillaAnimationDef(
     id: 'idle',
-    assetPath: 'assets/mascot/sprite-sheets/idle.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/idle_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/idle_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1500),
@@ -39,16 +43,18 @@ class ZillaAnimations {
 
   static const looking = ZillaAnimationDef(
     id: 'looking',
-    assetPath: 'assets/mascot/sprite-sheets/idle2.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/idle2_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/idle2_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1400),
   );
 
-  // Sleep sequence — always free, triggered by inactivity (not random cycling)
+  // Sleep sequence - always free, triggered by inactivity (not random cycling)
   static const goingToSleep = ZillaAnimationDef(
     id: 'going_to_sleep',
-    assetPath: 'assets/mascot/sprite-sheets/going-to-sleep.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/going-to-sleep_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/going-to-sleep_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 2000),
@@ -56,7 +62,8 @@ class ZillaAnimations {
 
   static const sleepingLoop = ZillaAnimationDef(
     id: 'sleeping_loop',
-    assetPath: 'assets/mascot/sprite-sheets/sleeping.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/sleeping_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/sleeping_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 2500),
@@ -64,7 +71,8 @@ class ZillaAnimations {
 
   static const wakingUp = ZillaAnimationDef(
     id: 'waking_up',
-    assetPath: 'assets/mascot/sprite-sheets/wake-up.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/wake-up_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/wake-up_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1800),
@@ -73,7 +81,8 @@ class ZillaAnimations {
   // ── Premium level-up unlocks ─────────────────────────────────────────────────
   static const wave = ZillaAnimationDef(
     id: 'wave',
-    assetPath: 'assets/mascot/sprite-sheets/wave.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/wave_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/wave_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1200),
@@ -81,7 +90,8 @@ class ZillaAnimations {
 
   static const sweeping = ZillaAnimationDef(
     id: 'sweeping',
-    assetPath: 'assets/mascot/sprite-sheets/sweeping.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/sweeping_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/sweeping_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1400),
@@ -89,7 +99,8 @@ class ZillaAnimations {
 
   static const wiping = ZillaAnimationDef(
     id: 'wiping',
-    assetPath: 'assets/mascot/sprite-sheets/wiping.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/wiping_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/wiping_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1200),
@@ -97,10 +108,39 @@ class ZillaAnimations {
 
   static const dance = ZillaAnimationDef(
     id: 'dance',
-    assetPath: 'assets/mascot/sprite-sheets/dance.png',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/dance_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/dance_details.png',
     columns: 6,
     rows: 6,
     duration: Duration(milliseconds: 1600),
+  );
+
+  // ── State sprites (used by profile header, loot boxes, etc.) ───────────────
+  static const grumpy = ZillaAnimationDef(
+    id: 'grumpy',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/grumpy_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/grumpy_details.png',
+    columns: 6,
+    rows: 6,
+    duration: Duration(milliseconds: 1200),
+  );
+
+  static const grrr = ZillaAnimationDef(
+    id: 'grrr',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/grrr_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/grrr_details.png',
+    columns: 6,
+    rows: 6,
+    duration: Duration(milliseconds: 1200),
+  );
+
+  static const celebrate = ZillaAnimationDef(
+    id: 'celebrate',
+    bodyAssetPath: 'assets/mascot/sprite-sheets/celebrate_body.png',
+    detailsAssetPath: 'assets/mascot/sprite-sheets/celebrate_details.png',
+    columns: 6,
+    rows: 6,
+    duration: Duration(milliseconds: 1800),
   );
 
   // ── All definitions by ID ────────────────────────────────────────────────────
@@ -115,6 +155,9 @@ class ZillaAnimations {
     'sweeping': sweeping,
     'wiping': wiping,
     'dance': dance,
+    'grumpy': grumpy,
+    'grrr': grrr,
+    'celebrate': celebrate,
   };
 
   static ZillaAnimationDef? byId(String id) => _all[id];
@@ -129,7 +172,7 @@ class ZillaAnimations {
     'waking_up',
   ];
 
-  // ── Premium unlocks by level (level → animationId) ───────────────────────────
+  // ── Premium unlocks by level (level -> animationId) ───────────────────────────
   static const Map<int, String> premiumUnlockByLevel = {
     2: 'wave',
     4: 'sweeping',
