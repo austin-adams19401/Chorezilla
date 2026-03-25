@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 import 'package:chorezilla/components/inputs.dart';
 import 'package:flutter/material.dart';
@@ -26,6 +28,9 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
   String? _titleId;
 
   bool _saving = false;
+  _SaveStatus _saveStatus = _SaveStatus.idle;
+  Timer? _nameDebounce;
+  Timer? _savedFadeTimer;
 
   static const _defaultAvatar = 'avatar_default_1';
 
@@ -33,6 +38,12 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
   void initState() {
     super.initState();
     _nameController = TextEditingController();
+    _nameController.addListener(_onNameChanged);
+  }
+
+  void _onNameChanged() {
+    _nameDebounce?.cancel();
+    _nameDebounce = Timer(const Duration(milliseconds: 800), _autoSave);
   }
 
   @override
@@ -68,25 +79,21 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
   @override
   void dispose() {
+    _nameController.removeListener(_onNameChanged);
     _nameController.dispose();
+    _nameDebounce?.cancel();
+    _savedFadeTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _save() async {
-    final app = context.read<AppState>();
+  Future<void> _autoSave() async {
     final name = _nameController.text.trim();
+    if (name.isEmpty || _saving) return;
 
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please choose a name.')));
-      return;
-    }
-
-    setState(() => _saving = true);
+    if (mounted) setState(() { _saving = true; _saveStatus = _SaveStatus.saving; });
 
     try {
-      await app.updateMember(widget.memberId, {
+      await context.read<AppState>().updateMember(widget.memberId, {
         'displayName': name,
         'avatarKey': _avatarEmoji,
         'equippedBackgroundId': _backgroundId,
@@ -96,14 +103,17 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
       });
 
       if (!mounted) return;
-      Navigator.of(context).pop();
+      setState(() { _saving = false; _saveStatus = _SaveStatus.saved; });
+      _savedFadeTimer?.cancel();
+      _savedFadeTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) setState(() => _saveStatus = _SaveStatus.idle);
+      });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Could not save changes: $e')));
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      setState(() { _saving = false; _saveStatus = _SaveStatus.idle; });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: $e')),
+      );
     }
   }
 
@@ -125,7 +135,6 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final ts = theme.textTheme;
-
     final ownedBackgrounds = CosmeticCatalog.backgrounds()
         .where((b) => b.isDefault || member.ownsCosmetic(b.id))
         .toList();
@@ -136,207 +145,185 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
       orElse: () => ownedBackgrounds.first,
     );
 
+    const gradientTop = Color(0xFF0B2545);
+    const gradientBottom = Color(0xFF1B8A4C);
+
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.secondary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Text('Edit ${member.displayName}\'s profile'),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            style: TextButton.styleFrom(foregroundColor: Colors.white),
-            child: _saving
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Save'),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Live preview ────────────────────────────────────────────────
-            Center(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      width: 200,
-                      height: 130,
-                      decoration: BoxDecoration(
-                        color: cs.secondaryContainer,
-                        image: selectedBg.assetKey.isNotEmpty
-                            ? DecorationImage(
-                                image: AssetImage(selectedBg.assetKey),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                  AvatarWithFrame(
-                    member: _previewMember(member),
-                    radius: 38,
-                  ),
-                ],
+      backgroundColor: cs.surface,
+      body: CustomScrollView(
+        slivers: [
+          // ── Gradient hero app bar ──────────────────────────────────────────
+          SliverAppBar(
+            expandedHeight: 260,
+            pinned: true,
+            backgroundColor: gradientTop,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            title: Text(
+              'Edit Profile',
+              style: ts.titleLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w700,
               ),
             ),
-            const SizedBox(height: 20),
-
-            // ── Name field ──────────────────────────────────────────────────
-            TextField(
-              controller: _nameController,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.done,
-              decoration: themedInput(context, 'Name'),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Avatar ──────────────────────────────────────────────────────
-            Text(
-              'Avatar',
-              style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 12),
-            _buildAvatarPicker(context, member, cs),
-
-            const SizedBox(height: 24),
-
-            // ── Background ──────────────────────────────────────────────────
-            _EditSectionHeader(
-              title: 'Background',
-              onGetMore: () => _goToCosmetics(context, member.id),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 120,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: ownedBackgrounds.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 10),
-                itemBuilder: (context, index) {
-                  final item = ownedBackgrounds[index];
-                  final selected = item.id == selectedBgId;
-
-                  return GestureDetector(
-                    onTap: () => setState(() => _backgroundId = item.id),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: 180,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: selected ? cs.primary : Colors.transparent,
-                          width: 2,
+            actions: [
+              Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: switch (_saveStatus) {
+                    _SaveStatus.saving => const SizedBox(
+                        key: ValueKey('saving'),
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
                         ),
-                        color: cs.surfaceContainerHighest,
-                        image: item.assetKey.isNotEmpty
-                            ? DecorationImage(
-                                image: AssetImage(item.assetKey),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
                       ),
-                      child: Stack(
+                    _SaveStatus.saved => const Row(
+                        key: ValueKey('saved'),
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Positioned.fill(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(18),
-                                gradient: LinearGradient(
-                                  begin: Alignment.bottomCenter,
-                                  end: Alignment.topCenter,
-                                  colors: [
-                                    Colors.black.withValues(alpha: .35),
-                                    Colors.transparent,
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            left: 10,
-                            bottom: 10,
-                            right: 10,
-                            child: Text(
-                              item.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: ts.labelLarge?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          if (selected)
-                            Positioned(
-                              top: 8,
-                              right: 8,
-                              child: CircleAvatar(
-                                radius: 12,
-                                backgroundColor: cs.primary,
-                                child: const Icon(
-                                  Icons.check,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
+                          Icon(Icons.check_circle_rounded,
+                              color: Color(0xFF2ECC71), size: 18),
+                          SizedBox(width: 5),
+                          Text('Saved',
+                              style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600)),
                         ],
                       ),
-                    ),
-                  );
-                },
+                    _SaveStatus.idle => const SizedBox.shrink(key: ValueKey('idle')),
+                  },
+                ),
+              ),
+            ],
+            flexibleSpace: FlexibleSpaceBar(
+              collapseMode: CollapseMode.pin,
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [gradientTop, gradientBottom],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
+                        child: _PreviewCard(
+                          member: _previewMember(member),
+                          selectedBg: selectedBg,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
+          ),
 
-            const SizedBox(height: 24),
+          // ── Scrollable content ─────────────────────────────────────────────
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // Name
+                _SectionCard(
+                  color: const Color(0xFF3498DB),
+                  icon: Icons.badge_rounded,
+                  title: 'Name',
+                  child: TextField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.done,
+                    decoration: themedInput(context, 'Display name'),
+                  ),
+                ),
+                const SizedBox(height: 16),
 
-            // ── Avatar Frame ─────────────────────────────────────────────────
-            _EditSectionHeader(
-              title: 'Avatar Frame',
-              onGetMore: () => _goToCosmetics(context, member.id),
+                // Avatar
+                _SectionCard(
+                  color: const Color(0xFFE74C3C),
+                  icon: Icons.face_rounded,
+                  title: 'Avatar',
+                  child: _buildAvatarPicker(context, member, cs),
+                ),
+                const SizedBox(height: 16),
+
+                // Background
+                _SectionCard(
+                  color: const Color(0xFF9B59B6),
+                  icon: Icons.wallpaper_rounded,
+                  title: 'Background',
+                  trailing: _GetMoreButton(
+                    onTap: () => _goToCosmetics(context, member.id),
+                  ),
+                  child: SizedBox(
+                    height: 120,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: ownedBackgrounds.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 10),
+                      itemBuilder: (context, index) {
+                        final item = ownedBackgrounds[index];
+                        final selected = item.id == selectedBgId;
+                        return _BackgroundTile(
+                          item: item,
+                          selected: selected,
+                          cs: cs,
+                          ts: ts,
+                          onTap: () { setState(() => _backgroundId = item.id); _autoSave(); },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Avatar Frame
+                _SectionCard(
+                  color: const Color(0xFFF39C12),
+                  icon: Icons.crop_free_rounded,
+                  title: 'Avatar Frame',
+                  trailing: _GetMoreButton(
+                    onTap: () => _goToCosmetics(context, member.id),
+                  ),
+                  child: _buildFramePicker(context, member, cs),
+                ),
+                const SizedBox(height: 16),
+
+                // Zilla Skin
+                _SectionCard(
+                  color: const Color(0xFF2ECC71),
+                  icon: Icons.color_lens_rounded,
+                  title: 'Zilla Skin',
+                  trailing: _GetMoreButton(
+                    onTap: () => _goToCosmetics(context, member.id),
+                  ),
+                  child: _buildSkinPicker(context, member, cs, ts),
+                ),
+                const SizedBox(height: 16),
+
+                // Title
+                _SectionCard(
+                  color: const Color(0xFF1ABC9C),
+                  icon: Icons.military_tech_rounded,
+                  title: 'Title',
+                  trailing: _GetMoreButton(
+                    onTap: () => _goToCosmetics(context, member.id),
+                  ),
+                  child: _buildTitlePicker(context, member, cs, ts),
+                ),
+              ]),
             ),
-            const SizedBox(height: 12),
-            _buildFramePicker(context, member, cs),
-
-            const SizedBox(height: 24),
-
-            // ── Zilla Skin ───────────────────────────────────────────────────
-            _EditSectionHeader(
-              title: 'Zilla Skin',
-              onGetMore: () => _goToCosmetics(context, member.id),
-            ),
-            const SizedBox(height: 12),
-            _buildSkinPicker(context, member, cs, ts),
-
-            const SizedBox(height: 24),
-
-            // ── Title ─────────────────────────────────────────────────────────
-            _EditSectionHeader(
-              title: 'Title',
-              onGetMore: () => _goToCosmetics(context, member.id),
-            ),
-            const SizedBox(height: 12),
-            _buildTitlePicker(context, member, cs, ts),
-
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
+          ),
+        ],
       ),
     );
   }
@@ -361,7 +348,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
     final selected = _avatarFrameId ?? 'frame_default';
     return SizedBox(
-      height: 80,
+      height: 88,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: owned.length,
@@ -370,21 +357,10 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
           final frame = owned[index];
           final isSelected = frame.id == selected;
           return GestureDetector(
-            onTap: () => setState(() => _avatarFrameId = frame.id),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? cs.primaryContainer
-                    : cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isSelected ? cs.primary : Colors.transparent,
-                  width: 2,
-                ),
-              ),
+            onTap: () { setState(() => _avatarFrameId = frame.id); _autoSave(); },
+            child: _CosmeticTile(
+              isSelected: isSelected,
+              cs: cs,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -392,18 +368,19 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
                     alignment: Alignment.center,
                     children: [
                       CircleAvatar(
-                        radius: 18,
+                        radius: 20,
                         backgroundColor: cs.surfaceContainerHigh,
                       ),
-                      FrameOverlay(frameId: frame.id, radius: 18),
+                      FrameOverlay(frameId: frame.id, radius: 20),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   Text(
                     frame.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? cs.primary : cs.onSurface,
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 1,
@@ -430,7 +407,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
     final selected = _zillaSkinId ?? 'zilla_green_basic';
     return SizedBox(
-      height: 80,
+      height: 88,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: owned.length,
@@ -439,39 +416,29 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
           final skin = owned[index];
           final isSelected = skin.id == selected;
           return GestureDetector(
-            onTap: () => setState(() => _zillaSkinId = skin.id),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? cs.primaryContainer
-                    : cs.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: isSelected ? cs.primary : Colors.transparent,
-                  width: 2,
-                ),
-              ),
+            onTap: () { setState(() => _zillaSkinId = skin.id); _autoSave(); },
+            child: _CosmeticTile(
+              isSelected: isSelected,
+              cs: cs,
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset(
                     'assets/mascot/mascot_plain.png',
-                    width: 32,
-                    height: 32,
+                    width: 36,
+                    height: 36,
                     color: skin.colorValue != null
                         ? Color(skin.colorValue!)
                         : null,
                     colorBlendMode: BlendMode.srcIn,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 5),
                   Text(
                     skin.name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected ? cs.primary : cs.onSurface,
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 1,
@@ -488,13 +455,11 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
   Widget _buildAvatarPicker(
       BuildContext context, Member member, ColorScheme cs) {
-    // Default image avatars (always available)
     final defaultImageIds = CosmeticCatalog.avatars()
         .where((a) => a.isDefault)
         .map((a) => a.id)
         .toList();
 
-    // Loot-box earned image avatars (owned by this member, non-default)
     final earnedImageIds = CosmeticCatalog.avatars()
         .where((a) => !a.isDefault && member.ownsCosmetic(a.id))
         .map((a) => a.id)
@@ -502,47 +467,58 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
     final allImageIds = [...defaultImageIds, ...earnedImageIds];
 
-    Widget tile({
-      required bool selected,
-      required VoidCallback onTap,
-      required Widget child,
-    }) {
-      return GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: selected ? cs.primary : Colors.transparent,
-              width: 2,
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Center(child: child),
-          ),
-        ),
-      );
-    }
-
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: 10,
+      runSpacing: 10,
       alignment: WrapAlignment.center,
       children: allImageIds.map((id) {
         final item = CosmeticCatalog.byId(id);
-        return tile(
-          selected: id == _avatarEmoji,
-          onTap: () => setState(() => _avatarEmoji = id),
-          child: Image.asset(
-            item.assetKey,
-            width: 52,
-            height: 52,
-            fit: BoxFit.cover,
+        final isSelected = id == _avatarEmoji;
+        return GestureDetector(
+          onTap: () { setState(() => _avatarEmoji = id); _autoSave(); },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: isSelected ? cs.primary : Colors.transparent,
+                width: 3,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: cs.primary.withValues(alpha: .35),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                      )
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(13),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.asset(item.assetKey, fit: BoxFit.cover),
+                  if (isSelected)
+                    Positioned(
+                      bottom: 2,
+                      right: 2,
+                      child: CircleAvatar(
+                        radius: 9,
+                        backgroundColor: cs.primary,
+                        child: const Icon(
+                          Icons.check,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         );
       }).toList(),
@@ -560,51 +536,399 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     }
 
     final selected = _titleId ?? 'title_none';
+
+    const chipColors = [
+      Color(0xFF3498DB),
+      Color(0xFFE74C3C),
+      Color(0xFF9B59B6),
+      Color(0xFFF39C12),
+      Color(0xFF2ECC71),
+      Color(0xFF1ABC9C),
+      Color(0xFFE67E22),
+    ];
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: owned.map((title) {
+      children: owned.asMap().entries.map((entry) {
+        final i = entry.key;
+        final title = entry.value;
         final isSelected = title.id == selected;
-        return ChoiceChip(
-          label: Text(title.name),
-          selected: isSelected,
-          onSelected: (_) => setState(() => _titleId = title.id),
-          selectedColor: cs.primaryContainer,
+        final chipColor = chipColors[i % chipColors.length];
+
+        return GestureDetector(
+          onTap: () { setState(() => _titleId = title.id); _autoSave(); },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? chipColor
+                  : chipColor.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: isSelected
+                    ? chipColor
+                    : chipColor.withValues(alpha: .3),
+                width: 1.5,
+              ),
+            ),
+            child: Text(
+              title.name,
+              style: ts.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: isSelected ? Colors.white : chipColor,
+              ),
+            ),
+          ),
         );
       }).toList(),
     );
   }
 }
 
-class _EditSectionHeader extends StatelessWidget {
-  const _EditSectionHeader({required this.title, required this.onGetMore});
-  final String title;
-  final VoidCallback onGetMore;
+// ── Preview Card ──────────────────────────────────────────────────────────────
+
+class _PreviewCard extends StatelessWidget {
+  const _PreviewCard({required this.member, required this.selectedBg});
+  final Member member;
+  final CosmeticItem selectedBg;
 
   @override
   Widget build(BuildContext context) {
     final ts = Theme.of(context).textTheme;
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Text(
-          title,
-          style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-        ),
-        const Spacer(),
-        TextButton(
-          onPressed: onGetMore,
-          style: TextButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-            foregroundColor: cs.primary,
-            textStyle: const TextStyle(fontSize: 12),
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          child: const Text('Get more'),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              height: 150,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1B3A4B),
+                image: selectedBg.assetKey.isNotEmpty
+                    ? DecorationImage(
+                        image: AssetImage(selectedBg.assetKey),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+            ),
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: .5),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AvatarWithFrame(member: member, radius: 42),
+                const SizedBox(height: 8),
+                Text(
+                  member.displayName,
+                  style: ts.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    shadows: [
+                      const Shadow(blurRadius: 4, color: Colors.black54),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
+
+// ── Section Card ──────────────────────────────────────────────────────────────
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.color,
+    required this.icon,
+    required this.title,
+    required this.child,
+    this.trailing,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String title;
+  final Widget child;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? cs.surfaceContainerLow : cs.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: color.withValues(alpha: .25),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: .08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 8, 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: .15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 18),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: ts.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
+                ),
+                if (trailing != null) ...[
+                  const Spacer(),
+                  trailing!,
+                ],
+              ],
+            ),
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: color.withValues(alpha: .12),
+            indent: 14,
+            endIndent: 14,
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+            child: child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Get More Button ───────────────────────────────────────────────────────────
+
+class _GetMoreButton extends StatelessWidget {
+  const _GetMoreButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF2ECC71), Color(0xFF1ABC9C)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          '+ Get more',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Cosmetic Tile ─────────────────────────────────────────────────────────────
+
+class _CosmeticTile extends StatelessWidget {
+  const _CosmeticTile({
+    required this.isSelected,
+    required this.cs,
+    required this.child,
+  });
+
+  final bool isSelected;
+  final ColorScheme cs;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 76,
+      height: 84,
+      decoration: BoxDecoration(
+        color: isSelected ? cs.primaryContainer : cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected ? cs.primary : Colors.transparent,
+          width: 2.5,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: cs.primary.withValues(alpha: .25),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                )
+              ]
+            : null,
+      ),
+      child: child,
+    );
+  }
+}
+
+// ── Background Tile ───────────────────────────────────────────────────────────
+
+class _BackgroundTile extends StatelessWidget {
+  const _BackgroundTile({
+    required this.item,
+    required this.selected,
+    required this.cs,
+    required this.ts,
+    required this.onTap,
+  });
+
+  final CosmeticItem item;
+  final bool selected;
+  final ColorScheme cs;
+  final TextTheme ts;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 180,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? cs.primary : Colors.transparent,
+            width: 3,
+          ),
+          color: cs.surfaceContainerHighest,
+          image: item.assetKey.isNotEmpty
+              ? DecorationImage(
+                  image: AssetImage(item.assetKey),
+                  fit: BoxFit.cover,
+                )
+              : null,
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: cs.primary.withValues(alpha: .35),
+                    blurRadius: 10,
+                    spreadRadius: 1,
+                  )
+                ]
+              : null,
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: .5),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              bottom: 10,
+              right: 10,
+              child: Text(
+                item.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: ts.labelLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  shadows: [
+                    const Shadow(blurRadius: 3, color: Colors.black87),
+                  ],
+                ),
+              ),
+            ),
+            if (selected)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: CircleAvatar(
+                  radius: 13,
+                  backgroundColor: cs.primary,
+                  child: const Icon(
+                    Icons.check,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Empty Cosmetics ───────────────────────────────────────────────────────────
 
 class _EmptyCosmetics extends StatelessWidget {
   const _EmptyCosmetics({required this.label});
@@ -614,9 +938,19 @@ class _EmptyCosmetics extends StatelessWidget {
   Widget build(BuildContext context) {
     final ts = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    return Text(
-      'You don\'t own any $label yet — visit the store!',
-      style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+    return Row(
+      children: [
+        Icon(Icons.lock_outline_rounded, size: 16, color: cs.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            'No $label yet — visit the store!',
+            style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ),
+      ],
     );
   }
 }
+
+enum _SaveStatus { idle, saving, saved }
