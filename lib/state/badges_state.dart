@@ -134,7 +134,7 @@ extension BadgeStateAuth on AppState {
     };
 
     // ── Patch map and badge list ─────────────────────────────────────────────
-    final updatedTotalChores = member.totalChoresCompleted;
+    final updatedTotalChores = member.totalChoresCompleted + 1;
     final newCurrentBadges = [...member.badges];
     final badgeEvents = <BadgeEvent>[];
     final patchMap = <String, dynamic>{
@@ -146,6 +146,7 @@ extension BadgeStateAuth on AppState {
       'activeDays': newActiveDays,
       'allTaskDaysCompleted': newAllTaskDays,
       'peakCoins': newPeakCoins,
+      if (isNewDay) 'lastActiveDate': Timestamp.fromDate(todayDate),
       if (newLastSat != member.lastSatCompleted && newLastSat != null)
         'lastSatCompleted': Timestamp.fromDate(newLastSat),
       if (newLastSun != member.lastSunCompleted && newLastSun != null)
@@ -199,7 +200,7 @@ extension BadgeStateAuth on AppState {
     }
 
     if (completedAt != null) {
-      maybeUnlock('sunrise_starter', completedAt.hour < 7);
+      maybeUnlock('sunrise_starter', completedAt.hour < 9);
       maybeUnlock('night_owl', completedAt.hour >= 20);
     }
 
@@ -244,14 +245,14 @@ extension BadgeStateAuth on AppState {
       badgeEvents.add(BadgeEvent(badge: def, newTier: highestEarned, coinBonus: bonus));
     }
 
-    maybeUpgradeTier('task_master', updatedTotalChores);
-    maybeUpgradeTier('room_rescuer', newRoom);
-    maybeUpgradeTier('laundry_legend', newLaundry);
-    maybeUpgradeTier('dish_destroyer', newDish);
-    maybeUpgradeTier('trash_trooper', newTrash);
-    maybeUpgradeTier('pet_pal', newPet);
-    maybeUpgradeTier('clean_sweep', newAllTaskDays);
-    maybeUpgradeTier('daily_helper', newActiveDays);
+    maybeUpgradeTier('task_master', updatedTotalChores, thresholds: [25, 75, 150]);
+    maybeUpgradeTier('room_rescuer', newRoom, thresholds: [25, 75, 150]);
+    maybeUpgradeTier('laundry_legend', newLaundry, thresholds: [25, 75, 150]);
+    maybeUpgradeTier('dish_destroyer', newDish, thresholds: [25, 75, 150]);
+    maybeUpgradeTier('trash_trooper', newTrash, thresholds: [25, 75, 150]);
+    maybeUpgradeTier('pet_pal', newPet, thresholds: [25, 75, 150]);
+    maybeUpgradeTier('clean_sweep', newAllTaskDays, thresholds: [25, 75, 150]);
+    maybeUpgradeTier('daily_helper', newActiveDays, thresholds: [25, 75, 150]);
     maybeUpgradeTier('coin_collector', newPeakCoins,
         thresholds: [50, 100, 200]);
 

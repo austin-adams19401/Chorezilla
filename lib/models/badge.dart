@@ -149,6 +149,20 @@ class BadgeDefinition {
         return null;
     }
   }
+
+  /// Returns a kid-friendly description of what they did to earn this achievement.
+  /// For one-time badges, returns the unlockHint. For tiered badges, formats
+  /// a tier-specific sentence using the threshold.
+  String earnedHint(BadgeTier? tier) {
+    if (!isTiered || tier == null || tiers == null) return unlockHint;
+    try {
+      final t = tiers!.firstWhere((t) => t.tier == tier);
+      final prefix = unlockHint.split('(').first.trimRight();
+      return '$prefix — you hit ${t.threshold}!';
+    } catch (_) {
+      return unlockHint;
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +178,7 @@ class BadgeEvent {
   const BadgeEvent({required this.badge, this.newTier, this.coinBonus = 0});
 
   String get dialogTitle {
-    if (newTier == null) return 'Badge Unlocked!';
+    if (newTier == null) return 'Achievement Unlocked!';
     switch (newTier!) {
       case BadgeTier.bronze:
         return 'Bronze Earned!';
@@ -173,7 +187,7 @@ class BadgeEvent {
       case BadgeTier.gold:
         return 'Upgraded to Gold!';
       case BadgeTier.locked:
-        return 'Badge Unlocked!';
+        return 'Achievement Unlocked!';
     }
   }
 }
@@ -251,13 +265,13 @@ class BadgeCatalog {
       assetPath: 'assets/badges/one-time-badges/first-win.png',
     ),
     BadgeDefinition(
-      id: 'fast_finisher',
-      name: 'Fast Finisher',
-      description: 'You finished a task within 10 minutes of getting it!',
-      unlockHint: 'Complete a task within 10 minutes of assignment.',
-      icon: '⚡',
+      id: 'heavy_hitter',
+      name: 'Heavy Hitter',
+      description: 'You tackled a seriously tough chore!',
+      unlockHint: 'Complete a difficulty 4 or 5 chore.',
+      icon: '💪',
       type: BadgeType.oneTime,
-      assetPath: 'assets/badges/one-time-badges/fast-finisher.png',
+      assetPath: 'assets/badges/one-time-badges/heavy-hitter.png',
     ),
     BadgeDefinition(
       id: 'early_bird',
@@ -275,7 +289,7 @@ class BadgeCatalog {
       unlockHint: 'Complete all assigned tasks in a single day.',
       icon: '📋',
       type: BadgeType.oneTime,
-      assetPath: 'assets/badges/one-time-badges/getting-started.png',
+      assetPath: 'assets/badges/one-time-badges/all-done.png',
     ),
     BadgeDefinition(
       id: 'bonus_boss',
@@ -299,7 +313,7 @@ class BadgeCatalog {
       id: 'sunrise_starter',
       name: 'Sunrise Starter',
       description: 'Up early and already getting things done!',
-      unlockHint: 'Complete a task before 7 AM.',
+      unlockHint: 'Complete a task before 9 AM.',
       icon: '🌅',
       type: BadgeType.oneTime,
       assetPath: 'assets/badges/one-time-badges/sunrise-starter.png',
@@ -341,13 +355,13 @@ class BadgeCatalog {
       assetPath: 'assets/badges/one-time-badges/overachiever.png',
     ),
     BadgeDefinition(
-      id: 'trash_trooper_daily',
-      name: 'Trash Trooper',
+      id: 'trash_hero',
+      name: 'Trash Hero',
       description: 'You knocked out 3 trash chores in a single day!',
       unlockHint: 'Complete 3 trash chores in one day.',
       icon: '🗑️',
       type: BadgeType.oneTime,
-      assetPath: 'assets/badges/one-time-badges/trash-trooper.png',
+      assetPath: 'assets/badges/one-time-badges/trash-hero.png',
     ),
     BadgeDefinition(
       id: 'task_crusher',
@@ -364,104 +378,104 @@ class BadgeCatalog {
       id: 'task_master',
       name: 'Task Master',
       description: 'Complete tasks to level this up!',
-      unlockHint: 'Complete tasks (Bronze: 5, Silver: 15, Gold: 30).',
+      unlockHint: 'Complete tasks (Bronze: 25, Silver: 75, Gold: 150).',
       icon: '📈',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/tiered-badges/task-bronze.png'),
-        TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/tiered-badges/task-silver.png'),
-        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/tiered-badges/task-gold.png'),
+        TierDef(tier: BadgeTier.bronze, threshold: 25,  assetPath: 'assets/badges/tiered-badges/task-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 75,  assetPath: 'assets/badges/tiered-badges/task-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 150, assetPath: 'assets/badges/tiered-badges/task-gold.png'),
       ],
     ),
     BadgeDefinition(
       id: 'room_rescuer',
       name: 'Room Rescuer',
       description: 'Keep those rooms clean!',
-      unlockHint: 'Complete cleaning-type tasks (Bronze: 5, Silver: 15, Gold: 30).',
+      unlockHint: 'Complete cleaning-type tasks (Bronze: 25, Silver: 75, Gold: 150).',
       icon: '🧹',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/tiered-badges/room-bronze.png'),
-        TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/tiered-badges/room-silver.png'),
-        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/tiered-badges/room-gold.png'),
+        TierDef(tier: BadgeTier.bronze, threshold: 25,  assetPath: 'assets/badges/tiered-badges/room-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 75,  assetPath: 'assets/badges/tiered-badges/room-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 150, assetPath: 'assets/badges/tiered-badges/room-gold.png'),
       ],
     ),
     BadgeDefinition(
       id: 'laundry_legend',
       name: 'Laundry Legend',
       description: 'Laundry? No problem!',
-      unlockHint: 'Complete laundry tasks (Bronze: 5, Silver: 15, Gold: 30).',
+      unlockHint: 'Complete laundry tasks (Bronze: 25, Silver: 75, Gold: 150).',
       icon: '🧺',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/tiered-badges/bronze-laundry.png'),
-        TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/tiered-badges/silver-laundry.png'),
-        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/tiered-badges/gold-laundry.png'),
+        TierDef(tier: BadgeTier.bronze, threshold: 25,  assetPath: 'assets/badges/tiered-badges/laundry-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 75,  assetPath: 'assets/badges/tiered-badges/laundry-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 150, assetPath: 'assets/badges/tiered-badges/laundry-gold.png'),
       ],
     ),
     BadgeDefinition(
       id: 'dish_destroyer',
       name: 'Dish Destroyer',
       description: 'Crushing those dishes!',
-      unlockHint: 'Complete dish-related tasks (Bronze: 5, Silver: 15, Gold: 30).',
+      unlockHint: 'Complete dish-related tasks (Bronze: 25, Silver: 75, Gold: 150).',
       icon: '🍽️',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/tiered-badges/bronze-dish.png'),
-        TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/tiered-badges/silver-dish.png'),
-        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/one-time-badges/dish-destroyer.png'),
+        TierDef(tier: BadgeTier.bronze, threshold: 25,  assetPath: 'assets/badges/tiered-badges/dish-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 75,  assetPath: 'assets/badges/tiered-badges/dish-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 150, assetPath: 'assets/badges/tiered-badges/dish-gold.png'),
       ],
     ),
     BadgeDefinition(
       id: 'trash_trooper',
       name: 'Trash Trooper',
       description: 'Taking out the trash like a pro!',
-      unlockHint: 'Complete trash tasks (Bronze: 5, Silver: 15, Gold: 30).',
+      unlockHint: 'Complete trash tasks (Bronze: 25, Silver: 75, Gold: 150).',
       icon: '🗑️',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/tiered-badges/bronze-trash.png'),
-        TierDef(tier: BadgeTier.silver, threshold: 15), // no silver asset yet
-        TierDef(tier: BadgeTier.gold,   threshold: 30), // no gold asset yet
+        TierDef(tier: BadgeTier.bronze, threshold: 25,  assetPath: 'assets/badges/tiered-badges/trash-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 75,  assetPath: 'assets/badges/tiered-badges/trash-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 150, assetPath: 'assets/badges/tiered-badges/trash-gold.png'),
       ],
     ),
     BadgeDefinition(
       id: 'pet_pal',
       name: 'Pet Pal',
       description: 'Taking great care of your furry friends!',
-      unlockHint: 'Complete pet-care tasks (Bronze: 5, Silver: 15, Gold: 30).',
+      unlockHint: 'Complete pet-care tasks (Bronze: 25, Silver: 75, Gold: 150).',
       icon: '🐾',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/one-time-badges/pet-pal.png'),
-        TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/one-time-badges/pet-pal.png'),
-        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/one-time-badges/pet-pal.png'),
+        TierDef(tier: BadgeTier.bronze, threshold: 25,  assetPath: 'assets/badges/tiered-badges/pet-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 75,  assetPath: 'assets/badges/tiered-badges/pet-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 150, assetPath: 'assets/badges/tiered-badges/pet-gold.png'),
       ],
     ),
     BadgeDefinition(
       id: 'clean_sweep',
       name: 'Clean Sweep',
       description: 'Finishing every task for the day!',
-      unlockHint: 'Complete ALL assigned tasks in a day (Bronze: 5 days, Silver: 15 days, Gold: 30 days).',
+      unlockHint: 'Complete ALL assigned tasks in a day (Bronze: 25 days, Silver: 75 days, Gold: 150 days).',
       icon: '🎯',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5),
-        TierDef(tier: BadgeTier.silver, threshold: 15),
-        TierDef(tier: BadgeTier.gold,   threshold: 30),
+        TierDef(tier: BadgeTier.bronze, threshold: 25,  assetPath: 'assets/badges/tiered-badges/sweep-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 75,  assetPath: 'assets/badges/tiered-badges/sweep-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 150, assetPath: 'assets/badges/tiered-badges/sweep-gold.png'),
       ],
     ),
     BadgeDefinition(
       id: 'daily_helper',
       name: 'Daily Helper',
       description: 'Showing up every day!',
-      unlockHint: 'Complete at least 1 task per day (Bronze: 5 days, Silver: 15 days, Gold: 30 days).',
+      unlockHint: 'Complete at least 1 task per day (Bronze: 25 days, Silver: 75 days, Gold: 150 days).',
       icon: '🔁',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 5,  assetPath: 'assets/badges/one-time-badges/chore-machine.png'),
-        TierDef(tier: BadgeTier.silver, threshold: 15, assetPath: 'assets/badges/one-time-badges/chore-machine.png'),
-        TierDef(tier: BadgeTier.gold,   threshold: 30, assetPath: 'assets/badges/one-time-badges/chore-machine.png'),
+        TierDef(tier: BadgeTier.bronze, threshold: 25,  assetPath: 'assets/badges/tiered-badges/daily-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 75,  assetPath: 'assets/badges/tiered-badges/daily-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 150, assetPath: 'assets/badges/tiered-badges/daily-gold.png'),
       ],
     ),
     BadgeDefinition(
@@ -472,9 +486,9 @@ class BadgeCatalog {
       icon: '💰',
       type: BadgeType.tiered,
       tiers: [
-        TierDef(tier: BadgeTier.bronze, threshold: 50),
-        TierDef(tier: BadgeTier.silver, threshold: 100),
-        TierDef(tier: BadgeTier.gold,   threshold: 200),
+        TierDef(tier: BadgeTier.bronze, threshold: 50,  assetPath: 'assets/badges/tiered-badges/coin-bronze.png'),
+        TierDef(tier: BadgeTier.silver, threshold: 100, assetPath: 'assets/badges/tiered-badges/coin-silver.png'),
+        TierDef(tier: BadgeTier.gold,   threshold: 200, assetPath: 'assets/badges/tiered-badges/coin-gold.png'),
       ],
     ),
   ];

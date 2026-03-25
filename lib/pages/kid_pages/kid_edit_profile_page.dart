@@ -159,7 +159,9 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -334,6 +336,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
             const SizedBox(height: 24),
           ],
         ),
+      ),
       ),
     );
   }

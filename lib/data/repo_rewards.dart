@@ -93,6 +93,26 @@ extension RewardRepo on ChorezillaRepo {
   }
 
 
+  Future<void> restockReward(
+    String familyId, {
+    required String rewardId,
+  }) {
+    return rewardsColl(firebaseDB, familyId).doc(rewardId).update({
+      'memberPurchaseCounts': {},
+      'restockedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> restockRewardForKid(
+    String familyId, {
+    required String rewardId,
+    required String memberId,
+  }) {
+    return rewardsColl(firebaseDB, familyId).doc(rewardId).update({
+      'memberPurchaseCounts.$memberId': FieldValue.delete(),
+    });
+  }
+
   Future<void> deleteReward(String familyId, {required String rewardId}) async {
     final ref = rewardsColl(firebaseDB, familyId).doc(rewardId);
     await ref.delete();
@@ -113,6 +133,17 @@ extension RewardRepo on ChorezillaRepo {
   // ─────────────────────────────────────────────────────────────────────────
   // Reward redemptions
   // ─────────────────────────────────────────────────────────────────────────
+
+  /// Watch ALL reward redemptions for this family (all statuses, all members).
+  /// Used by the parent rewards page to compute per-kid stock counts.
+  Stream<List<RewardRedemption>> watchAllRewardRedemptionsForFamily(
+    String familyId,
+  ) {
+    return rewardRedemptionsColl(firebaseDB, familyId)
+        .orderBy('createdAt', descending: false)
+        .snapshots()
+        .map((s) => s.docs.map(RewardRedemption.fromDoc).toList());
+  }
 
   /// Watch all pending reward redemptions for this family (parent queue).
   Stream<List<RewardRedemption>> watchPendingRewardRedemptions(
@@ -157,7 +188,7 @@ extension RewardRepo on ChorezillaRepo {
     await ref.update({
       'status': 'fulfilled',
       'givenAt': FieldValue.serverTimestamp(),
-      if (parentMemberId != null) 'parentMemberId': parentMemberId,
+      'parentMemberId': ?parentMemberId,
     });
   }
 
@@ -176,7 +207,7 @@ extension RewardRepo on ChorezillaRepo {
     final memberRef = membersColl(db, familyId).doc(redemption.memberId);
 
     await db.runTransaction((tx) async {
-      // Reload redemption inside the transaction
+      // ── All reads first ────────────────────────────────────────────────────
       final redeemSnap = await tx.get(redemptionRef);
       if (!redeemSnap.exists) {
         throw Exception('Reward redemption not found');
@@ -192,18 +223,38 @@ extension RewardRepo on ChorezillaRepo {
 
       final coinCost =
           (data['coinCost'] as num?)?.toInt() ?? redemption.coinCost;
+      final rewardId = data['rewardId'] as String?;
 
-      // If there was a coin cost, credit it back.
-      if (coinCost > 0) {
-        final memSnap = await tx.get(memberRef);
-        if (!memSnap.exists) {
-          throw Exception('Member not found');
-        }
+      final memSnap = coinCost > 0 ? await tx.get(memberRef) : null;
+      if (memSnap != null && !memSnap.exists) {
+        throw Exception('Member not found');
+      }
 
+      // Read the reward doc so we can check if it tracks stock.
+      final rewardDocRef =
+          rewardId != null ? rewardsColl(db, familyId).doc(rewardId) : null;
+      final rewardSnap =
+          rewardDocRef != null ? await tx.get(rewardDocRef) : null;
+
+      // ── All writes ─────────────────────────────────────────────────────────
+      if (memSnap != null) {
         final memData = memSnap.data() as Map<String, dynamic>;
         final currentCoins = (memData['coins'] as num?)?.toInt() ?? 0;
-
         tx.update(memberRef, {'coins': currentCoins + coinCost});
+      }
+
+      // If this reward tracks per-kid stock, decrement the purchase count so
+      // the kid can buy it again after a refund.
+      if (rewardDocRef != null &&
+          rewardSnap != null &&
+          rewardSnap.exists) {
+        final rewardData = rewardSnap.data() as Map<String, dynamic>;
+        if (rewardData['stock'] != null) {
+          tx.update(rewardDocRef, {
+            'memberPurchaseCounts.${redemption.memberId}':
+                FieldValue.increment(-1),
+          });
+        }
       }
 
       // Mark redemption as cancelled so it falls out of the pending queue
@@ -211,7 +262,7 @@ extension RewardRepo on ChorezillaRepo {
         'status': 'cancelled',
         // Clear givenAt just in case
         'givenAt': null,
-        if (parentMemberId != null) 'parentMemberId': parentMemberId,
+        'parentMemberId': ?parentMemberId,
       });
     });
   }
@@ -278,14 +329,29 @@ extension RewardRepo on ChorezillaRepo {
     final rewardRef = rewardsColl(firebaseDB, familyId).doc(reward.id);
 
     await firebaseDB.runTransaction((tx) async {
+      // ── All reads first ────────────────────────────────────────────────────
       final memSnap = await tx.get(memberRef);
       if (!memSnap.exists) throw Exception('Member not found');
-      final member = Member.fromDoc(memSnap);
 
+      Reward? currentReward;
+      if (reward.stock != null) {
+        final rSnap = await tx.get(rewardRef);
+        if (!rSnap.exists) throw Exception('Reward not found');
+        currentReward = Reward.fromDoc(rSnap);
+      }
+
+      // ── Validation ─────────────────────────────────────────────────────────
+      final member = Member.fromDoc(memSnap);
       if (member.coins < reward.coinCost) {
         throw Exception('Not enough coins');
       }
 
+      if (currentReward != null) {
+        final kidCount = currentReward.memberPurchaseCounts[memberId] ?? 0;
+        if (kidCount >= reward.stock!) throw Exception('Out of stock');
+      }
+
+      // ── All writes ─────────────────────────────────────────────────────────
       final newCoins = member.coins - reward.coinCost;
 
       // Track daily coin spend for Big Spender achievement title.
@@ -308,13 +374,10 @@ extension RewardRepo on ChorezillaRepo {
       };
       tx.update(memberRef, memberUpdate);
 
-      if (reward.stock != null) {
-        final rSnap = await tx.get(rewardRef);
-        if (!rSnap.exists) throw Exception('Reward not found');
-        final current = Reward.fromDoc(rSnap);
-        final newStock = (current.stock ?? 0) - 1;
-        if (newStock < 0) throw Exception('Out of stock');
-        tx.update(rewardRef, {'stock': newStock});
+      if (currentReward != null) {
+        tx.update(rewardRef, {
+          'memberPurchaseCounts.$memberId': FieldValue.increment(1),
+        });
       }
 
       // Redemption record created inside the transaction so coins can never

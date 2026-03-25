@@ -158,6 +158,7 @@ class _KidHeroHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
+    final bool compact = MediaQuery.of(context).size.height < 680;
 
     // Resolve equipped title name, if any.
     final titleId = member.equippedTitleId;
@@ -172,7 +173,9 @@ class _KidHeroHeader extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 160 + (showTitle ? 24 : 0),
+      height: compact
+          ? 132 + (showTitle ? 24 : 0)
+          : 160 + (showTitle ? 24 : 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -195,15 +198,15 @@ class _KidHeroHeader extends StatelessWidget {
               children: [
                 // Stats column
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 2, 10, 2),
+                  padding: EdgeInsets.fromLTRB(compact ? 8 : 10, compact ? 1 : 2, compact ? 8 : 10, compact ? 1 : 2),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // Avatar — larger, centered
-                      _AvatarCircle(member: member, radius: 32),
+                      _AvatarCircle(member: member, radius: compact ? 22 : 32),
 
-                      const SizedBox(height: 4),
+                      SizedBox(height: compact ? 2 : 4),
 
                       // Name
                       Text(
@@ -241,7 +244,7 @@ class _KidHeroHeader extends StatelessWidget {
                         ),
                       ],
 
-                      const SizedBox(height: 5),
+                      SizedBox(height: compact ? 3 : 5),
                       // Level / XP bar
                       _LevelProgressBar(member: member, compact: true),
                     ],

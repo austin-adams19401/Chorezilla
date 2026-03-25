@@ -39,13 +39,20 @@ class Reward {
   /// True if parent created it (vs built-in starter rewards).
   final bool isCustom;
 
-  /// Optional stock; null = unlimited.
+  /// Optional stock; null = unlimited. Represents max purchases per kid.
   final int? stock;
+
+  /// Tracks how many times each kid has purchased this reward.
+  /// Key: memberId, Value: purchase count.
+  final Map<String, int> memberPurchaseCounts;
 
   /// Whether this is visible to kids in the store.
   final bool active;
 
   final DateTime? createdAt;
+
+  /// Set when a parent restocks this reward. Used to notify kids on store open.
+  final DateTime? restockedAt;
 
   const Reward({
     required this.id,
@@ -57,8 +64,10 @@ class Reward {
     this.requiresApproval = false,
     this.isCustom = true,
     this.stock,
+    this.memberPurchaseCounts = const {},
     this.active = true,
     this.createdAt,
+    this.restockedAt,
   });
 
   Reward copyWith({
@@ -71,8 +80,10 @@ class Reward {
     bool? requiresApproval,
     bool? isCustom,
     int? stock,
+    Map<String, int>? memberPurchaseCounts,
     bool? active,
     DateTime? createdAt,
+    DateTime? restockedAt,
   }) {
     return Reward(
       id: id ?? this.id,
@@ -84,8 +95,10 @@ class Reward {
       requiresApproval: requiresApproval ?? this.requiresApproval,
       isCustom: isCustom ?? this.isCustom,
       stock: stock ?? this.stock,
+      memberPurchaseCounts: memberPurchaseCounts ?? this.memberPurchaseCounts,
       active: active ?? this.active,
       createdAt: createdAt ?? this.createdAt,
+      restockedAt: restockedAt ?? this.restockedAt,
     );
   }
 
@@ -99,8 +112,10 @@ class Reward {
     'requiresApproval': requiresApproval,
     'isCustom': isCustom,
     'stock': stock,
+    'memberPurchaseCounts': memberPurchaseCounts.isEmpty ? null : memberPurchaseCounts,
     'active': active,
     'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
+    'restockedAt': restockedAt == null ? null : Timestamp.fromDate(restockedAt!),
 
     // Backwards-compat fields (for old data)
     'name': title,
@@ -135,8 +150,13 @@ class Reward {
       requiresApproval: (data['requiresApproval'] as bool?) ?? false,
       isCustom: (data['isCustom'] as bool?) ?? false,
       stock: (data['stock'] as num?)?.toInt(),
+      memberPurchaseCounts: {
+        for (final e in ((data['memberPurchaseCounts'] as Map<String, dynamic>?) ?? {}).entries)
+          e.key: (e.value as num).toInt(),
+      },
       active: (data['active'] as bool?) ?? true,
       createdAt: tsAsDate(data['createdAt']),
+      restockedAt: tsAsDate(data['restockedAt']),
     );
   }
 }

@@ -364,7 +364,7 @@ exports.notifyOnRewardPurchased = functions
         const tokens = await getParentTokens(familyId);
         if (tokens.length === 0) return null;
 
-        return sendMulticast({
+        await sendMulticast({
             tokens,
             notification: { title: notifTitle, body: notifBody },
             data: {
@@ -374,6 +374,34 @@ exports.notifyOnRewardPurchased = functions
                 redemptionId,
             },
         });
+
+        // Check if this purchase made the reward out of stock for this kid.
+        if (data.rewardId) {
+            const rewardSnap = await db
+                .collection(`families/${familyId}/rewards`)
+                .doc(data.rewardId)
+                .get();
+            if (rewardSnap.exists) {
+                const reward = rewardSnap.data();
+                const kidCount = ((reward.memberPurchaseCounts || {})[memberId]) || 0;
+                if (reward.stock != null && kidCount >= reward.stock) {
+                    await sendMulticast({
+                        tokens,
+                        notification: {
+                            title: "🚫 Reward out of stock",
+                            body: `"${rewardName}" is out of stock for ${kidName}. Tap to restock.`,
+                        },
+                        data: {
+                            type: "reward_out_of_stock",
+                            familyId,
+                            rewardId: data.rewardId,
+                        },
+                    });
+                }
+            }
+        }
+
+        return null;
     });
 
 exports.notifyOnMemberLevelUp = functions

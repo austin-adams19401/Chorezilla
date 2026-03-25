@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:chorezilla/components/auth_scaffold.dart';
 import 'package:chorezilla/components/inputs.dart';
+import 'package:chorezilla/pages/startup/kid_join_page.dart';
+import 'package:chorezilla/pages/startup/role_selection_page.dart';
 
 
 class RegisterPage extends StatefulWidget {
@@ -50,7 +52,9 @@ class _RegisterPageState extends State<RegisterPage> {
       await userCredentials.user?.updateDisplayName(_name.text.trim());
       if (!mounted) return;
 
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const RoleSelectionPage()),
+      );
 
     } on FirebaseAuthException catch (e) {
       setState(() { _error = e.message ?? 'Registration failed'; });
@@ -183,6 +187,26 @@ class _RegisterPageState extends State<RegisterPage> {
                       ),
                     ),
                     Text('Sign in!', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 16)),
+                  ],
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const KidJoinPage()),
+                  );
+                },
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Joining a family? ',
+                        style: TextStyle(color: cs.inverseSurface, fontSize: 16),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text('Enter code', style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 16)),
                   ],
                 ),
               ),

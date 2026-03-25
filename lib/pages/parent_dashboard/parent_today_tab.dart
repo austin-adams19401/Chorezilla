@@ -216,7 +216,7 @@ class _ParentTodayTabState extends State<ParentTodayTab> {
                     // Match original grid: 1 column if screen < 260px, else 2+
                     const double maxCrossAxisExtent = 260;
                     int columns =
-                        (availableWidth / maxCrossAxisExtent).ceil().clamp(1, summaries.length);
+                        (availableWidth / maxCrossAxisExtent).ceil().clamp(1, summaries.length > 2 ? 2 : summaries.length);
                     final itemWidth =
                         (availableWidth - gap * (columns - 1)) / columns;
 
@@ -311,6 +311,8 @@ class _TodayHero extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (onWeeklyOverviewPressed != null)
+                      const SizedBox(width: 12),
                     if (onWeeklyOverviewPressed != null)
                       TextButton.icon(
                         onPressed: onWeeklyOverviewPressed,
@@ -574,6 +576,203 @@ class _KidTodayCard extends StatelessWidget {
       statusFg = cs.onSecondaryContainer;
     }
 
+    final bool compact = MediaQuery.of(context).size.height < 680;
+
+    // Shared: avatar progress ring + away button
+    final avatarSection = Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        SizedBox(
+          width: (avatarRadius + 7) * 2,
+          height: (avatarRadius + 7) * 2,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox.expand(
+                child: CircularProgressIndicator(
+                  value: progress,
+                  strokeWidth: 4.0,
+                  backgroundColor: cs.surfaceContainerHighest,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isAllDone
+                        ? cs.primary
+                        : cs.primary.withValues(alpha: 0.75),
+                  ),
+                  strokeCap: StrokeCap.round,
+                ),
+              ),
+              CircleAvatar(
+                radius: avatarRadius,
+                backgroundColor: Colors.black,
+                child: buildAvatarContent(
+                  (summary.avatarKey ?? '').trim(),
+                  avatarRadius * 0.95,
+                  _initialsFor(summary.name),
+                ),
+              ),
+              if (isAllDone)
+                Positioned(
+                  right: 1,
+                  bottom: 1,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: cs.surface, width: 1.5),
+                    ),
+                    child: const Icon(Icons.check_rounded, size: 11, color: Colors.white),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // Away button — pushed far enough right to clear the avatar image
+        Positioned(
+          top: -8,
+          right: -16,
+          child: Tooltip(
+            message: isAway ? 'Cancel away' : 'Set away',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => isAway
+                  ? _confirmClearAway(context, summary)
+                  : showSetAwayDialog(context, memberId: summary.memberId, memberName: summary.name),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  isAway ? Icons.flight_land_rounded : Icons.flight_takeoff_rounded,
+                  size: 14,
+                  color: isAway ? cs.onSurfaceVariant : cs.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    // Shared: level + coins badge row
+    Widget levelCoinsRow({bool centered = false}) => Row(
+          mainAxisAlignment:
+              centered ? MainAxisAlignment.center : MainAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: cs.secondaryContainer.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                'Lvl ${summary.level}',
+                style: ts.labelSmall?.copyWith(
+                  color: cs.onSecondaryContainer,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Text('🪙', style: TextStyle(fontSize: 12)),
+            const SizedBox(width: 2),
+            Flexible(
+              child: Text(
+                '${summary.coins}',
+                style: ts.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
+
+    // Shared: status pill
+    final statusPill = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: statusBg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        statusText,
+        textAlign: TextAlign.center,
+        style: ts.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: statusFg,
+        ),
+      ),
+    );
+
+    // Shared: progress bar + count
+    final progressSection = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: progress,
+            minHeight: 6,
+            backgroundColor: cs.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(
+              isAllDone ? cs.primary : cs.primary.withValues(alpha: 0.8),
+            ),
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          '$completed / $total chores',
+          textAlign: TextAlign.center,
+          style: ts.labelSmall?.copyWith(
+            color: cs.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+
+    // Shared: stat chips
+    final chipsSection = Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      alignment: WrapAlignment.center,
+      children: [
+        _StatChip(
+          icon: Icons.checklist_rtl_rounded,
+          label: 'Left',
+          value: remaining,
+          color: remaining == 0
+              ? cs.primary.withValues(alpha: 0.30)
+              : cs.secondaryContainer.withValues(alpha: 0.85),
+          textColor: remaining == 0 ? cs.primary : cs.onSecondaryContainer,
+        ),
+        _StatChip(
+          icon: Icons.hourglass_bottom_rounded,
+          label: 'Pend',
+          value: pending,
+          color: cs.tertiaryContainer,
+          textColor: cs.onTertiaryContainer,
+        ),
+        _StatChip(
+          icon: Icons.close_rounded,
+          label: 'Rej',
+          value: rejected,
+          color: rejected > 0 ? cs.errorContainer : cs.surfaceContainerHighest,
+          textColor: rejected > 0 ? cs.onErrorContainer : cs.onSurfaceVariant,
+        ),
+        if (summary.bonusCount > 0)
+          _StatChip(
+            icon: Icons.bolt_rounded,
+            label: 'Bonus',
+            value: summary.bonusCount,
+            color: cs.primaryContainer,
+            textColor: cs.onPrimaryContainer,
+          ),
+      ],
+    );
+
     return InkWell(
       borderRadius: BorderRadius.circular(18),
       onTap: () => _showKidDetailsDialog(context, summary),
@@ -588,280 +787,166 @@ class _KidTodayCard extends StatelessWidget {
           border: Border.all(color: borderColor, width: borderWidth),
           boxShadow: shadows,
         ),
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Avatar with circular progress ring + name row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Avatar + progress ring
-                SizedBox(
-                  width: (avatarRadius + 7) * 2,
-                  height: (avatarRadius + 7) * 2,
-                  child: Stack(
-                    alignment: Alignment.center,
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        child: compact
+            // ── Small phone: vertical layout ─────────────────────────────
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  avatarSection,
+                  const SizedBox(height: 6),
+                  Text(
+                    summary.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  levelCoinsRow(centered: true),
+                  const SizedBox(height: 8),
+                  statusPill,
+                  const SizedBox(height: 6),
+                  progressSection,
+                  const SizedBox(height: 6),
+                  chipsSection,
+                ],
+              )
+            // ── Normal screen: original layout ───────────────────────────
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      SizedBox.expand(
-                        child: CircularProgressIndicator(
-                          value: progress,
-                          strokeWidth: 4.0,
-                          backgroundColor: cs.surfaceContainerHighest,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            isAllDone
-                                ? cs.primary
-                                : cs.primary.withValues(alpha: 0.75),
+                      // Plain avatar, no progress ring
+                      Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          CircleAvatar(
+                            radius: avatarRadius,
+                            backgroundColor: Colors.black,
+                            child: buildAvatarContent(
+                              (summary.avatarKey ?? '').trim(),
+                              avatarRadius * 0.95,
+                              _initialsFor(summary.name),
+                            ),
                           ),
-                          strokeCap: StrokeCap.round,
-                        ),
-                      ),
-                      CircleAvatar(
-                        radius: avatarRadius,
-                        backgroundColor: Colors.black,
-                        child: buildAvatarContent(
-                          (summary.avatarKey ?? '').trim(),
-                          avatarRadius * 0.95,
-                          _initialsFor(summary.name),
-                        ),
-                      ),
-                      if (isAllDone)
-                        Positioned(
-                          right: 1,
-                          bottom: 1,
-                          child: Container(
-                            width: 18,
-                            height: 18,
-                            decoration: BoxDecoration(
-                              color: cs.primary,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: cs.surface,
-                                width: 1.5,
+                          if (isAllDone)
+                            Positioned(
+                              right: 1,
+                              bottom: 1,
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: cs.primary,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: cs.surface, width: 1.5),
+                                ),
+                                child: const Icon(Icons.check_rounded, size: 11, color: Colors.white),
                               ),
                             ),
-                            child: const Icon(
-                              Icons.check_rounded,
-                              size: 11,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Name + level/coins
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
+                        ],
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
                               summary.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: ts.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                             ),
-                          ),
-                          if (!isAway)
-                            Tooltip(
-                              message: 'Set away',
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(999),
-                                onTap: () => showSetAwayDialog(
+                            const SizedBox(height: 4),
+                            levelCoinsRow(),
+                          ],
+                        ),
+                      ),
+                      // Away button at top-right, clear of the avatar
+                      Tooltip(
+                        message: isAway ? 'Cancel away' : 'Set away',
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(999),
+                          onTap: () => isAway
+                              ? _confirmClearAway(context, summary)
+                              : showSetAwayDialog(
                                   context,
                                   memberId: summary.memberId,
                                   memberName: summary.name,
                                 ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(4),
-                                  child: Icon(
-                                    Icons.flight_takeoff_rounded,
-                                    size: 16,
-                                    color: cs.onSurfaceVariant.withValues(alpha: 0.6),
-                                  ),
-                                ),
-                              ),
-                            )
-                          else
-                            Tooltip(
-                              message: 'Cancel away',
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(999),
-                                onTap: () => _confirmClearAway(context, summary),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(4),
-                                  child: Icon(
-                                    Icons.flight_land_rounded,
-                                    size: 16,
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: cs.secondaryContainer.withValues(
-                                alpha: 0.75,
-                              ),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Lvl ${summary.level}',
-                              style: ts.labelSmall?.copyWith(
-                                color: cs.onSecondaryContainer,
-                                fontWeight: FontWeight.w700,
-                              ),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(6, 4, 0, 4),
+                            child: Icon(
+                              isAway ? Icons.flight_land_rounded : Icons.flight_takeoff_rounded,
+                              size: 16,
+                              color: isAway
+                                  ? cs.onSurfaceVariant
+                                  : cs.onSurfaceVariant.withValues(alpha: 0.5),
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          const Text('🪙', style: TextStyle(fontSize: 12)),
-                          const SizedBox(width: 2),
-                          Text(
-                            '${summary.coins}',
-                            style: ts.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 10),
-
-            // Status pill — full width
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: statusBg,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                statusText,
-                textAlign: TextAlign.center,
-                style: ts.labelMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: statusFg,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Progress bar
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 8,
-                backgroundColor: cs.surfaceContainerHighest,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  isAllDone ? cs.primary : cs.primary.withValues(alpha: 0.8),
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                '$completed / $total chores',
-                style: ts.labelSmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 6),
-
-            // Chips row
-            Wrap(
-              spacing: 6,
-              runSpacing: 4,
-              children: [
-                _StatChip(
-                  icon: Icons.checklist_rtl_rounded,
-                  label: 'Left',
-                  value: remaining,
-                  color: remaining == 0
-                      ? cs.primary.withValues(alpha: 0.30)
-                      : cs.secondaryContainer.withValues(alpha: 0.85),
-                  textColor: remaining == 0
-                      ? cs.primary
-                      : cs.onSecondaryContainer,
-                ),
-                _StatChip(
-                  icon: Icons.hourglass_bottom_rounded,
-                  label: 'Pending',
-                  value: pending,
-                  color: cs.tertiaryContainer,
-                  textColor: cs.onTertiaryContainer,
-                ),
-                _StatChip(
-                  icon: Icons.close_rounded,
-                  label: 'Rejected',
-                  value: rejected,
-                  color: rejected > 0
-                      ? cs.errorContainer
-                      : cs.surfaceContainerHighest,
-                  textColor: rejected > 0
-                      ? cs.onErrorContainer
-                      : cs.onSurfaceVariant,
-                ),
-                if (summary.bonusCount > 0)
-                  _StatChip(
-                    icon: Icons.bolt_rounded,
-                    label: 'Bonus',
-                    value: summary.bonusCount,
-                    color: cs.primaryContainer,
-                    textColor: cs.onPrimaryContainer,
+                  const SizedBox(height: 8),
+                  statusPill,
+                  const SizedBox(height: 6),
+                  progressSection,
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      _StatChip(
+                        icon: Icons.checklist_rtl_rounded,
+                        label: 'Left',
+                        value: remaining,
+                        color: remaining == 0
+                            ? cs.primary.withValues(alpha: 0.30)
+                            : cs.secondaryContainer.withValues(alpha: 0.85),
+                        textColor: remaining == 0 ? cs.primary : cs.onSecondaryContainer,
+                      ),
+                      _StatChip(
+                        icon: Icons.hourglass_bottom_rounded,
+                        label: 'Pending',
+                        value: pending,
+                        color: cs.tertiaryContainer,
+                        textColor: cs.onTertiaryContainer,
+                      ),
+                      _StatChip(
+                        icon: Icons.close_rounded,
+                        label: 'Rejected',
+                        value: rejected,
+                        color: rejected > 0 ? cs.errorContainer : cs.surfaceContainerHighest,
+                        textColor: rejected > 0 ? cs.onErrorContainer : cs.onSurfaceVariant,
+                      ),
+                      if (summary.bonusCount > 0)
+                        _StatChip(
+                          icon: Icons.bolt_rounded,
+                          label: 'Bonus',
+                          value: summary.bonusCount,
+                          color: cs.primaryContainer,
+                          textColor: cs.onPrimaryContainer,
+                        ),
+                    ],
                   ),
-              ],
-            ),
-
-            const SizedBox(height: 8),
-
-            // Footer hint
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Text(
-                  'Tap to view chores',
-                  style: ts.labelSmall?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 6),
+                  Text(
+                    'Tap to view chores >',
+                    textAlign: TextAlign.center,
+                    style: ts.labelSmall?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 2),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 10,
-                  color: cs.primary,
-                ),
-              ],
-            ),
-          ],
-        ),
+                ],
+              ),
       ),
     );
   }

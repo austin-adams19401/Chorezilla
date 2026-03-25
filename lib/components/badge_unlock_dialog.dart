@@ -132,6 +132,37 @@ class BadgeUnlockDialog extends StatelessWidget {
                     ),
                   ),
 
+                  const SizedBox(height: 10),
+
+                  // What they did to earn it
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      children: [
+                        Text(
+                          'What you did:',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          badge.earnedHint(tier),
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   if (event.coinBonus > 0) ...[
                     const SizedBox(height: 12),
                     Container(
@@ -161,7 +192,7 @@ class BadgeUnlockDialog extends StatelessWidget {
                   const SizedBox(height: 16),
 
                   Text(
-                    'Keep it up! More badges unlock as you build habits.',
+                    'Keep it up! More achievements unlock as you build habits.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall,
                   ),

@@ -8,7 +8,7 @@ enum AuthStatus { unknown, signedOut, needsFamilySetup, ready }
 enum AppViewMode { parent, kid }
 enum ProofChoice { camera, gallery, skip }
 enum CosmeticType { background, zillaSkin, avatarFrame, title, avatar }
-enum RewardMenuAction { edit, delete }
+enum RewardMenuAction { edit, restock, delete }
 
 
 String roleToString(FamilyRole role) {

@@ -52,8 +52,10 @@ class KidBadgesPage extends StatelessWidget {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Badges')),
-      body: SingleChildScrollView(
+      appBar: AppBar(title: const Text('Achievements')),
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,7 +66,7 @@ class KidBadgesPage extends StatelessWidget {
                 const Text('🏅', style: TextStyle(fontSize: 20)),
                 const SizedBox(width: 8),
                 Text(
-                  '${earnedBadges.length} of ${allBadges.length} badges earned',
+                  '${earnedBadges.length} of ${allBadges.length} achievements earned',
                   style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ],
@@ -126,6 +128,7 @@ class KidBadgesPage extends StatelessWidget {
             ],
           ],
         ),
+      ),
       ),
     );
   }
@@ -418,6 +421,10 @@ class _CompactBadgeItem extends StatelessWidget {
         : badge.assetPath;
     final isFeatured = member.featuredBadgeIds.contains(badge.id);
 
+    final bool compact = MediaQuery.of(context).size.height < 680;
+    final double ringSize = compact ? 60.0 : 70.0;
+    final double imageSize = compact ? 40.0 : 48.0;
+
     return GestureDetector(
       onTap: () => _showDetail(context, currentTier, progress),
       child: Opacity(
@@ -427,8 +434,8 @@ class _CompactBadgeItem extends StatelessWidget {
           children: [
             Center(
               child: SizedBox(
-                width: 70,
-                height: 70,
+                width: ringSize,
+                height: ringSize,
                 child: Stack(
                   children: [
                     Positioned.fill(
@@ -442,8 +449,8 @@ class _CompactBadgeItem extends StatelessWidget {
                     ),
                     Center(
                       child: SizedBox(
-                        width: 48,
-                        height: 48,
+                        width: imageSize,
+                        height: imageSize,
                         child: assetPath != null
                             ? Image.asset(
                                 assetPath,
@@ -689,7 +696,7 @@ class _BadgePickerSheet extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Choose a badge',
+                    'Choose an achievement',
                     style:
                         ts.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),
@@ -708,7 +715,7 @@ class _BadgePickerSheet extends StatelessWidget {
             Expanded(
               child: Center(
                 child: Text(
-                  'Earn some badges first!',
+                  'Earn some achievements first!',
                   style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ),

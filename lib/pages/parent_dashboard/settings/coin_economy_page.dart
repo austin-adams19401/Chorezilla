@@ -117,7 +117,9 @@ class _CoinEconomyPageState extends State<CoinEconomyPage> {
         backgroundColor: cs.secondary,
         foregroundColor: Colors.white,
       ),
-      body: ListView(
+      body: SafeArea(
+        top: false,
+        child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Text(
@@ -184,6 +186,7 @@ class _CoinEconomyPageState extends State<CoinEconomyPage> {
                 : const Text('Save'),
           ),
         ],
+      ),
       ),
     );
   }

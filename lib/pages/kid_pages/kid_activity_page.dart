@@ -67,13 +67,15 @@ class KidActivityPage extends StatelessWidget {
     items.sort((a, b) => b.time.compareTo(a.time));
 
     return Scaffold(
-      appBar: AppBar(title: Text('${member.displayName}’s activity')),
-      body: items.isEmpty
+      appBar: AppBar(title: Text("${member.displayName}'s activity")),
+      body: SafeArea(
+        top: false,
+        child: items.isEmpty
           ? const _EmptyStateActivity(
               emoji: '✨',
               title: 'No activity yet',
               subtitle:
-                  'When you finish chores or buy rewards, they’ll show up here.',
+                  "When you finish chores or buy rewards, they'll show up here.",
             )
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -84,6 +86,7 @@ class KidActivityPage extends StatelessWidget {
                 return _ActivityTile(item: item);
               },
             ),
+      ),
     );
   }
 

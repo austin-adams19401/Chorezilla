@@ -1,4 +1,5 @@
 // lib/pages/kid_pages/kid_rewards_page.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -36,7 +37,35 @@ class _KidRewardsPageState extends State<KidRewardsPage>
       if (member != null) {
         app.startKidStreams(member.id);
       }
+      _checkRestockedRewards();
     });
+  }
+
+  void _checkRestockedRewards() {
+    if (!mounted) return;
+    final app = context.read<AppState>();
+    final member = _resolveMember(app);
+    if (member == null) return;
+
+    final allRedemptions = app.rewardRedemptionsForKid(member.id);
+    final purchasedRewardIds = allRedemptions
+        .where((r) => r.rewardId != null)
+        .map((r) => r.rewardId!)
+        .toSet();
+
+    final cutoff = DateTime.now().subtract(const Duration(days: 30));
+    final hasRestock = app.rewards.any(
+      (r) =>
+          r.restockedAt != null &&
+          r.restockedAt!.isAfter(cutoff) &&
+          purchasedRewardIds.contains(r.id),
+    );
+
+    if (hasRestock) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('🎁 Some rewards have been restocked!')),
+      );
+    }
   }
 
   Member? _resolveMember(AppState app) {
@@ -77,13 +106,26 @@ class _KidRewardsPageState extends State<KidRewardsPage>
     }
 
     final allRedemptions = app.rewardRedemptionsForKid(member.id);
-    final boughtRewardIds = allRedemptions
-        .where((r) => r.status != 'cancelled' && r.rewardId != null)
-        .map((r) => r.rewardId!)
-        .toSet();
-
     final rewards = [...app.rewards]
       ..sort((a, b) => a.coinCost.compareTo(b.coinCost));
+
+    // Build a lookup so we can check restockedAt per reward.
+    final rewardsById = {for (final r in rewards) r.id: r};
+
+    // Only count redemptions that occurred AFTER the reward's last restock.
+    // This ensures a parent restock immediately clears the kid's out-of-stock state.
+    final kidPurchaseCounts = <String, int>{};
+    for (final r in allRedemptions) {
+      if (r.status != 'cancelled' && r.rewardId != null) {
+        final restockedAt = rewardsById[r.rewardId!]?.restockedAt;
+        final countedOut = restockedAt != null &&
+            r.createdAt != null &&
+            !r.createdAt!.isAfter(restockedAt);
+        if (!countedOut) {
+          kidPurchaseCounts[r.rewardId!] = (kidPurchaseCounts[r.rewardId!] ?? 0) + 1;
+        }
+      }
+    }
 
     final myRedemptions = allRedemptions
         .where((r) => r.isPending)
@@ -91,6 +133,7 @@ class _KidRewardsPageState extends State<KidRewardsPage>
 
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final bool compact = MediaQuery.of(context).size.height < 680;
 
     return Scaffold(
       appBar: AppBar(
@@ -99,7 +142,9 @@ class _KidRewardsPageState extends State<KidRewardsPage>
         elevation: 0,
         title: Text("Reward Store"),
       ),
-      body: Stack(
+      body: SafeArea(
+        top: false,
+        child: Stack(
         children: [
           Container(color: cs.secondary),
 
@@ -107,12 +152,12 @@ class _KidRewardsPageState extends State<KidRewardsPage>
             children: [
               const SizedBox(height: 4),
               _WalletHeader(member: member),
-              const SizedBox(height: 8),
+              SizedBox(height: compact ? 4 : 8),
 
               // Store / My Rewards tabs on a rounded sheet
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(compact ? 8.0 : 16.0),
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
@@ -148,7 +193,7 @@ class _KidRewardsPageState extends State<KidRewardsPage>
                                   member: member,
                                   rewards: rewards,
                                   busyRewardIds: _busyRewardIds,
-                                  boughtRewardIds: boughtRewardIds,
+                                  kidPurchaseCounts: kidPurchaseCounts,
                                   onPurchase: _purchaseReward,
                                 ),
                                 _CosmeticsTab(member: member),
@@ -165,6 +210,7 @@ class _KidRewardsPageState extends State<KidRewardsPage>
             ],
           ),
         ],
+      ),
       ),
     );
   }
@@ -219,11 +265,12 @@ class _WalletHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final ts = theme.textTheme;
+    final bool compact = MediaQuery.of(context).size.height < 680;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: EdgeInsets.fromLTRB(compact ? 12 : 16, compact ? 8 : 16, compact ? 12 : 16, compact ? 8 : 16),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(compact ? 10 : 16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
@@ -317,19 +364,20 @@ class _RewardStoreTab extends StatelessWidget {
     required this.member,
     required this.rewards,
     required this.busyRewardIds,
-    required this.boughtRewardIds,
+    required this.kidPurchaseCounts,
     required this.onPurchase,
   });
 
   final Member member;
   final List<Reward> rewards;
   final Set<String> busyRewardIds;
-  final Set<String> boughtRewardIds;
+  final Map<String, int> kidPurchaseCounts;
   final Future<void> Function(Member, Reward) onPurchase;
 
   @override
   Widget build(BuildContext context) {
-    final visibleRewards = rewards.where((r) => !boughtRewardIds.contains(r.id)).toList();
+    final visibleRewards = rewards.toList();
+
     if (visibleRewards.isEmpty) {
       return const _EmptyStateKidRewards(
         emoji: '🛍️',
@@ -352,7 +400,8 @@ class _RewardStoreTab extends StatelessWidget {
           crossAxisCount = 3; // big screens
         }
 
-        const tileHeight = 160.0;
+        final cardWidth = (width - 32 - (crossAxisCount - 1) * 12.0) / crossAxisCount;
+        final tileHeight = (185.0 * (360.0 / cardWidth.clamp(160.0, 360.0))).clamp(175.0, 240.0);
 
         return GridView.builder(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
@@ -360,14 +409,15 @@ class _RewardStoreTab extends StatelessWidget {
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 12,
             mainAxisSpacing: 12,
-            mainAxisExtent:
-                tileHeight, 
+            mainAxisExtent: tileHeight,
           ),
           itemCount: visibleRewards.length,
           itemBuilder: (context, index) {
             final r = visibleRewards[index];
+            final kidCount = kidPurchaseCounts[r.id] ?? 0;
+            final stockRemaining = r.stock != null ? r.stock! - kidCount : null;
+            final soldOut = stockRemaining != null && stockRemaining <= 0;
             final canAfford = member.coins >= r.coinCost;
-            final soldOut = r.stock != null && r.stock! <= 0;
             final busy = busyRewardIds.contains(r.id);
 
             return _RewardTile(
@@ -375,6 +425,7 @@ class _RewardStoreTab extends StatelessWidget {
               canAfford: canAfford && !soldOut && !busy,
               soldOut: soldOut,
               busy: busy,
+              stockRemaining: stockRemaining,
               onPressed: () => onPurchase(member, r),
             );
           },
@@ -384,46 +435,94 @@ class _RewardStoreTab extends StatelessWidget {
   }
 }
 
-class _RewardTile extends StatelessWidget {
+class _RewardTile extends StatefulWidget {
   const _RewardTile({
     required this.reward,
     required this.canAfford,
     required this.soldOut,
     required this.busy,
     required this.onPressed,
+    this.stockRemaining,
   });
 
   final Reward reward;
   final bool canAfford;
   final bool soldOut;
   final bool busy;
+  final int? stockRemaining;
   final VoidCallback onPressed;
 
   @override
+  State<_RewardTile> createState() => _RewardTileState();
+}
+
+class _RewardTileState extends State<_RewardTile>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _flipCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _flipCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+      value: widget.soldOut ? 1.0 : 0.0,
+    );
+  }
+
+  @override
+  void didUpdateWidget(_RewardTile old) {
+    super.didUpdateWidget(old);
+    if (widget.soldOut != old.soldOut) {
+      if (widget.soldOut) {
+        _flipCtrl.forward();
+      } else {
+        _flipCtrl.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _flipCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _flipCtrl,
+      builder: (context, _) {
+        final angle = _flipCtrl.value * math.pi;
+        final showBack = _flipCtrl.value >= 0.5;
+        return Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.001)
+            ..rotateY(showBack ? angle - math.pi : angle),
+          child: showBack ? _buildBack(context) : _buildFront(context),
+        );
+      },
+    );
+  }
+
+  Widget _buildFront(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
 
-    final iconText = (reward.icon?.trim().isNotEmpty ?? false)
-        ? reward.icon!.trim()
+    final iconText = (widget.reward.icon?.trim().isNotEmpty ?? false)
+        ? widget.reward.icon!.trim()
         : '🎁';
 
-    final subtitleParts = <String>[];
-    if (reward.description != null && reward.description!.isNotEmpty) {
-      subtitleParts.add(reward.description!);
-    }
-    if (reward.stock != null) {
-      subtitleParts.add('Stock: ${reward.stock}');
-    }
-    final subtitleText = subtitleParts.join(' • ');
+    final descriptionText = (widget.reward.description?.trim().isNotEmpty ?? false)
+        ? widget.reward.description!.trim()
+        : null;
+    final stockText = widget.stockRemaining != null ? 'Limit: ${widget.stockRemaining}' : null;
 
-    final bool disabled = !canAfford || soldOut;
+    final bool disabled = !widget.canAfford;
 
-    final Color cardColor = soldOut
-        ? cs.surfaceContainerHighest
-        : disabled
-        ? cs.surfaceContainer
-        : cs.surface;
+    final Color cardColor =
+        disabled ? cs.surfaceContainer : cs.surface;
 
     return Card(
       elevation: 0,
@@ -448,9 +547,11 @@ class _RewardTile extends StatelessWidget {
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    reward.title,
+                    widget.reward.title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: ts.titleMedium?.copyWith(
@@ -458,12 +559,23 @@ class _RewardTile extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  if (subtitleText.isNotEmpty)
+                  if (descriptionText != null)
                     Text(
-                      subtitleText,
+                      descriptionText,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      style: ts.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  if (stockText != null)
+                    Text(
+                      stockText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ts.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   const SizedBox(height: 6),
                   Row(
@@ -471,7 +583,7 @@ class _RewardTile extends StatelessWidget {
                       const Text('🪙'),
                       const SizedBox(width: 4),
                       Text(
-                        '${reward.coinCost} coins',
+                        '${widget.reward.coinCost} coins',
                         style: ts.bodySmall?.copyWith(
                           fontWeight: FontWeight.w600,
                           color: disabled ? cs.onSurfaceVariant : cs.primary,
@@ -483,35 +595,52 @@ class _RewardTile extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            if (soldOut)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Sold out',
-                  style: ts.labelMedium?.copyWith(
-                    color: cs.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              )
-            else
-              FilledButton(
-                onPressed: disabled || busy ? null : onPressed,
-                child: busy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Buy'),
-              ),
+            FilledButton(
+              onPressed: disabled || widget.busy ? null : widget.onPressed,
+              child: widget.busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Buy'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBack(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final ts = Theme.of(context).textTheme;
+
+    final iconText = (widget.reward.icon?.trim().isNotEmpty ?? false)
+        ? widget.reward.icon!.trim()
+        : '🎁';
+
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerHighest,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(iconText, style: const TextStyle(fontSize: 36)),
+            const SizedBox(height: 6),
+            Text(
+              widget.reward.title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Out of stock',
+              style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
           ],
         ),
       ),
@@ -599,7 +728,7 @@ class _RedemptionTile extends StatelessWidget {
     final subtitleParts = <String>[
       '${redemption.coinCost} coins',
       statusLabel,
-      if (dateText != null) dateText,
+      ?dateText,
     ];
     final subtitleText = subtitleParts.join(' • ');
 
@@ -1416,6 +1545,10 @@ class _CosmeticTile extends StatelessWidget {
                     item.rarity!.displayName,
                     style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                   ),
+                ],
+                if (!owned) ...[
+                  const SizedBox(height: 4),
+                  _coinAndBuyRow(context),
                 ],
                 if (owned && !equipped) ...[
                   const SizedBox(height: 2),

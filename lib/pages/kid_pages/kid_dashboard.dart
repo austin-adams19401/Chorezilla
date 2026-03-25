@@ -342,6 +342,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     final cs = theme.colorScheme;
 
     final dayComplete = app.isDayCompleteForKid(member.id);
+    final bool compact = MediaQuery.of(context).size.height < 680;
 
     return Scaffold(
       appBar: AppBar(
@@ -363,7 +364,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
           ),
           IconButton(
             icon: const Icon(Icons.emoji_events_rounded, size: 28),
-            tooltip: 'Badges',
+            tooltip: 'Achievements',
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute(
@@ -397,7 +398,9 @@ class _KidDashboardPageState extends State<KidDashboardPage>
           ),
         ],
       ),
-            body: Stack(
+            body: SafeArea(
+        top: false,
+        child: Stack(
         children: [
           // Background layer: either equipped image or fallback gradient
           Container(
@@ -421,11 +424,11 @@ class _KidDashboardPageState extends State<KidDashboardPage>
           // Main content
           Column(
             children: [
-              const SizedBox(height: 4),
+              SizedBox(height: compact ? 2 : 4),
 
                             // Profile header inside a tappable rounded hero card
               Container(
-                margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                margin: EdgeInsets.fromLTRB(compact ? 8 : 12, compact ? 4 : 8, compact ? 8 : 12, compact ? 2 : 4),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(24),
                   onTap: () {
@@ -457,13 +460,13 @@ class _KidDashboardPageState extends State<KidDashboardPage>
               ),
 
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                padding: EdgeInsets.fromLTRB(compact ? 12 : 16, compact ? 2 : 4, compact ? 12 : 16, compact ? 2 : 4),
                 child: _KidStatsBar(member: member),
               ),
 
               if (pendingRewards.isNotEmpty)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                  padding: EdgeInsets.fromLTRB(compact ? 12 : 16, compact ? 2 : 4, compact ? 12 : 16, compact ? 2 : 4),
                   child: _PendingRewardsBanner(
                     count: pendingRewards.length,
                     onTap: () {
@@ -481,7 +484,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
               if (dayComplete)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  padding: EdgeInsets.fromLTRB(compact ? 12 : 16, 0, compact ? 12 : 16, compact ? 2 : 4),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -509,12 +512,12 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                   ),
                 ),
 
-              const SizedBox(height: 8),
+              SizedBox(height: compact ? 4 : 8),
 
               // Tabs + lists on a rounded “sheet”
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(compact ? 8.0 : 16.0),
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
@@ -634,6 +637,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
               ),
             ),
         ],
+      ),
       ),
     );
   }
@@ -926,7 +930,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
         }
       }
 
-      if (lvlReward != null) {
+      if (lvlReward != null && lvlReward.cosmeticId == null) {
         try {
           await app.createLevelUpRewardRedemptionForKid(
             memberId: member.id,
@@ -976,7 +980,8 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                       ),
                     ],
                   ),
-                  content: Column(
+                  content: SingleChildScrollView(
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(height: 8),
@@ -1109,6 +1114,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                         style: theme.textTheme.bodySmall,
                       ),
                     ],
+                  ),
                   ),
                   actions: [
                     if (lvlTitle != null && !simulate)
@@ -2054,7 +2060,7 @@ class _EarnedBadgesStrip extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   physics: const BouncingScrollPhysics(),
                   itemCount: items.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  separatorBuilder: (_, _) => const SizedBox(width: 6),
                   itemBuilder: (_, i) {
                     final item = items[i];
                     return SizedBox(

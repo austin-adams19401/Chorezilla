@@ -1,5 +1,6 @@
 import 'package:chorezilla/models/assignment.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/themes/app_theme.dart';
 import 'package:flutter/material.dart';
 
 // ignore: unused_element
@@ -12,6 +13,7 @@ class _KidTodayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     final total = summary.total;
     final completed = summary.completed;
@@ -28,11 +30,15 @@ class _KidTodayCard extends StatelessWidget {
     // Status pill
     final String statusText = isAllDone ? 'All done' : '$remaining left';
     final Color statusColor = isAllDone
-        ? cs.primary.withValues(alpha: 0.14)
-        : cs.secondaryContainer.withValues(alpha: 0.35);
+        ? (isLight
+            ? AppTheme.zillaGreen.withValues(alpha: 0.18)
+            : cs.primary.withValues(alpha: 0.14))
+        : (isLight
+            ? AppTheme.deepNavy.withValues(alpha: 0.10)
+            : cs.secondaryContainer.withValues(alpha: 0.35));
     final Color statusTextColor = isAllDone
-        ? cs.primary
-        : cs.onSecondaryContainer;
+        ? (isLight ? AppTheme.zillaGreen : cs.primary)
+        : (isLight ? AppTheme.deepNavy : cs.onSecondaryContainer);
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -40,29 +46,47 @@ class _KidTodayCard extends StatelessWidget {
         _showKidDetailsBottomSheet(context, summary);
       },
       child: Card(
-        elevation: isAllDone ? 2 : 0,
+        elevation: isAllDone ? 4 : (isLight ? 3 : 0),
+        shadowColor: isLight
+            ? AppTheme.deepNavy.withValues(alpha: 0.15)
+            : null,
         margin: EdgeInsets.zero,
-        color: isAllDone
-            ? cs.primaryContainer.withValues(alpha: 0.25)
-            : cs.surface,
+        color: isLight ? Colors.white : (isAllDone ? cs.primaryContainer.withValues(alpha: 0.25) : cs.surface),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(18),
           side: BorderSide(
-            color: isAllDone ? cs.primary : cs.outlineVariant,
-            width: isAllDone ? 2 : 1,
+            color: isAllDone
+                ? (isLight ? AppTheme.zillaGreen : cs.primary)
+                : (isLight
+                    ? AppTheme.deepNavy.withValues(alpha: 0.22)
+                    : cs.outlineVariant),
+            width: isAllDone ? 2.5 : 1.5,
           ),
         ),
         child: Container(
           decoration: BoxDecoration(
-            // subtle top-to-bottom tint so it feels less flat
-            gradient: LinearGradient(
-              colors: [
-                cs.surfaceContainerHighest.withValues(alpha: 0.24),
-                cs.surface,
-              ],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
+            gradient: isLight
+                ? LinearGradient(
+                    colors: isAllDone
+                        ? [
+                            AppTheme.zillaGreen.withValues(alpha: 0.18),
+                            AppTheme.zillaGreen.withValues(alpha: 0.04),
+                          ]
+                        : [
+                            AppTheme.deepNavy.withValues(alpha: 0.07),
+                            Colors.white,
+                          ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : LinearGradient(
+                    colors: [
+                      cs.surfaceContainerHighest.withValues(alpha: 0.24),
+                      cs.surface,
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
             borderRadius: BorderRadius.circular(18),
           ),
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -75,7 +99,9 @@ class _KidTodayCard extends StatelessWidget {
                 children: [
                   CircleAvatar(
                     radius: avatarRadius,
-                    backgroundColor: cs.primaryContainer,
+                    backgroundColor: isLight
+                        ? AppTheme.zillaGreen.withValues(alpha: 0.20)
+                        : cs.primaryContainer,
                     child:
                         (summary.avatarKey != null &&
                             summary.avatarKey!.isNotEmpty)
@@ -151,8 +177,12 @@ class _KidTodayCard extends StatelessWidget {
                       child: LinearProgressIndicator(
                         value: progress,
                         minHeight: 6,
-                        backgroundColor: cs.surfaceContainerHighest,
-                        valueColor: AlwaysStoppedAnimation<Color>(cs.primary),
+                        backgroundColor: isLight
+                            ? AppTheme.deepNavy.withValues(alpha: 0.12)
+                            : cs.surfaceContainerHighest,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isLight ? AppTheme.zillaGreen : cs.primary,
+                        ),
                       ),
                     ),
                   ),
@@ -179,18 +209,24 @@ class _KidTodayCard extends StatelessWidget {
                     label: 'Left',
                     value: remaining,
                     color: remaining == 0
-                        ? cs.primary.withValues(alpha: 0.16)
-                        : cs.secondaryContainer.withValues(alpha: 0.6),
+                        ? (isLight
+                            ? AppTheme.zillaGreen.withValues(alpha: 0.15)
+                            : cs.primary.withValues(alpha: 0.16))
+                        : (isLight
+                            ? AppTheme.deepNavy
+                            : cs.secondaryContainer.withValues(alpha: 0.6)),
                     textColor: remaining == 0
-                        ? cs.primary
-                        : cs.onSecondaryContainer,
+                        ? (isLight ? AppTheme.zillaGreen : cs.primary)
+                        : (isLight ? Colors.white : cs.onSecondaryContainer),
                   ),
                   _StatChip(
                     icon: Icons.hourglass_bottom_rounded,
                     label: 'Pending',
                     value: pending,
-                    color: cs.tertiaryContainer.withValues(alpha: 0.8),
-                    textColor: cs.onTertiaryContainer,
+                    color: isLight
+                        ? AppTheme.zillaGreen
+                        : cs.tertiaryContainer.withValues(alpha: 0.8),
+                    textColor: isLight ? Colors.white : cs.onTertiaryContainer,
                   ),
                   _StatChip(
                     icon: Icons.close_rounded,
@@ -216,7 +252,7 @@ class _KidTodayCard extends StatelessWidget {
                   Text(
                     'View today',
                     style: ts.labelSmall?.copyWith(
-                      color: cs.onSurfaceVariant,
+                      color: isLight ? AppTheme.deepNavy : cs.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -224,7 +260,7 @@ class _KidTodayCard extends StatelessWidget {
                   Icon(
                     Icons.arrow_forward_ios_rounded,
                     size: 10,
-                    color: cs.onSurfaceVariant,
+                    color: isLight ? AppTheme.deepNavy : cs.onSurfaceVariant,
                   ),
                 ],
               ),

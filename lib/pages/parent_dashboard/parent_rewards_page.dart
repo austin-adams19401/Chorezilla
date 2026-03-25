@@ -5,8 +5,6 @@ import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/services/subscription_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart';
-
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/reward.dart';
 import 'package:chorezilla/models/reward_redemption.dart';
@@ -21,7 +19,7 @@ class ParentRewardsPage extends StatefulWidget {
 
 class _ParentRewardsPageState extends State<ParentRewardsPage> {
   RewardCategory? _categoryFilter; // null = All
-  bool _showDisabled = false;
+  bool _stockFilter = false;
   bool _pendingExpanded = true;
 
   @override
@@ -38,6 +36,7 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
     final ts = theme.textTheme;
 
     return Scaffold(
+      backgroundColor: cs.secondary.withValues(alpha: 0.10),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final rewards = app.rewards;
@@ -51,38 +50,18 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
               : 0;
 
 
-          final isLandscape = constraints.maxWidth > constraints.maxHeight;
-
           // 1) Decide how many columns based on width
           int gridCrossAxisCount;
           if (constraints.maxWidth >= 1100) {
-            gridCrossAxisCount = 4; // large tablet / desktop
+            gridCrossAxisCount = 4;
           } else if (constraints.maxWidth >= 750) {
-            gridCrossAxisCount = 3; // small / medium tablet
+            gridCrossAxisCount = 3;
           } else {
-            gridCrossAxisCount = 2; // phones
+            gridCrossAxisCount = 2;
           }
 
-          // 2) Compute a childAspectRatio that keeps the card at a reasonable *pixel* height
-          const double gridHorizontalPadding =
-              4.0; // from your GridView padding (left/right)
-          const double gridCrossAxisSpacing = 8.0;
-
-          final double usableWidth =
-              constraints.maxWidth -
-              (gridHorizontalPadding * 2) -
-              gridCrossAxisSpacing * (gridCrossAxisCount - 1);
-
-          final double tileWidth = usableWidth / gridCrossAxisCount;
-
-          // Target physical height for a card (tweak these)
-          final double targetCardHeight = isLandscape ? 150.0 : 150.0;
-
-          // childAspectRatio is width / height
-          final double childAspectRatio = tileWidth / targetCardHeight;
-
-
           return SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 88),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -112,12 +91,12 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                           // ── Filters ────────────────────────────────────────
                           _RewardsFilters(
                             categoryFilter: _categoryFilter,
-                            showDisabled: _showDisabled,
                             onCategoryChanged: (cat) {
                               setState(() => _categoryFilter = cat);
                             },
-                            onShowDisabledChanged: (val) {
-                              setState(() => _showDisabled = val);
+                            stockFilter: _stockFilter,
+                            onStockFilterChanged: (val) {
+                              setState(() => _stockFilter = val);
                             },
                           ),
 
@@ -137,7 +116,7 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                                   pendingSnap.data ?? const <RewardRedemption>[];
 
                               // In release: only show if there are items.
-                              if (pending.isEmpty && !kDebugMode) {
+                              if (pending.isEmpty) {
                                 return const SizedBox.shrink();
                               }
 
@@ -159,8 +138,18 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                           const SizedBox(height: 8),
 
                           // ── Rewards grid (non-scrollable, inside scroll view) ─────────
-                          Builder(
-                            builder: (context) {
+                          StreamBuilder<List<RewardRedemption>>(
+                            stream: app.repo.watchAllRewardRedemptionsForFamily(familyId),
+                            builder: (context, redemptionSnap) {
+                              // Group all family redemptions by memberId for out-of-stock lookups.
+                              final allRedemptions = redemptionSnap.data ?? const <RewardRedemption>[];
+                              final redemptionsByMember = <String, List<RewardRedemption>>{};
+                              for (final rd in allRedemptions) {
+                                redemptionsByMember
+                                    .putIfAbsent(rd.memberId, () => [])
+                                    .add(rd);
+                              }
+
                               final rewards = app.rewards;
 
                               if (!app.rewardsBootstrapped) {
@@ -192,23 +181,16 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                               }
 
                               var visible = rewards;
-                              if (!_showDisabled) {
-                                visible = visible.where((r) => r.active).toList();
-                              }
                               if (_categoryFilter != null) {
                                 visible = visible
                                     .where((r) => r.category == _categoryFilter)
                                     .toList();
                               }
-
-                              visible.sort((a, b) {
-                                final costCmp = a.coinCost.compareTo(b.coinCost);
-                                if (costCmp != 0) return costCmp;
-                                final catCmp =
-                                    a.category.index.compareTo(b.category.index);
-                                if (catCmp != 0) return catCmp;
-                                return a.title.compareTo(b.title);
-                              });
+                              if (_stockFilter) {
+                                visible = visible
+                                    .where((r) => r.stock != null)
+                                    .toList();
+                              }
 
                               if (visible.isEmpty) {
                                 return Center(
@@ -226,90 +208,202 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                                 );
                               }
 
-                              return GridView.builder(
-                                padding:
-                                    const EdgeInsets.fromLTRB(4, 8, 4, 16),
-                                // IMPORTANT: let the parent scroll view handle scrolling
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: gridCrossAxisCount,
-                                  mainAxisSpacing: 8,
-                                  crossAxisSpacing: 8,
-                                  childAspectRatio: childAspectRatio,
-                                ),
-                                itemCount: visible.length,
-                                itemBuilder: (context, i) {
-                                  final r = visible[i];
-                                  return _RewardCard(
-                                    reward: r,
-                                    onEdit: () =>
-                                        _openEditRewardSheet(context, r),
-                                    onToggleActive: (active) async {
-                                      final messenger = ScaffoldMessenger.of(context);
-                                      try {
-                                        await app.repo.setRewardActive(
-                                          familyId,
-                                          rewardId: r.id,
-                                          active: active,
-                                        );
-                                      } catch (_) {
-                                        if (!mounted) return;
-                                        messenger.showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Could not update reward. Check your connection.'),
-                                          ),
-                                        );
-                                      }
-                                    },
-                                    onDelete: () async {
-                                      final messenger = ScaffoldMessenger.of(context);
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        builder: (ctx) => AlertDialog(
-                                          title: const Text('Delete reward?'),
-                                          content: Text(
-                                            'Delete "${r.title}" permanently? '
-                                            "Kids won't see it in the store anymore.",
-                                          ),
-                                          actions: [
-                                            TextButton(
-                                              onPressed: () =>
-                                                  Navigator.of(ctx).pop(false),
-                                              child: const Text('Cancel'),
-                                            ),
-                                            FilledButton.tonal(
-                                              onPressed: () =>
-                                                  Navigator.of(ctx).pop(true),
-                                              style: FilledButton.styleFrom(
-                                                foregroundColor: Theme.of(
-                                                  ctx,
-                                                ).colorScheme.error,
-                                              ),
-                                              child: const Text('Delete'),
-                                            ),
-                                          ],
+                              final kids = app.members
+                                  .where((m) => m.role == FamilyRole.child)
+                                  .toList();
+
+                              // Helper to build a single reward card with all callbacks.
+                              Widget buildCard(Reward r) {
+                                // Mirror the kid's store logic exactly: count non-cancelled
+                                // redemptions per kid for this reward, respecting restockedAt.
+                                final outOfStockKids = r.stock == null
+                                    ? <({String id, String name})>[]
+                                    : kids.where((k) {
+                                        final count = (redemptionsByMember[k.id] ?? [])
+                                            .where((rd) {
+                                              if (rd.status == 'cancelled') return false;
+                                              if (rd.rewardId != r.id) return false;
+                                              final restockedAt = r.restockedAt;
+                                              if (restockedAt != null &&
+                                                  rd.createdAt != null &&
+                                                  !rd.createdAt!.isAfter(restockedAt)) {
+                                                return false;
+                                              }
+                                              return true;
+                                            })
+                                            .length;
+                                        return count >= r.stock!;
+                                      })
+                                        .map((k) => (id: k.id, name: k.displayName))
+                                        .toList();
+                                return _RewardCard(
+                                  reward: r,
+                                  outOfStockKids: outOfStockKids,
+                                  onEdit: () => _openEditRewardSheet(context, r),
+                                  onRestock: () async {
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    try {
+                                      await app.repo.restockReward(
+                                        familyId,
+                                        rewardId: r.id,
+                                      );
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        SnackBar(content: Text('"${r.title}" restocked for all kids!')),
+                                      );
+                                    } catch (_) {
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Could not restock. Check your connection.'),
                                         ),
                                       );
-                                      if (confirm != true) return;
-
-                                      try {
-                                        await app.repo.deleteReward(
-                                          familyId,
-                                          rewardId: r.id,
-                                        );
-                                      } catch (_) {
-                                        if (!mounted) return;
-                                        messenger.showSnackBar(
-                                          const SnackBar(
-                                            content: Text('Could not delete reward. Check your connection.'),
+                                    }
+                                  },
+                                  onRestockKid: (memberId) async {
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    final kidName = outOfStockKids
+                                        .firstWhere((k) => k.id == memberId,
+                                            orElse: () => (id: memberId, name: 'Kid'))
+                                        .name;
+                                    try {
+                                      await app.repo.restockRewardForKid(
+                                        familyId,
+                                        rewardId: r.id,
+                                        memberId: memberId,
+                                      );
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        SnackBar(content: Text('"${r.title}" restocked for $kidName!')),
+                                      );
+                                    } catch (_) {
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Could not restock. Check your connection.'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  onToggleActive: (active) async {
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    try {
+                                      await app.repo.setRewardActive(
+                                        familyId,
+                                        rewardId: r.id,
+                                        active: active,
+                                      );
+                                    } catch (_) {
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Could not update reward. Check your connection.'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  onDelete: () async {
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      builder: (ctx) => AlertDialog(
+                                        title: const Text('Delete reward?'),
+                                        content: Text(
+                                          'Delete "${r.title}" permanently? '
+                                          "Kids won't see it in the store anymore.",
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.of(ctx).pop(false),
+                                            child: const Text('Cancel'),
                                           ),
+                                          FilledButton.tonal(
+                                            onPressed: () => Navigator.of(ctx).pop(true),
+                                            style: FilledButton.styleFrom(
+                                              foregroundColor: Theme.of(ctx).colorScheme.error,
+                                            ),
+                                            child: const Text('Delete'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (confirm != true) return;
+                                    try {
+                                      await app.repo.deleteReward(
+                                        familyId,
+                                        rewardId: r.id,
+                                      );
+                                    } catch (_) {
+                                      if (!mounted) return;
+                                      messenger.showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Could not delete reward. Check your connection.'),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                );
+                              }
+
+                              // Build one section per category that has rewards.
+                              final categoriesToShow = _categoryFilter != null
+                                  ? [_categoryFilter!]
+                                  : RewardCategory.values;
+
+                              final sections = <Widget>[];
+                              for (final cat in categoriesToShow) {
+                                final catRewards = visible
+                                    .where((r) => r.category == cat)
+                                    .toList()
+                                  ..sort((a, b) => a.coinCost.compareTo(b.coinCost));
+                                if (catRewards.isEmpty) continue;
+
+                                sections.add(
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(8, 16, 8, 6),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _categoryIcon(cat),
+                                          size: 16,
+                                          color: cs.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          _categoryLabel(cat),
+                                          style: ts.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: cs.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+
+                                const wrapSpacing = 8.0;
+                                sections.add(
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+                                    child: LayoutBuilder(
+                                      builder: (context, wrapConstraints) {
+                                        final cardWidth = (wrapConstraints.maxWidth - (wrapSpacing * (gridCrossAxisCount - 1))) / gridCrossAxisCount;
+                                        return Wrap(
+                                          spacing: wrapSpacing,
+                                          runSpacing: wrapSpacing,
+                                          children: catRewards
+                                              .map((r) => SizedBox(width: cardWidth, child: buildCard(r)))
+                                              .toList(),
                                         );
-                                      }
-                                    },
-                                  );
-                                },
+                                      },
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: sections,
                               );
                             },
                           ),
@@ -375,6 +469,7 @@ class _RewardsHero extends StatelessWidget {
     final media = MediaQuery.of(context);
     final double topInset = media.padding.top;
     final bool isLandscape = media.orientation == Orientation.landscape;
+    final bool isCompact = media.size.height < 680;
 
     return Container(
       width: double.infinity,
@@ -382,7 +477,7 @@ class _RewardsHero extends StatelessWidget {
         20,
         isLandscape ? topInset + 2 : topInset + 4,
         20,
-        isLandscape ? 6 : 8,
+        (isLandscape || isCompact) ? 6 : 8,
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -404,7 +499,7 @@ class _RewardsHero extends StatelessWidget {
                 children: [
                   Text(
                     'Rewards & store',
-                    style: (isLandscape ? ts.titleMedium : ts.headlineSmall)
+                    style: ((isLandscape || isCompact) ? ts.titleMedium : ts.headlineSmall)
                         ?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -441,8 +536,8 @@ class _RewardsHero extends StatelessWidget {
           const SizedBox(width: 12),
           // Rounded gift icon “badge”
           Container(
-            height: isLandscape ? 48 : 64,
-            width: isLandscape ? 48 : 64,
+            height: (isLandscape || isCompact) ? 48 : 64,
+            width: (isLandscape || isCompact) ? 48 : 64,
             decoration: BoxDecoration(
               color: cs.secondary,
               shape: BoxShape.circle,
@@ -457,7 +552,7 @@ class _RewardsHero extends StatelessWidget {
             child: Icon(
               Icons.card_giftcard_rounded,
               color: Colors.white,
-              size: isLandscape ? 24 : 32,
+              size: (isLandscape || isCompact) ? 24 : 32,
             ),
           ),
         ],
@@ -473,15 +568,15 @@ class _RewardsHero extends StatelessWidget {
 class _RewardsFilters extends StatelessWidget {
   const _RewardsFilters({
     required this.categoryFilter,
-    required this.showDisabled,
     required this.onCategoryChanged,
-    required this.onShowDisabledChanged,
+    required this.stockFilter,
+    required this.onStockFilterChanged,
   });
 
   final RewardCategory? categoryFilter;
-  final bool showDisabled;
   final ValueChanged<RewardCategory?> onCategoryChanged;
-  final ValueChanged<bool> onShowDisabledChanged;
+  final bool stockFilter;
+  final ValueChanged<bool> onStockFilterChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -518,6 +613,20 @@ class _RewardsFilters extends StatelessWidget {
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: const Text('Stock limit'),
+                    avatar: const Icon(Icons.inventory_2_outlined, size: 14),
+                    selected: stockFilter,
+                    onSelected: onStockFilterChanged,
+                    selectedColor: cs.tertiaryContainer,
+                    labelStyle: ts.labelMedium?.copyWith(
+                      color: stockFilter ? cs.onTertiaryContainer : cs.onSurface,
+                    ),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
                 for (final cat in RewardCategory.values)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
@@ -538,23 +647,6 @@ class _RewardsFilters extends StatelessWidget {
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            FilterChip(
-              label: const Text('Show disabled rewards'),
-              selected: showDisabled,
-              onSelected: (val) => onShowDisabledChanged(val),
-              avatar: Icon(
-                showDisabled
-                    ? Icons.visibility_rounded
-                    : Icons.visibility_off_rounded,
-                size: 16,
-              ),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ],
         ),
       ],
     );
@@ -623,15 +715,38 @@ class _EmptyRewards extends StatelessWidget {
 class _RewardCard extends StatelessWidget {
   const _RewardCard({
     required this.reward,
+    required this.outOfStockKids,
     required this.onEdit,
     required this.onToggleActive,
     required this.onDelete,
+    required this.onRestock,
+    required this.onRestockKid,
   });
 
   final Reward reward;
+  final List<({String id, String name})> outOfStockKids;
   final ValueChanged<bool> onToggleActive;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
+  final VoidCallback onRestock;
+  final ValueChanged<String> onRestockKid;
+
+  void _openDetail(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _RewardDetailSheet(
+        reward: reward,
+        outOfStockKids: outOfStockKids,
+        onEdit: onEdit,
+        onToggleActive: onToggleActive,
+        onDelete: onDelete,
+        onRestock: onRestock,
+        onRestockKid: onRestockKid,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -640,199 +755,465 @@ class _RewardCard extends StatelessWidget {
     final ts = theme.textTheme;
 
     final iconText = reward.icon?.isNotEmpty == true ? reward.icon! : '🎁';
+    final isDark = theme.brightness == Brightness.dark;
+    final baseColor = _categoryCardColor(reward.category, dark: isDark);
+    final accentColor = _categoryAccentColor(reward.category);
+    final gradientEnd = isDark
+        ? Color.lerp(baseColor, Colors.black, 0.3)!
+        : Color.lerp(baseColor, Colors.white, 0.5)!;
+    final hasOutOfStock = outOfStockKids.isNotEmpty;
 
-    return Card(
-      elevation: 0,
-      color: cs.surface,
-      shape: RoundedRectangleBorder(
+    return Material(
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _openDetail(context),
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: reward.active ? cs.primary : cs.outlineVariant,
-          width: 1.3,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Top row: icon, title/coins, delete X ────────────────────────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(iconText, style: const TextStyle(fontSize: 24)),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        reward.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: ts.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${reward.coinCost} coins',
-                        style: ts.bodySmall?.copyWith(
-                          color: cs.primary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PopupMenuButton<RewardMenuAction>(
-                  tooltip: 'Reward options',
-                  icon: Icon(
-                    Icons.more_vert_rounded,
-                    size: 20,
-                    color: cs.outline,
-                  ),
-                  padding: EdgeInsets.zero,
-                  splashRadius: 18,
-                  onSelected: (action) {
-                    switch (action) {
-                      case RewardMenuAction.edit:
-                        onEdit();
-                        break;
-                      case RewardMenuAction.delete:
-                        onDelete();
-                        break;
-                    }
-                  },
-                  itemBuilder: (ctx) => [
-                    const PopupMenuItem(
-                      value: RewardMenuAction.edit,
-                      child: ListTile(
-                        dense: true,
-                        leading: Icon(Icons.edit_rounded),
-                        title: Text('Edit'),
-                      ),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [baseColor, gradientEnd],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: reward.active
+                  ? accentColor.withValues(alpha: isDark ? 0.55 : 0.45)
+                  : cs.outlineVariant.withValues(alpha: 0.5),
+              width: 1.5,
+            ),
+            boxShadow: reward.active
+                ? [
+                    BoxShadow(
+                      color: accentColor.withValues(alpha: isDark ? 0.25 : 0.18),
+                      blurRadius: 10,
+                      offset: const Offset(0, 3),
                     ),
-                    PopupMenuItem(
-                      value: RewardMenuAction.delete,
-                      child: ListTile(
-                        dense: true,
-                        leading: Icon(
-                          Icons.delete_outline_rounded,
-                          color: cs.error,
+                  ]
+                : null,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ── Top row: icon | out-of-stock badge | menu ─────────────
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: isDark ? 0.20 : 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(iconText, style: const TextStyle(fontSize: 22)),
+                    ),
+                    const Spacer(),
+                    if (hasOutOfStock) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: cs.errorContainer,
+                          borderRadius: BorderRadius.circular(999),
                         ),
-                        title: Text(
-                          'Delete',
-                          style: TextStyle(color: cs.error),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.warning_amber_rounded, size: 11, color: cs.onErrorContainer),
+                            const SizedBox(width: 3),
+                            Text(
+                              '${outOfStockKids.length}',
+                              style: ts.labelSmall?.copyWith(
+                                color: cs.onErrorContainer,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                    SizedBox(
+                      width: 32,
+                      height: 32,
+                      child: PopupMenuButton<RewardMenuAction>(
+                        tooltip: 'Reward options',
+                        icon: Icon(Icons.more_vert_rounded, size: 18, color: cs.onSurfaceVariant),
+                        padding: EdgeInsets.zero,
+                        splashRadius: 16,
+                        onSelected: (action) {
+                          switch (action) {
+                            case RewardMenuAction.edit:
+                              onEdit();
+                              break;
+                            case RewardMenuAction.restock:
+                              onRestock();
+                              break;
+                            case RewardMenuAction.delete:
+                              onDelete();
+                              break;
+                          }
+                        },
+                        itemBuilder: (ctx) => [
+                          const PopupMenuItem(
+                            value: RewardMenuAction.edit,
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(Icons.edit_rounded),
+                              title: Text('Edit'),
+                            ),
+                          ),
+                          if (reward.stock != null && reward.memberPurchaseCounts.isNotEmpty)
+                            const PopupMenuItem(
+                              value: RewardMenuAction.restock,
+                              child: ListTile(
+                                dense: true,
+                                leading: Icon(Icons.refresh_rounded),
+                                title: Text('Restock all'),
+                              ),
+                            ),
+                          PopupMenuItem(
+                            value: RewardMenuAction.delete,
+                            child: ListTile(
+                              dense: true,
+                              leading: Icon(Icons.delete_outline_rounded),
+                              title: Text('Delete'),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
 
+                const SizedBox(height: 6),
+
+                // ── Title ─────────────────────────────────────────────────
+                Text(
+                  reward.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: ts.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Text('🪙', style: TextStyle(fontSize: 11)),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${reward.coinCost} coins',
+                      style: ts.bodySmall?.copyWith(
+                        color: accentColor.withValues(alpha: isDark ? 0.9 : 1.0),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 6),
+
+                // ── Bottom row: chip + toggle ──────────────────────────────
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Wrap(
+                        spacing: 4,
+                        runSpacing: 4,
+                        children: [
+                          _SmallChip(
+                            label: _categoryLabel(reward.category),
+                            color: accentColor.withValues(alpha: isDark ? 0.22 : 0.13),
+                            textColor: isDark ? accentColor.withValues(alpha: 0.9) : accentColor,
+                          ),
+                          if (!reward.active)
+                            _SmallChip(
+                              label: 'Off',
+                              color: cs.errorContainer.withValues(alpha: 0.7),
+                              textColor: cs.onErrorContainer,
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Switch(
+                      value: reward.active,
+                      onChanged: onToggleActive,
+                      activeThumbColor: Colors.white,
+                      activeTrackColor: cs.primary,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ],
+                ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-            const SizedBox(height: 8),
+// ─────────────────────────────────────────────────────────────────────────────
+// Reward detail bottom sheet
+// ─────────────────────────────────────────────────────────────────────────────
 
-            // ── Flexible description area (uses the spare space) ────────────
-            Expanded(
-              child:
-                  (reward.description != null &&
-                      reward.description!.trim().isNotEmpty)
-                  ? Text(
-                      reward.description!,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
+class _RewardDetailSheet extends StatelessWidget {
+  const _RewardDetailSheet({
+    required this.reward,
+    required this.outOfStockKids,
+    required this.onEdit,
+    required this.onToggleActive,
+    required this.onDelete,
+    required this.onRestock,
+    required this.onRestockKid,
+  });
+
+  final Reward reward;
+  final List<({String id, String name})> outOfStockKids;
+  final VoidCallback onEdit;
+  final ValueChanged<bool> onToggleActive;
+  final VoidCallback onDelete;
+  final VoidCallback onRestock;
+  final ValueChanged<String> onRestockKid;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final ts = theme.textTheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final accentColor = _categoryAccentColor(reward.category);
+    final hasDesc = reward.description?.isNotEmpty == true;
+    final hasOutOfStock = outOfStockKids.isNotEmpty;
+    final iconText = reward.icon?.isNotEmpty == true ? reward.icon! : '🎁';
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      minChildSize: 0.4,
+      maxChildSize: 0.92,
+      expand: false,
+      builder: (context, scrollController) {
+        return SingleChildScrollView(
+          controller: scrollController,
+          padding: EdgeInsets.fromLTRB(
+            20,
+            4,
+            20,
+            MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Header: icon + title + coins ──────────────────────────
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: isDark ? 0.20 : 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    alignment: Alignment.center,
+                    child: Text(iconText, style: const TextStyle(fontSize: 32)),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          reward.title,
+                          style: ts.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Text('🪙', style: TextStyle(fontSize: 14)),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${reward.coinCost} coins',
+                              style: ts.bodyMedium?.copyWith(
+                                color: accentColor.withValues(alpha: isDark ? 0.9 : 1.0),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        _SmallChip(
+                          label: _categoryLabel(reward.category),
+                          color: accentColor.withValues(alpha: isDark ? 0.22 : 0.13),
+                          textColor: isDark ? accentColor.withValues(alpha: 0.9) : accentColor,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              if (hasDesc) ...[
+                const SizedBox(height: 16),
+                Text(
+                  reward.description!,
+                  style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant, height: 1.4),
+                ),
+              ],
+
+              if (reward.stock != null) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Icon(Icons.inventory_2_outlined, size: 16, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Limit per kid: ${reward.stock}',
                       style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    )
-                  : const SizedBox.shrink(),
-            ),
+                    ),
+                  ],
+                ),
+              ],
 
-            const SizedBox(height: 4),
-
-            // ── Bottom row: chips on left, switch on right ──────────────────
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      Chip(
-                        label: Text(_categoryLabel(reward.category)),
-                        avatar: Icon(_categoryIcon(reward.category), size: 14),
-                        backgroundColor: cs.secondaryContainer.withValues(
-                          alpha: 0.7,
-                        ),
-                        labelStyle: ts.labelSmall?.copyWith(
-                          color: cs.onSecondaryContainer,
-                        ),
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              // ── Out-of-stock section ───────────────────────────────────
+              if (hasOutOfStock) ...[
+                const SizedBox(height: 20),
+                const Divider(),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, size: 16, color: cs.error),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Out of stock for:',
+                      style: ts.titleSmall?.copyWith(
+                        color: cs.error,
+                        fontWeight: FontWeight.w700,
                       ),
-                      if (reward.isCustom)
-                        Chip(
-                          label: const Text('Custom'),
-                          backgroundColor: cs.tertiaryContainer.withValues(
-                            alpha: 0.7,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                for (final kid in outOfStockKids)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            kid.name,
+                            style: ts.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                           ),
-                          labelStyle: ts.labelSmall?.copyWith(
-                            color: cs.onTertiaryContainer,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
                         ),
-                      if (!reward.active)
-                        Chip(
-                          label: const Text('Disabled'),
-                          backgroundColor: cs.errorContainer.withValues(
-                            alpha: 0.7,
+                        FilledButton.tonal(
+                          onPressed: () {
+                            onRestockKid(kid.id);
+                            Navigator.of(context).pop();
+                          },
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                           ),
-                          labelStyle: ts.labelSmall?.copyWith(
-                            color: cs.onErrorContainer,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
+                          child: const Text('Restock'),
                         ),
-                      if (reward.stock != null)
-                        Chip(
-                          label: Text('Stock: ${reward.stock}'),
-                          avatar: const Icon(Icons.inventory_2_outlined, size: 14),
-                          backgroundColor: cs.primaryContainer.withValues(
-                            alpha: 0.7,
-                          ),
-                          labelStyle: ts.labelSmall?.copyWith(
-                            color: cs.onPrimaryContainer,
-                          ),
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                        ),
-                    ],
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      onRestock();
+                      Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Restock all'),
                   ),
                 ),
-                const SizedBox(width: 4),
-                Switch(
-                  value: reward.active,
-                  onChanged: onToggleActive,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
               ],
-            ),
-          ],
+
+              // ── Actions ───────────────────────────────────────────────
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onEdit();
+                      },
+                      icon: const Icon(Icons.edit_rounded),
+                      label: const Text('Edit'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        onDelete();
+                      },
+                      icon: Icon(Icons.delete_outline_rounded, color: cs.error),
+                      label: Text('Delete', style: TextStyle(color: cs.error)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: cs.error.withValues(alpha: 0.4)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    reward.active ? 'Visible to kids' : 'Hidden from kids',
+                    style: ts.bodyMedium,
+                  ),
+                  const Spacer(),
+                  Switch(
+                    value: reward.active,
+                    onChanged: onToggleActive,
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: cs.primary,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _SmallChip extends StatelessWidget {
+  const _SmallChip({required this.label, required this.color, required this.textColor});
+  final String label;
+  final Color color;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: textColor,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -1091,7 +1472,7 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
                     controller: _stockCtrl,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(
-                      labelText: 'Available quantity',
+                      labelText: 'Max per kid',
                       hintText: '1',
                     ),
                   ),
@@ -1220,6 +1601,41 @@ String _formatRelativeTime(DateTime dt) {
   if (diff.inDays == 1) return 'yesterday';
   if (diff.inDays < 7) return '${diff.inDays}d ago';
   return '${(diff.inDays / 7).floor()}w ago';
+}
+
+Color _categoryCardColor(RewardCategory cat, {bool dark = false}) {
+  if (dark) {
+    switch (cat) {
+      case RewardCategory.snack:      return const Color(0xFF183818); // forest green
+      case RewardCategory.time:       return const Color(0xFF0A2040);
+      case RewardCategory.experience: return const Color(0xFF1E1040);
+      case RewardCategory.digital:    return const Color(0xFF083830);
+      case RewardCategory.money:      return const Color(0xFF062030);
+      case RewardCategory.toy:        return const Color(0xFF181A48); // deep indigo
+      case RewardCategory.other:      return const Color(0xFF141618);
+    }
+  }
+  switch (cat) {
+    case RewardCategory.snack:      return const Color(0xFFECFDF0);
+    case RewardCategory.time:       return const Color(0xFFE8F4FF);
+    case RewardCategory.experience: return const Color(0xFFF2EAFF);
+    case RewardCategory.digital:    return const Color(0xFFE0F9F8);
+    case RewardCategory.money:      return const Color(0xFFE0F7FA);
+    case RewardCategory.toy:        return const Color(0xFFEEF0FF);
+    case RewardCategory.other:      return const Color(0xFFF0F2F6);
+  }
+}
+
+Color _categoryAccentColor(RewardCategory cat) {
+  switch (cat) {
+    case RewardCategory.snack:      return const Color(0xFF16A34A); // forest green
+    case RewardCategory.time:       return const Color(0xFF2563EB); // blue
+    case RewardCategory.experience: return const Color(0xFF7C3AED); // violet
+    case RewardCategory.digital:    return const Color(0xFF0D9488); // teal
+    case RewardCategory.money:      return const Color(0xFF0891B2); // cyan
+    case RewardCategory.toy:        return const Color(0xFF4F46E5); // indigo
+    case RewardCategory.other:      return const Color(0xFF475569); // slate
+  }
 }
 
 String _categoryLabel(RewardCategory cat) {
@@ -1616,33 +2032,24 @@ class _PendingRewardTile extends StatelessWidget {
             children: [
               TextButton(
                 onPressed: () async {
+                  final app = context.read<AppState>();
                   final familyId = app.familyId;
                   if (familyId == null) return;
-
-                  // Show snackbar first — only write to Firestore if not undone.
                   final messenger = ScaffoldMessenger.of(context);
-                  var undone = false;
-                  final ctrl = messenger.showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        '"${redemption.rewardName}" marked as given to $kidName.',
-                      ),
-                      action: SnackBarAction(
-                        label: 'Undo',
-                        onPressed: () => undone = true,
-                      ),
-                      duration: const Duration(seconds: 4),
-                    ),
-                  );
-
-                  await ctrl.closed;
-                  if (undone) return;
-
                   try {
                     await app.repo.markRewardGiven(
                       familyId,
                       redemptionId: redemption.id,
                       parentMemberId: app.currentMember?.id,
+                    );
+                    if (!context.mounted) return;
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '"${redemption.rewardName}" marked as given to $kidName.',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
                     );
                   } catch (e) {
                     if (!context.mounted) return;

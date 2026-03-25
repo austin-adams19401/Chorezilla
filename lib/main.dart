@@ -152,6 +152,11 @@ class _NotificationTapHandlerState extends State<NotificationTapHandler> {
       Navigator.of(
         context,
       ).pushNamedAndRemoveUntil('/parent', (route) => false);
+    } else if (type == 'reward_out_of_stock') {
+      debugPrint('NotificationTapHandler: reward_out_of_stock tapped');
+      Navigator.of(
+        context,
+      ).pushNamedAndRemoveUntil('/parent', (route) => false);
     }
   }
 

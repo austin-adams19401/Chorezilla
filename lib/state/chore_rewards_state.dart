@@ -230,7 +230,37 @@ extension AppStateWrites on AppState {
       );
     }
 
+    // Capture memberId + choreId before deleting the schedule.
+    final scheduleMatches = choreSchedulesVN.value
+        .where((s) => s.id == scheduleId)
+        .toList();
+    final schedule = scheduleMatches.isNotEmpty ? scheduleMatches.first : null;
+
     await repo.deleteChoreMemberSchedule(famId, scheduleId: scheduleId);
+
+    // Also delete any open (not yet completed/pending) assignments for this
+    // kid+chore so they disappear immediately from the kid's dashboard.
+    if (schedule != null) {
+      final db = FirebaseFirestore.instance;
+      final assignmentsRef = db
+          .collection('families')
+          .doc(famId)
+          .collection('assignments');
+
+      final snap = await assignmentsRef
+          .where('choreId', isEqualTo: schedule.choreId)
+          .where('memberId', isEqualTo: schedule.memberId)
+          .where('status', isEqualTo: 'assigned')
+          .get();
+
+      if (snap.docs.isNotEmpty) {
+        final batch = db.batch();
+        for (final doc in snap.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+    }
   }
 
 

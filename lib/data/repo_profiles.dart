@@ -45,8 +45,11 @@ if (isNewProfile) {
       }
     }
 
-    // Ensure they have a default family + owner membership
-    if (profile.defaultFamilyId == null || profile.defaultFamilyId!.isEmpty) {
+    // Ensure they have a default family + owner membership.
+    // Skip for anonymous users — they're joining an existing family via code,
+    // not creating their own.
+    final isAnon = FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
+    if (!isAnon && (profile.defaultFamilyId == null || profile.defaultFamilyId!.isEmpty)) {
       profile = await _getOrCreateFamilyWithOwner(
         userID,
         displayName,
