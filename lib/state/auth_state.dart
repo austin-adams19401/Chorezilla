@@ -30,6 +30,8 @@ extension AppStateAuth on AppState {
 
   Future<void> signInWithGoogle() async {
     await GoogleSignIn.instance.initialize(
+      clientId:
+          '588085741239-auq29s1kutqjjto23re395l76m8t1o9a.apps.googleusercontent.com',
       serverClientId:
           '588085741239-tetqvu3rths6h7s5paoj2qvvham46sfg.apps.googleusercontent.com',
     );
