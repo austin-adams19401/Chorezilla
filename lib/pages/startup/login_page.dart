@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/components/google_sign_in.dart';
+import 'package:chorezilla/services/analytics_service.dart';
+import 'package:chorezilla/services/legal_links.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -38,6 +40,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() { _googleBusy = true; _googleError = null; });
     try {
       await context.read<AppState>().signInWithGoogle();
+      if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -59,6 +62,8 @@ class _LoginPageState extends State<LoginPage> {
         email: _email.text.trim(),
         password: _password.text,
       );
+      AnalyticsService.logLogin();
+      if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
     } on FirebaseAuthException catch (e) {
       final msg = switch (e.code) {
         'wrong-password' || 'invalid-credential' => 'Incorrect password. Please try again.',
@@ -223,6 +228,8 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ),
+              const SizedBox(height: 8),
+              const LegalConsentText(),
             ],
           ),
         ),

@@ -30,7 +30,6 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   bool _busy = false;
   bool _requiresApproval = false;
   bool _bonusOnly = false;
-  bool _isFromTemplate = false;
   ChoreCategory _category = ChoreCategory.other;
 
   @override
@@ -143,7 +142,6 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
                         _desc.text = chore.description;
                         _icon.text = chore.icon;
                         setState(() {
-                          _isFromTemplate = true;
                           _category = chore.category;
                         });
                       },
@@ -409,6 +407,11 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
     }
   }
 
+  bool _titleMatchesDefault(String title) {
+    final lower = title.toLowerCase();
+    return kDefaultChores.any((c) => c.title.toLowerCase() == lower);
+  }
+
   Future<void> _save() async {
     final rawTitle = _title.text.trim();
     if (rawTitle.isEmpty) {
@@ -422,8 +425,18 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
         ? rawTitle.substring(0, kMaxChoreTitleLength)
         : rawTitle;
 
+    // Gate: block free users from editing default chores
+    if (widget.chore != null && !widget.chore!.isCustom) {
+      final app = context.read<AppState>();
+      if (!SubscriptionService.isPremium(app.family)) {
+        if (!mounted) return;
+        await showPremiumUpgradeSheet(context, reason: UpgradeReason.editDefaultChores);
+        return;
+      }
+    }
+
     // Gate: check custom chore limit for new chores that aren't from a template
-    if (widget.chore == null && !_isFromTemplate) {
+    if (widget.chore == null && !_titleMatchesDefault(title)) {
       final app = context.read<AppState>();
       final customChoreCount =
           app.chores.where((c) => c.isCustom).length;
@@ -459,7 +472,7 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
           recurrence: rec,
           requiresApproval: _requiresApproval,
           bonusOnly: _bonusOnly,
-          isCustom: !_isFromTemplate,
+          isCustom: !_titleMatchesDefault(title),
           category: _category,
         );
       } else {

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'package:chorezilla/components/premium_upgrade_sheet.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/assignment.dart';
@@ -497,6 +499,10 @@ class _AssignTabState extends State<AssignTab> {
 
   Future<void> _openEditChoreSheet(BuildContext context, Chore chore) async {
     final app = context.read<AppState>();
+    if (!chore.isCustom && !SubscriptionService.isPremium(app.family)) {
+      await showPremiumUpgradeSheet(context, reason: UpgradeReason.editDefaultChores);
+      return;
+    }
     final fam = app.family!;
     await showModalBottomSheet<bool>(
       context: context,

@@ -4,6 +4,8 @@ import 'package:chorezilla/components/auth_scaffold.dart';
 import 'package:chorezilla/components/inputs.dart';
 import 'package:chorezilla/pages/startup/kid_join_page.dart';
 import 'package:chorezilla/pages/startup/role_selection_page.dart';
+import 'package:chorezilla/services/analytics_service.dart';
+import 'package:chorezilla/services/legal_links.dart';
 
 
 class RegisterPage extends StatefulWidget {
@@ -50,6 +52,7 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       await userCredentials.user?.updateDisplayName(_name.text.trim());
+      AnalyticsService.logAccountCreated();
       if (!mounted) return;
 
       Navigator.of(context).pushReplacement(
@@ -171,6 +174,8 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 8),
                 Text(_error!, style: TextStyle(color: cs.error)),
               ],
+              const SizedBox(height: 12),
+              const LegalConsentText(),
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () {

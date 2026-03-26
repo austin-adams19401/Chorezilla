@@ -507,6 +507,7 @@ extension AppStateWrites on AppState {
     }
 
     await batch.commit();
+    AnalyticsService.logChoreAssigned();
     debugPrint('ASSIGN_CHORE: batch committed ${mems.length} docs.');
 
     // Keep defaultAssignees in sync: read latest from Firestore, then union.
@@ -594,6 +595,8 @@ extension AppStateWrites on AppState {
           .toList();
     }
 
+    AnalyticsService.logChoreCompleted();
+    ReviewService.trackCompletionAndMaybePrompt();
     _notifyStateChanged();
   }
 
@@ -625,6 +628,7 @@ extension AppStateWrites on AppState {
     }
 
     await repo.purchaseReward(famId, memberId: memberId, reward: reward);
+    AnalyticsService.logRewardRedeemed();
   }
 
   Future<void> createLevelUpRewardRedemptionForKid({

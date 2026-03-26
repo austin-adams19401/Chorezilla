@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:chorezilla/services/analytics_service.dart';
+import 'package:chorezilla/services/legal_links.dart';
 
 /// Custom paywall screen. Call [showPaywallScreen] to present it as a
 /// full-screen modal.
@@ -76,6 +78,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     };
 
     setState(() => _purchasing = true);
+    AnalyticsService.logPremiumPurchaseStarted();
 
     try {
       late CustomerInfo info;
@@ -107,6 +110,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
         );
       }
 
+      AnalyticsService.logPremiumPurchaseCompleted();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -784,6 +788,8 @@ class _BottomCta extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 4),
+          const LegalLinksRow(),
         ],
       ),
     );

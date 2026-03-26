@@ -60,6 +60,7 @@ extension AppStateAuth on AppState {
     final credential = GoogleAuthProvider.credential(idToken: idToken);
     final userCred = await auth.signInWithCredential(credential);
 
+    AnalyticsService.logLogin(method: 'google');
     debugPrint(
       'GOOGLE SIGN IN: user=${userCred.user?.uid} - ${userCred.user?.displayName}',
     );

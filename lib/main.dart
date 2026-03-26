@@ -14,12 +14,14 @@ import 'package:chorezilla/pages/parent_dashboard/parent_dashboard.dart';
 import 'package:chorezilla/themes/app_theme.dart';
 
 //Flutter libraries
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 //Firebase
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:chorezilla/firebase_options.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -39,6 +41,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Crashlytics: catch Flutter framework errors
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+  // Crashlytics: catch async errors not caught by Flutter
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
 
   // Register background handler for FCM
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

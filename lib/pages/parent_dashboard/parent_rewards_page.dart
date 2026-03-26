@@ -435,6 +435,13 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
   }
 
   Future<void> _openEditRewardSheet(BuildContext context, Reward reward) async {
+    if (!reward.isCustom) {
+      final app = context.read<AppState>();
+      if (!SubscriptionService.isPremium(app.family)) {
+        await showPremiumUpgradeSheet(context, reason: UpgradeReason.editDefaultRewards);
+        return;
+      }
+    }
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1519,6 +1526,16 @@ class _RewardEditorSheetState extends State<_RewardEditorSheet> {
       stock = int.tryParse(_stockCtrl.text.trim());
       if (stock == null || stock <= 0) {
         _showSnack('Enter a valid quantity (must be at least 1).');
+        return;
+      }
+    }
+
+    // Gate: block free users from editing default rewards
+    if (widget.existing != null && !widget.existing!.isCustom) {
+      final app = context.read<AppState>();
+      if (!SubscriptionService.isPremium(app.family)) {
+        if (!mounted) return;
+        await showPremiumUpgradeSheet(context, reason: UpgradeReason.editDefaultRewards);
         return;
       }
     }

@@ -12,6 +12,8 @@ enum UpgradeReason {
   allowance,
   parentAccount,
   levelRewards,
+  editDefaultChores,
+  editDefaultRewards,
 }
 
 extension _UpgradeReasonCopy on UpgradeReason {
@@ -33,6 +35,10 @@ extension _UpgradeReasonCopy on UpgradeReason {
         return 'Add a co-parent to your family';
       case UpgradeReason.levelRewards:
         return 'Customize your level-up rewards';
+      case UpgradeReason.editDefaultChores:
+        return 'Customize built-in chores';
+      case UpgradeReason.editDefaultRewards:
+        return 'Customize built-in rewards';
     }
   }
 
@@ -54,6 +60,10 @@ extension _UpgradeReasonCopy on UpgradeReason {
         return 'Free families support one parent account. Go Premium to invite a co-parent.';
       case UpgradeReason.levelRewards:
         return 'Free families use built-in rewards. Go Premium to set your own rewards for every level.';
+      case UpgradeReason.editDefaultChores:
+        return 'Editing built-in chores is a Premium feature. Go Premium to personalize them, or create up to 3 of your own.';
+      case UpgradeReason.editDefaultRewards:
+        return 'Editing built-in rewards is a Premium feature. Go Premium to personalize them, or create up to 3 of your own.';
     }
   }
 }

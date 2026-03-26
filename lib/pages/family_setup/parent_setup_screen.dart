@@ -1,5 +1,9 @@
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/pages/family_setup/parent_pin_setup_page.dart';
+import 'package:chorezilla/services/analytics_service.dart';
+import 'package:chorezilla/services/legal_links.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -10,8 +14,15 @@ import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 import 'edit_family_page.dart';
 import 'add_kids_page.dart';
 
-class ParentSetupPage extends StatelessWidget {
+class ParentSetupPage extends StatefulWidget {
   const ParentSetupPage({super.key});
+
+  @override
+  State<ParentSetupPage> createState() => _ParentSetupPageState();
+}
+
+class _ParentSetupPageState extends State<ParentSetupPage> {
+  bool _coppaConsent = false;
 
   @override
   Widget build(BuildContext context) {
@@ -173,6 +184,40 @@ class ParentSetupPage extends StatelessWidget {
 
             const SizedBox(height: 12),
 
+            // ── COPPA parental consent ──────────────────────────────────────
+            if (kids.isNotEmpty) ...[
+              CheckboxListTile(
+                value: _coppaConsent,
+                onChanged: (v) => setState(() => _coppaConsent = v ?? false),
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                subtitle: RichText(
+                  text: TextSpan(
+                    style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    children: [
+                      const TextSpan(
+                        text:
+                            'I am a parent or guardian and consent to the collection of my children\'s information as described in our ',
+                      ),
+                      TextSpan(
+                        text: 'Privacy Policy',
+                        style: TextStyle(
+                          color: cs.primary,
+                          decoration: TextDecoration.underline,
+                        ),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = openPrivacyPolicy,
+                      ),
+                      const TextSpan(text: '.'),
+                    ],
+                  ),
+                ),
+                title: null,
+              ),
+              const SizedBox(height: 8),
+            ],
+
             // ── Bottom action ────────────────────────────────────────────────
             SizedBox(
               width: double.infinity,
@@ -190,34 +235,40 @@ class ParentSetupPage extends StatelessWidget {
                       child: const Text('Add a kid to get started'),
                     )
                   : FilledButton.icon(
-                      onPressed: () async {
-                        final app = context.read<AppState>();
-                        final family = app.family;
-                        if (family == null) return;
+                      onPressed: !_coppaConsent
+                          ? null
+                          : () async {
+                              final app = context.read<AppState>();
+                              final family = app.family;
+                              if (family == null) return;
 
-                        if (!app.hasParentPin) {
-                          final ok = await Navigator.of(context).push<bool>(
-                            MaterialPageRoute(
-                              builder: (_) => const ParentPinSetupPage(),
-                            ),
-                          );
-                          if (ok != true && !app.hasParentPin) {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Please create a parent PIN before finishing setup.',
-                                ),
-                              ),
-                            );
-                            return;
-                          }
-                        }
+                              if (!app.hasParentPin) {
+                                final ok =
+                                    await Navigator.of(context).push<bool>(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const ParentPinSetupPage(),
+                                  ),
+                                );
+                                if (ok != true && !app.hasParentPin) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please create a parent PIN before finishing setup.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                              }
 
-                        await app.repo.updateFamily(family.id, {
-                          'onboardingComplete': true,
-                        });
-                      },
+                              await app.repo.updateFamily(family.id, {
+                                'onboardingComplete': true,
+                                'coppaConsentAt': FieldValue.serverTimestamp(),
+                              });
+                              AnalyticsService.logFamilySetupComplete();
+                            },
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
                         shape: const StadiumBorder(),

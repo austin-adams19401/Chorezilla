@@ -14,6 +14,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import 'package:chorezilla/data/chorezilla_repo.dart';
+import 'package:chorezilla/services/legal_links.dart';
 import 'package:chorezilla/state/app_state.dart';
 
 class ParentDrawer extends StatelessWidget {
@@ -165,6 +167,27 @@ class ParentDrawer extends StatelessWidget {
 
             const Divider(height: 24),
 
+            // ── Legal ────────────────────────────────────────────────────────
+            const _SectionLabel('Legal'),
+            ListTile(
+              leading: Icon(Icons.privacy_tip_outlined, color: cs.primary),
+              title: const Text('Privacy Policy'),
+              onTap: () {
+                Navigator.of(context).pop();
+                openPrivacyPolicy();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.description_outlined, color: cs.primary),
+              title: const Text('Terms of Service'),
+              onTap: () {
+                Navigator.of(context).pop();
+                openTermsOfService();
+              },
+            ),
+
+            const Divider(height: 24),
+
             // ── Sign out ────────────────────────────────────────────────────
             ListTile(
               leading: Icon(Icons.logout_rounded, color: cs.error),
@@ -172,6 +195,15 @@ class ParentDrawer extends StatelessWidget {
               onTap: () async {
                 Navigator.of(context).pop();
                 await FirebaseAuth.instance.signOut();
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_forever_rounded, color: cs.error),
+              title: Text('Delete account',
+                  style: TextStyle(color: cs.error)),
+              onTap: () {
+                Navigator.of(context).pop();
+                _showDeleteAccountDialog(context);
               },
             ),
           ],
@@ -235,6 +267,13 @@ class ParentDrawer extends StatelessWidget {
     showDialog<void>(
       context: context,
       builder: (ctx) => const _RedeemCodeDialog(),
+    );
+  }
+
+  static void _showDeleteAccountDialog(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => const _DeleteAccountDialog(),
     );
   }
 
@@ -509,6 +548,231 @@ class _RedeemCodeDialogState extends State<_RedeemCodeDialog> {
             }
           },
           child: const Text('Join'),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Delete account dialog ────────────────────────────────────────────────────
+
+class _DeleteAccountDialog extends StatefulWidget {
+  const _DeleteAccountDialog();
+
+  @override
+  State<_DeleteAccountDialog> createState() => _DeleteAccountDialogState();
+}
+
+class _DeleteAccountDialogState extends State<_DeleteAccountDialog> {
+  bool _busy = false;
+  String? _error;
+  final _passwordController = TextEditingController();
+  bool _needsPassword = false;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _deleteAccount() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    try {
+      final app = context.read<AppState>();
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final familyId = app.familyId;
+      bool isLastParent = false;
+
+      if (familyId != null) {
+        final parentCount = await app.repo.countParents(familyId);
+        isLastParent = parentCount <= 1;
+      }
+
+      // Show a second confirmation if they're the last parent
+      if (isLastParent && mounted) {
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Delete family data?'),
+            content: const Text(
+              'You are the only parent in this family. '
+              'Deleting your account will also permanently delete all '
+              'family data including kids, chores, rewards, and history.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(true),
+                child: Text('Delete everything',
+                    style: TextStyle(
+                        color: Theme.of(ctx).colorScheme.error)),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) {
+          if (mounted) setState(() => _busy = false);
+          return;
+        }
+      }
+
+      await app.repo.deleteAccount(
+        uid: user.uid,
+        familyId: familyId,
+        isLastParent: isLastParent,
+      );
+
+      // Account deleted successfully - auth listener will handle nav
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        setState(() {
+          _needsPassword = true;
+          _busy = false;
+        });
+      } else {
+        setState(() {
+          _error = e.message ?? 'Failed to delete account.';
+          _busy = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _busy = false;
+      });
+    }
+  }
+
+  Future<void> _reauthAndDelete() async {
+    final password = _passwordController.text;
+    if (password.isEmpty) return;
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser!;
+      final credential = EmailAuthProvider.credential(
+        email: user.email!,
+        password: password,
+      );
+      await user.reauthenticateWithCredential(credential);
+
+      // Now retry deletion
+      final app = context.read<AppState>();
+      final familyId = app.familyId;
+      bool isLastParent = false;
+      if (familyId != null) {
+        final parentCount = await app.repo.countParents(familyId);
+        isLastParent = parentCount <= 1;
+      }
+
+      await app.repo.deleteAccount(
+        uid: user.uid,
+        familyId: familyId,
+        isLastParent: isLastParent,
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        _error = e.message ?? 'Re-authentication failed.';
+        _busy = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _busy = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    if (_needsPassword) {
+      return AlertDialog(
+        title: const Text('Confirm your password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'For security, please re-enter your password to delete your account.',
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                border: const OutlineInputBorder(),
+                errorText: _error,
+              ),
+              autofocus: true,
+              onSubmitted: (_) => _reauthAndDelete(),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: _busy ? null : _reauthAndDelete,
+            child: _busy
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text('Delete',
+                    style: TextStyle(color: cs.error)),
+          ),
+        ],
+      );
+    }
+
+    return AlertDialog(
+      title: const Text('Delete account'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'This will permanently delete your account and all associated data. '
+            'This action cannot be undone.',
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!, style: TextStyle(color: cs.error)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _busy ? null : _deleteAccount,
+          child: _busy
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text('Delete account',
+                  style: TextStyle(color: cs.error)),
         ),
       ],
     );
