@@ -36,8 +36,7 @@ class ParentSetupPage extends StatelessWidget {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          child: ListView(
           children: [
             // ── Welcome banner ───────────────────────────────────────────────
             if (family != null) ...[
@@ -142,35 +141,35 @@ class ParentSetupPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
 
-            Expanded(
-              child: kids.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No kids yet — add one below.',
-                        style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            if (kids.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Center(
+                  child: Text(
+                    'No kids yet — add one below.',
+                    style: ts.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ),
+              )
+            else
+              ...kids.map(
+                (m) => Card(
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: cs.tertiaryContainer,
+                      child: buildAvatarContent(
+                        m.avatarKey ?? '',
+                        16,
+                        _initial(m.displayName),
                       ),
-                    )
-                  : ListView(
-                      children: kids.map(
-                        (m) => Card(
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: cs.tertiaryContainer,
-                              child: buildAvatarContent(
-                                m.avatarKey ?? '',
-                                16,
-                                _initial(m.displayName),
-                              ),
-                            ),
-                            title: Text(m.displayName),
-                            subtitle: Text(
-                              'Level ${m.level} • ${m.xp} XP • ${m.coins} coins',
-                            ),
-                          ),
-                        ),
-                      ).toList(),
                     ),
-            ),
+                    title: Text(m.displayName),
+                    subtitle: Text(
+                      'Level ${m.level} • ${m.xp} XP • ${m.coins} coins',
+                    ),
+                  ),
+                ),
+              ),
 
             const SizedBox(height: 12),
 
