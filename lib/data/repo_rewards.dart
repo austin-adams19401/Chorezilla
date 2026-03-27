@@ -366,8 +366,10 @@ extension RewardRepo on ChorezillaRepo {
           : reward.coinCost;
 
       // If coins drop below 100, reset the hoard-since timestamp.
+      // Use exact computed values (not FieldValue.increment) inside a transaction
+      // to avoid "reads and writes were out of order" errors in the Firestore SDK.
       final memberUpdate = <String, dynamic>{
-        'coins': FieldValue.increment(-reward.coinCost),
+        'coins': newCoins,
         'dailyCoinsSpent': newDailySpent,
         'dailyCoinsSpentDate': Timestamp.fromDate(today),
         if (newCoins < 100) 'coinsHoardSince': null,
@@ -375,8 +377,9 @@ extension RewardRepo on ChorezillaRepo {
       tx.update(memberRef, memberUpdate);
 
       if (currentReward != null) {
+        final newCount = (currentReward.memberPurchaseCounts[memberId] ?? 0) + 1;
         tx.update(rewardRef, {
-          'memberPurchaseCounts.$memberId': FieldValue.increment(1),
+          'memberPurchaseCounts.$memberId': newCount,
         });
       }
 
