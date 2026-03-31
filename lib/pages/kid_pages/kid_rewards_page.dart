@@ -351,7 +351,7 @@ class _WalletHeader extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            member.displayName,
+                            member.kidName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: ts.titleMedium?.copyWith(

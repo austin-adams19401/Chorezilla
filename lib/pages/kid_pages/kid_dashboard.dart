@@ -1029,7 +1029,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                       ZillaLevelUpHero(size: 96),
                       const SizedBox(height: 16),
                       Text(
-                        '${member.displayName} reached Level ${info.level}!',
+                        '${member.kidName} reached Level ${info.level}!',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.titleMedium,
                       ),

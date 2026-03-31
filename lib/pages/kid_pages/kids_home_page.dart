@@ -450,7 +450,7 @@ class _KidCard extends StatelessWidget {
     }
 
     // Otherwise ALWAYS prompt for PIN
-    final pin = await _showKidPinDialog(context, member.displayName);
+    final pin = await _showKidPinDialog(context, member.kidName);
     if (pin == null) return; // cancelled
 
     final ok = await app.verifyKidPin(memberId: member.id, pin: pin);
@@ -568,7 +568,7 @@ class _KidCard extends StatelessWidget {
                             children: [
                               // Name
                               Text(
-                                member.displayName,
+                                member.kidName,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,

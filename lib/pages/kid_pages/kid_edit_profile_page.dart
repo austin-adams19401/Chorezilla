@@ -67,7 +67,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
     if (_avatarEmoji == null &&
         _backgroundId == null &&
         _nameController.text.isEmpty) {
-      _nameController.text = member.displayName;
+      _nameController.text = member.nickname ?? member.displayName;
       final key = member.avatarKey;
       _avatarEmoji = (key != null && key.startsWith('avatar_')) ? key : _defaultAvatar;
       _backgroundId = member.equippedBackgroundId ?? 'bg_default';
@@ -94,7 +94,7 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
 
     try {
       await context.read<AppState>().updateMember(widget.memberId, {
-        'displayName': name,
+        'nickname': name,
         'avatarKey': _avatarEmoji,
         'equippedBackgroundId': _backgroundId,
         'equippedAvatarFrameId': _avatarFrameId,
@@ -237,12 +237,12 @@ class _KidEditProfilePageState extends State<KidEditProfilePage> {
                 _SectionCard(
                   color: const Color(0xFF3498DB),
                   icon: Icons.badge_rounded,
-                  title: 'Name',
+                  title: 'Nickname',
                   child: TextField(
                     controller: _nameController,
                     textCapitalization: TextCapitalization.words,
                     textInputAction: TextInputAction.done,
-                    decoration: themedInput(context, 'Display name'),
+                    decoration: themedInput(context, 'Nickname'),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -647,7 +647,7 @@ class _PreviewCard extends StatelessWidget {
                 AvatarWithFrame(member: member, radius: 42),
                 const SizedBox(height: 8),
                 Text(
-                  member.displayName,
+                  member.kidName,
                   style: ts.titleMedium?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,

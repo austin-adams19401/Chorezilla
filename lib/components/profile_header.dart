@@ -210,7 +210,7 @@ class _KidHeroHeader extends StatelessWidget {
 
                       // Name
                       Text(
-                        member.displayName,
+                        member.kidName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,

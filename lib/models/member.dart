@@ -4,6 +4,7 @@ import 'common.dart';
 class Member {
   final String id;
   final String displayName;
+  final String? nickname;
   final FamilyRole role;
   final String? userUid;
   final String? avatarKey;
@@ -76,6 +77,7 @@ class Member {
   const Member({
     required this.id,
     required this.displayName,
+    this.nickname,
     required this.role,
     this.userUid,
     this.avatarKey,
@@ -125,6 +127,8 @@ class Member {
 
   Member copyWith({
     String? displayName,
+    String? nickname,
+    bool clearNickname = false,
     FamilyRole? role,
     String? userUid,
     String? avatarKey,
@@ -180,6 +184,7 @@ class Member {
   }) => Member(
     id: id,
     displayName: displayName ?? this.displayName,
+    nickname: clearNickname ? null : (nickname ?? this.nickname),
     role: role ?? this.role,
     userUid: userUid ?? this.userUid,
     avatarKey: avatarKey ?? this.avatarKey,
@@ -231,6 +236,7 @@ class Member {
 
     Map<String, dynamic> toMap() => {
     'displayName': displayName,
+    'nickname': nickname,
     'role': roleToString(role),
     'userUid': userUid,
     'avatarKey': avatarKey,
@@ -291,6 +297,7 @@ class Member {
     return Member(
       id: doc.id,
       displayName: data['displayName'] as String? ?? 'Member',
+      nickname: data['nickname'] as String?,
       role: roleFromString(rawRole ?? 'parent'),
       userUid: data['userUid'] as String?,
       avatarKey: data['avatarKey'] as String?,
@@ -355,6 +362,7 @@ class Member {
     Map<String, dynamic> toCacheMap() => {
     'id': id,
     'displayName': displayName,
+    'nickname': nickname,
     'role': roleToString(role),
     'userUid': userUid,
     'avatarKey': avatarKey,
@@ -407,6 +415,7 @@ class Member {
     return Member(
       id: data['id'] as String? ?? '',
       displayName: data['displayName'] as String? ?? 'Member',
+      nickname: data['nickname'] as String?,
       role: roleFromString(data['role'] as String? ?? 'parent'),
       userUid: data['userUid'] as String?,
       avatarKey: data['avatarKey'] as String?,
@@ -492,6 +501,9 @@ class Member {
     final yesterday = today.subtract(const Duration(days: 1));
     return (lastDay == today || lastDay == yesterday) ? currentStreak : 0;
   }
+
+  /// Name the kid chose for themselves; falls back to the parent-set displayName.
+  String get kidName => (nickname != null && nickname!.isNotEmpty) ? nickname! : displayName;
 
   bool ownsCosmetic(String cosmeticId) => ownedCosmetics.contains(cosmeticId);
 

@@ -3,10 +3,9 @@ import 'dart:io';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
-// TODO: Replace with your platform-specific production API keys before release.
 // Settings → API Keys → Public App-Specific Keys in the RevenueCat dashboard.
-const _kAppleApiKey = 'test_WKCbVvsMVCagogCbOhdLAGtVhQP';
-const _kGoogleApiKey = 'test_WKCbVvsMVCagogCbOhdLAGtVhQP';
+const _kAppleApiKey = 'appl_RntDvizvZzmMZcyxYYgyWakPiGn';
+const _kGoogleApiKey = 'goog_GOBddhelWNpjKoVIhjpcDAviVAs';
 
 /// RevenueCat entitlement that unlocks all premium features.
 const kPremiumEntitlement = 'Chorezilla Unlimited';

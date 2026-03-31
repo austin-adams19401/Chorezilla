@@ -67,7 +67,7 @@ class KidActivityPage extends StatelessWidget {
     items.sort((a, b) => b.time.compareTo(a.time));
 
     return Scaffold(
-      appBar: AppBar(title: Text("${member.displayName}'s activity")),
+      appBar: AppBar(title: Text("${member.kidName}'s activity")),
       body: SafeArea(
         top: false,
         child: items.isEmpty
