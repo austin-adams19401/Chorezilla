@@ -1506,18 +1506,28 @@ class _CosmeticTile extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: equipped
+            ? cs.primaryContainer
+            : owned
+            ? cs.secondaryContainer
+            : cs.surfaceContainer,
         borderRadius: BorderRadius.circular(14),
         border: equipped ? Border.all(color: cs.primary, width: 2) : null,
       ),
       child: Column(
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-              child: item.assetKey.isNotEmpty
-                  ? Image.asset(item.assetKey, fit: BoxFit.contain, width: double.infinity)
-                  : const SizedBox(),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                child: item.assetKey.isNotEmpty
+                    ? Image.asset(item.assetKey, fit: BoxFit.contain, width: double.infinity)
+                    : const SizedBox(),
+              ),
             ),
           ),
           Padding(

@@ -2,31 +2,31 @@
 part of 'app_state.dart';
 
 const _badgeCoinBonuses = <String, int>{
-  'streak_1': 5,
-  'streak_3': 10,
-  'streak_7': 25,
-  'streak_15': 50,
-  'streak_30': 100,
-  'streak_60': 200,
-  'first_win': 5,
-  'fast_finisher': 10,
-  'early_bird': 10,
-  'all_done': 10,
-  'bonus_boss': 15,
-  'weekend_warrior': 15,
-  'sunrise_starter': 10,
-  'night_owl': 10,
-  'perfect_day': 20,
-  'mix_master': 15,
-  'overachiever': 20,
-  'trash_trooper_daily': 15,
-  'task_crusher': 25,
+  'streak_1': 1,
+  'streak_3': 2,
+  'streak_7': 5,
+  'streak_15': 10,
+  'streak_30': 20,
+  'streak_60': 35,
+  'first_win': 1,
+  'fast_finisher': 2,
+  'early_bird': 3,
+  'all_done': 3,
+  'bonus_boss': 2,
+  'weekend_warrior': 3,
+  'sunrise_starter': 1,
+  'night_owl': 1,
+  'perfect_day': 5,
+  'mix_master': 3,
+  'overachiever': 3,
+  'trash_trooper_daily': 2,
+  'task_crusher': 5,
 };
 
 const _tieredBadgeCoinBonuses = <BadgeTier, int>{
-  BadgeTier.bronze: 10,
-  BadgeTier.silver: 25,
-  BadgeTier.gold: 50,
+  BadgeTier.bronze: 3,
+  BadgeTier.silver: 5,
+  BadgeTier.gold: 10,
 };
 
 extension BadgeStateAuth on AppState {

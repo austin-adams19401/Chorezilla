@@ -133,18 +133,20 @@ class ParentDrawer extends StatelessWidget {
               title: const Text('Share family code'),
               subtitle: const Text('Invite another parent or device'),
               onTap: () async {
-                Navigator.of(context).pop();
                 final famId = app.familyId;
                 if (famId == null) {
+                  Navigator.of(context).pop();
                   _showErrorSnack(context, 'No family loaded yet.');
                   return;
                 }
                 try {
                   final code = await app.ensureJoinCode();
                   if (!context.mounted) return;
+                  Navigator.of(context).pop();
                   _showJoinCodeDialog(context, code);
                 } catch (e) {
                   if (!context.mounted) return;
+                  Navigator.of(context).pop();
                   _showErrorSnack(context, 'Failed to generate code: $e');
                 }
               },

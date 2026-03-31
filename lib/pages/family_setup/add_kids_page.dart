@@ -1266,7 +1266,7 @@ class _AvatarPickerSheetState extends State<_AvatarPickerSheet> {
       padding: EdgeInsets.only(
         left: 16,
         right: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        bottom: MediaQuery.of(context).viewPadding.bottom + 16,
         top: 8,
       ),
       child: SizedBox(
