@@ -1,6 +1,8 @@
 import 'package:chorezilla/services/purchase_flow.dart';
+import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/themes/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 /// The reason a premium gate was hit — drives the headline copy.
 enum UpgradeReason {
@@ -69,11 +71,17 @@ extension _UpgradeReasonCopy on UpgradeReason {
 }
 
 /// Shows a context-aware premium upsell sheet, then launches the RevenueCat
-/// Paywall if the user taps "See Plans".
+/// Paywall if the user taps "See Plans" / "Renew".
+///
+/// Automatically detects whether the family previously had premium and shows
+/// renewal-focused copy instead of discovery copy when appropriate.
 Future<void> showPremiumUpgradeSheet(
   BuildContext context, {
   required UpgradeReason reason,
 }) async {
+  final family = context.read<AppState>().family;
+  final isRenewal = family?.wasFormerlyPremium ?? false;
+
   final shouldShowPaywall = await showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
@@ -81,7 +89,10 @@ Future<void> showPremiumUpgradeSheet(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (_) => _PremiumUpgradeSheet(reason: reason),
+    builder: (_) => _PremiumUpgradeSheet(
+      reason: reason,
+      isRenewal: isRenewal,
+    ),
   );
 
   if (shouldShowPaywall == true && context.mounted) {
@@ -90,13 +101,25 @@ Future<void> showPremiumUpgradeSheet(
 }
 
 class _PremiumUpgradeSheet extends StatelessWidget {
-  const _PremiumUpgradeSheet({required this.reason});
+  const _PremiumUpgradeSheet({
+    required this.reason,
+    this.isRenewal = false,
+  });
   final UpgradeReason reason;
+  final bool isRenewal;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final ts = Theme.of(context).textTheme;
+
+    final headline = isRenewal
+        ? 'Your subscription has expired'
+        : reason.headline;
+    final subtext = isRenewal
+        ? 'Renew to restore your custom chores, rewards, and all premium features.'
+        : reason.subtext;
+    final ctaLabel = isRenewal ? 'Renew Premium' : 'See Plans';
 
     return SafeArea(
       top: false,
@@ -125,7 +148,7 @@ class _PremiumUpgradeSheet extends StatelessWidget {
             // ── Headline ─────────────────────────────────────────────────
             Center(
               child: Text(
-                reason.headline,
+                headline,
                 style: ts.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 textAlign: TextAlign.center,
               ),
@@ -133,7 +156,7 @@ class _PremiumUpgradeSheet extends StatelessWidget {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                reason.subtext,
+                subtext,
                 style: ts.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
@@ -150,9 +173,12 @@ class _PremiumUpgradeSheet extends StatelessWidget {
               height: 52,
               child: FilledButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: const Text(
-                  'See Plans',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                child: Text(
+                  ctaLabel,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),

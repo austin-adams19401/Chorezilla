@@ -141,6 +141,7 @@ class AppState extends ChangeNotifier {
   // Boot flags to avoid false "setup" routing during hot restart
   bool _familyLoaded = false;
   bool _membersLoaded = false;
+  bool _subscriptionSynced = false;
 
   // Parent PIN state: value + "have we loaded it yet?"
   String? _parentPinHash; // from Family.parentPinHash

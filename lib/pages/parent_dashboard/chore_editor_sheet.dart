@@ -413,6 +413,8 @@ class _ChoreEditorSheetState extends State<ChoreEditorSheet> {
   }
 
   Future<void> _save() async {
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
+
     final rawTitle = _title.text.trim();
     if (rawTitle.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(

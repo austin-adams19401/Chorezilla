@@ -5,6 +5,7 @@ import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/assignment.dart';
 import 'package:chorezilla/models/chore.dart';
 import 'package:chorezilla/models/member.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 
 class ApproveTab extends StatefulWidget {
   const ApproveTab({super.key});
@@ -347,6 +348,7 @@ class _ApproveTabState extends State<ApproveTab> {
 
   Future<void> _approveAssignment(Assignment a) async {
     if (_busyIds.contains(a.id)) return;
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
 
     final app = context.read<AppState>();
 
@@ -381,6 +383,7 @@ class _ApproveTabState extends State<ApproveTab> {
 
   Future<void> _rejectAssignment(Assignment a) async {
     if (_busyIds.contains(a.id)) return;
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
 
     final reason = await showDialog<String>(
       context: context,

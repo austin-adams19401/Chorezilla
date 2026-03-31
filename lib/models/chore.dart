@@ -1,5 +1,6 @@
 import 'package:chorezilla/models/recurrance.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'common.dart';
 
 // chore.dart
 
@@ -24,6 +25,7 @@ class Chore {
   final bool bonusOnly;
   final bool isCustom;
   final ChoreCategory category;
+  final DateTime? createdAt;
 
   const Chore({
     required this.id,
@@ -39,6 +41,7 @@ class Chore {
     this.bonusOnly = false,
     this.isCustom = true,
     this.category = ChoreCategory.other,
+    this.createdAt,
   });
 
   factory Chore.fromDoc(DocumentSnapshot d) {
@@ -61,6 +64,7 @@ class Chore {
       bonusOnly: (m['bonusOnly'] as bool?) ?? false,
       isCustom: (m['isCustom'] as bool?) ?? true,
       category: choreCategoryFromString(m['category'] as String?),
+      createdAt: tsAsDate(m['createdAt']),
     );
   }
 
@@ -93,6 +97,7 @@ class Chore {
     'requiresApproval': requiresApproval,
     'bonusOnly': bonusOnly,
     'category': choreCategoryToString(category),
+    'createdAt': createdAt?.toIso8601String(),
   };
 
   factory Chore.fromCacheMap(Map<String, dynamic> m) {
@@ -113,6 +118,7 @@ class Chore {
       requiresApproval: (m['requiresApproval'] as bool?) ?? false,
       bonusOnly: (m['bonusOnly'] as bool?) ?? false,
       category: choreCategoryFromString(m['category'] as String?),
+      createdAt: parseIsoDateTimeOrNull(m['createdAt']),
     );
   }
 

@@ -303,6 +303,7 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
                                     }
                                   },
                                   onDelete: () async {
+                                    if (SubscriptionService.guardCoParentReadOnly(context)) return;
                                     final messenger = ScaffoldMessenger.of(context);
                                     final confirm = await showDialog<bool>(
                                       context: context,
@@ -426,6 +427,7 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
   }
 
   Future<void> _openNewRewardSheet(BuildContext context) async {
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -435,6 +437,7 @@ class _ParentRewardsPageState extends State<ParentRewardsPage> {
   }
 
   Future<void> _openEditRewardSheet(BuildContext context, Reward reward) async {
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
     if (!reward.isCustom) {
       final app = context.read<AppState>();
       if (!SubscriptionService.isPremium(app.family)) {

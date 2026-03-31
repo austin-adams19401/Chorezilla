@@ -20,6 +20,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import 'package:chorezilla/data/chorezilla_repo.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/member.dart';
@@ -646,6 +647,45 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 
   Future<void> _completeAssignment(Assignment a) async {
     final app = context.read<AppState>();
+
+    // Check if this kid is in limited mode (3rd+ kid on a lapsed subscription).
+    final member = app.members.where((m) => m.id == a.memberId).firstOrNull;
+    if (member != null &&
+        SubscriptionService.isKidLimited(
+          app.family,
+          member,
+          app.members,
+        )) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Ask your parent to renew the subscription to complete chores.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Check if this chore is a locked custom chore (4th+ by creation date).
+    final chore = app.chores.where((c) => c.id == a.choreId).firstOrNull;
+    if (chore != null &&
+        !SubscriptionService.isCustomChoreActive(
+          app.family,
+          chore,
+          app.chores,
+        )) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This chore is locked. Ask your parent to renew premium.',
+          ),
+        ),
+      );
+      return;
+    }
+
     setState(() => _busyIds.add(a.id));
 
     try {
@@ -1274,22 +1314,41 @@ class _TodoList extends StatelessWidget {
                     final busy = busyIds.contains(a.id);
                     final isRejected = a.status == AssignmentStatus.rejected;
 
+                    // Check if this chore or kid is locked due to lapsed premium.
+                    final app = context.read<AppState>();
+                    final member = app.members
+                        .where((m) => m.id == memberId)
+                        .firstOrNull;
+                    final chore = app.chores
+                        .where((c) => c.id == a.choreId)
+                        .firstOrNull;
+                    final isKidLocked = member != null &&
+                        SubscriptionService.isKidLimited(
+                          app.family, member, app.members);
+                    final isChoreLocked = chore != null &&
+                        !SubscriptionService.isCustomChoreActive(
+                          app.family, chore, app.chores);
+                    final isLocked = isKidLocked || isChoreLocked;
+
                     return _AssignmentTile(
                       assignment: a,
                       completed: false,
                       rejected: isRejected,
-                      trailing: FilledButton(
-                        onPressed: busy ? null : () => onComplete(a),
-                        child: busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Mark done'),
-                      ),
+                      locked: isLocked,
+                      trailing: isLocked
+                          ? const _LockIndicator()
+                          : FilledButton(
+                              onPressed: busy ? null : () => onComplete(a),
+                              child: busy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Mark done'),
+                            ),
                     );
                   }, childCount: items.length),
                 ),
@@ -1322,22 +1381,40 @@ class _TodoList extends StatelessWidget {
                     final a = bonusItems[index];
                     final busy = busyIds.contains(a.id);
 
+                    final app = context.read<AppState>();
+                    final member = app.members
+                        .where((m) => m.id == memberId)
+                        .firstOrNull;
+                    final chore = app.chores
+                        .where((c) => c.id == a.choreId)
+                        .firstOrNull;
+                    final isKidLocked = member != null &&
+                        SubscriptionService.isKidLimited(
+                          app.family, member, app.members);
+                    final isChoreLocked = chore != null &&
+                        !SubscriptionService.isCustomChoreActive(
+                          app.family, chore, app.chores);
+                    final isLocked = isKidLocked || isChoreLocked;
+
                     return _AssignmentTile(
                       assignment: a,
                       completed: false,
                       rejected: false,
-                      trailing: FilledButton(
-                        onPressed: busy ? null : () => onComplete(a),
-                        child: busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('Do this'),
-                      ),
+                      locked: isLocked,
+                      trailing: isLocked
+                          ? const _LockIndicator()
+                          : FilledButton(
+                              onPressed: busy ? null : () => onComplete(a),
+                              child: busy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text('Do this'),
+                            ),
                     );
                   }, childCount: bonusItems.length),
                 ),
@@ -1423,12 +1500,14 @@ class _AssignmentTile extends StatelessWidget {
     required this.trailing,
     this.completed = false,
     this.rejected = false,
+    this.locked = false,
   });
 
   final Assignment assignment;
   final Widget trailing;
   final bool completed;
   final bool rejected;
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
@@ -1462,7 +1541,9 @@ class _AssignmentTile extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: completed
+      color: locked
+          ? cs.surfaceContainerHighest.withAlpha(180)
+          : completed
           ? cs.surfaceContainerHighest
           : rejected
           ? cs.errorContainer
@@ -1540,6 +1621,39 @@ class _StatusPill extends StatelessWidget {
           color: cs.onSecondaryContainer,
           fontWeight: FontWeight.w600,
         ),
+      ),
+    );
+  }
+}
+
+/// Small lock icon + "Premium" label shown on chore/reward tiles that are
+/// locked because the family's subscription lapsed.
+class _LockIndicator extends StatelessWidget {
+  const _LockIndicator();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock_rounded, size: 14, color: cs.onSurfaceVariant),
+          const SizedBox(width: 4),
+          Text(
+            'Locked',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }

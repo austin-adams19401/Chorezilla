@@ -67,6 +67,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
   }
 
   Future<void> _save() async {
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
     if (!_formKey.currentState!.validate()) return;
 
     final app = context.read<AppState>();
@@ -130,6 +131,7 @@ class _AddKidsPageState extends State<AddKidsPage> {
   }
 
   Future<void> _removeKidFromFamily(Member m) async {
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
     final app = context.read<AppState>();
     final familyId = app.family?.id;
     if (familyId == null || familyId.isEmpty) return;

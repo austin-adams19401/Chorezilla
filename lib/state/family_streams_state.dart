@@ -22,6 +22,7 @@ extension AppStateFamilyStreams on AppState {
     await _loadCachedFamilyData(familyId);
 
     _familySub?.cancel();
+    _subscriptionSynced = false;
     _familySub = repo.watchFamily(familyId).listen((fam) {
       _family = fam;
       _cache.saveFamily(fam);
@@ -33,9 +34,18 @@ extension AppStateFamilyStreams on AppState {
       if (!_familyLoaded) {
         _familyLoaded = true;
       }
+
+      // Sync subscription status with RevenueCat once per session
+      // (only for non-free tiers).
+      if (!_subscriptionSynced &&
+          fam.subscriptionTier != SubscriptionTier.free) {
+        _subscriptionSynced = true;
+        _syncSubscription(familyId, fam);
+      }
+
       _notifyStateChanged();
 
-      refreshAssignmentsForToday(); 
+      refreshAssignmentsForToday();
     });
 
     _membersSub?.cancel();
@@ -229,6 +239,37 @@ extension AppStateFamilyStreams on AppState {
       }
     } catch (e) {
       debugPrint('Failed to load local cache for family $familyId: $e');
+    }
+  }
+
+  /// Syncs subscription status with RevenueCat and updates Firestore if needed.
+  Future<void> _syncSubscription(String familyId, Family fam) async {
+    try {
+      final result = await syncSubscriptionWithRevenueCat(
+        currentTier: fam.subscriptionTier.name,
+        currentExpiresAt: fam.subscriptionExpiresAt,
+        currentBillingIssue: fam.billingIssueDetectedAt,
+      );
+
+      if (result.changed) {
+        final updates = <String, dynamic>{
+          'subscriptionTier': result.tier,
+          'subscriptionExpiresAt': result.expiresAt == null
+              ? null
+              : Timestamp.fromDate(result.expiresAt!),
+          'billingIssueDetectedAt': result.billingIssueDetectedAt == null
+              ? null
+              : Timestamp.fromDate(result.billingIssueDetectedAt!),
+        };
+        await FirebaseFirestore.instance
+            .doc('families/$familyId')
+            .update(updates);
+        debugPrint('Subscription synced with RevenueCat: ${result.tier}');
+      } else {
+        debugPrint('Subscription in sync with RevenueCat, no update needed.');
+      }
+    } catch (e) {
+      debugPrint('Failed to sync subscription with RevenueCat: $e');
     }
   }
 }

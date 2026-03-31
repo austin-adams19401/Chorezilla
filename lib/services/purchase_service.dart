@@ -73,3 +73,66 @@ class PurchaseService {
     expiresAt: isLifetime ? null : expiresAt,
   );
 }
+
+/// Result of syncing subscription status with RevenueCat.
+class SubscriptionSyncResult {
+  final String tier;
+  final DateTime? expiresAt;
+  final DateTime? billingIssueDetectedAt;
+  final bool changed;
+
+  const SubscriptionSyncResult({
+    required this.tier,
+    this.expiresAt,
+    this.billingIssueDetectedAt,
+    required this.changed,
+  });
+}
+
+/// Checks RevenueCat for the current subscription status and determines
+/// what (if anything) needs to be updated in Firestore.
+///
+/// [currentTier], [currentExpiresAt], and [currentBillingIssue] are the
+/// values currently stored in Firestore.
+Future<SubscriptionSyncResult> syncSubscriptionWithRevenueCat({
+  required String currentTier,
+  required DateTime? currentExpiresAt,
+  required DateTime? currentBillingIssue,
+}) async {
+  final info = await Purchases.getCustomerInfo();
+  final sub = subscriptionFromCustomerInfo(info);
+
+  // Check for billing issues on the premium entitlement.
+  final entitlement = info.entitlements.all[kPremiumEntitlement];
+  final hasBillingIssue = entitlement?.billingIssueDetectedAt != null;
+
+  DateTime? newBillingIssue = currentBillingIssue;
+
+  if (hasBillingIssue && currentBillingIssue == null) {
+    // First time detecting a billing issue -- start the grace clock.
+    newBillingIssue = DateTime.now();
+  } else if (!hasBillingIssue && currentBillingIssue != null) {
+    // Billing issue resolved -- clear the grace clock.
+    newBillingIssue = null;
+  }
+
+  // If the grace period has expired, force downgrade to free.
+  String newTier = sub.tier;
+  DateTime? newExpiresAt = sub.expiresAt;
+  if (newBillingIssue != null &&
+      DateTime.now().difference(newBillingIssue) >= const Duration(days: 14)) {
+    newTier = 'free';
+    newExpiresAt = null;
+  }
+
+  final changed = newTier != currentTier ||
+      newExpiresAt != currentExpiresAt ||
+      newBillingIssue != currentBillingIssue;
+
+  return SubscriptionSyncResult(
+    tier: newTier,
+    expiresAt: newExpiresAt,
+    billingIssueDetectedAt: newBillingIssue,
+    changed: changed,
+  );
+}

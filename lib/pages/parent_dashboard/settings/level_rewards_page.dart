@@ -7,6 +7,7 @@ import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/models/cosmetics.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/themes/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -57,6 +58,7 @@ class _LevelRewardsPageState extends State<LevelRewardsPage> {
   }
 
   Future<void> _save() async {
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
     final app = context.read<AppState>();
     final famId = app.familyId;
     final family = app.family;

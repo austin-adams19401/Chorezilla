@@ -11,6 +11,7 @@ import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/components/loot_box_open_dialog.dart';
 import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 
 class KidRewardsPage extends StatefulWidget {
   const KidRewardsPage({super.key, this.memberId, this.initialTabIndex = 0 });
@@ -219,6 +220,40 @@ class _KidRewardsPageState extends State<KidRewardsPage>
   Future<void> _purchaseReward(Member member, Reward reward) async {
     final app = context.read<AppState>();
 
+    // Check if this kid is in limited mode (3rd+ kid on a lapsed subscription).
+    if (SubscriptionService.isKidLimited(
+      app.family,
+      member,
+      app.members,
+    )) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Ask your parent to renew the subscription to purchase rewards.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Check if this custom reward is beyond the free limit.
+    if (!SubscriptionService.isCustomRewardActive(
+      app.family,
+      reward,
+      app.rewards,
+    )) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This reward is locked. Ask your parent to renew premium.',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (member.coins < reward.coinCost) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Not enough coins for this reward.')),
@@ -420,11 +455,20 @@ class _RewardStoreTab extends StatelessWidget {
             final canAfford = member.coins >= r.coinCost;
             final busy = busyRewardIds.contains(r.id);
 
+            // Check if this reward or kid is locked due to lapsed premium.
+            final app = context.read<AppState>();
+            final isKidLocked = SubscriptionService.isKidLimited(
+              app.family, member, app.members);
+            final isRewardLocked = !SubscriptionService.isCustomRewardActive(
+              app.family, r, rewards);
+            final isLocked = isKidLocked || isRewardLocked;
+
             return _RewardTile(
               reward: r,
-              canAfford: canAfford && !soldOut && !busy,
+              canAfford: canAfford && !soldOut && !busy && !isLocked,
               soldOut: soldOut,
               busy: busy,
+              locked: isLocked,
               stockRemaining: stockRemaining,
               onPressed: () => onPurchase(member, r),
             );
@@ -443,12 +487,14 @@ class _RewardTile extends StatefulWidget {
     required this.busy,
     required this.onPressed,
     this.stockRemaining,
+    this.locked = false,
   });
 
   final Reward reward;
   final bool canAfford;
   final bool soldOut;
   final bool busy;
+  final bool locked;
   final int? stockRemaining;
   final VoidCallback onPressed;
 
@@ -519,10 +565,11 @@ class _RewardTileState extends State<_RewardTile>
         : null;
     final stockText = widget.stockRemaining != null ? 'Limit: ${widget.stockRemaining}' : null;
 
-    final bool disabled = !widget.canAfford;
+    final bool disabled = !widget.canAfford || widget.locked;
 
-    final Color cardColor =
-        disabled ? cs.surfaceContainer : cs.surface;
+    final Color cardColor = widget.locked
+        ? cs.surfaceContainerHighest.withAlpha(180)
+        : disabled ? cs.surfaceContainer : cs.surface;
 
     return Card(
       elevation: 0,
@@ -595,16 +642,43 @@ class _RewardTileState extends State<_RewardTile>
               ),
             ),
             const SizedBox(width: 12),
-            FilledButton(
-              onPressed: disabled || widget.busy ? null : widget.onPressed,
-              child: widget.busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Buy'),
-            ),
+            widget.locked
+                ? Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock_rounded,
+                            size: 14, color: cs.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Locked',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: cs.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : FilledButton(
+                    onPressed: disabled || widget.busy
+                        ? null
+                        : widget.onPressed,
+                    child: widget.busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Buy'),
+                  ),
           ],
         ),
       ),
@@ -775,6 +849,23 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
       orElse: () => widget.member,
     );
 
+    // Limited-mode kids can't open loot boxes.
+    if (SubscriptionService.isKidLimited(
+      app.family,
+      member,
+      app.members,
+    )) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Ask your parent to renew the subscription to open loot boxes.',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (member.coins < box.costCoins) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Not enough coins to open this box.')),
@@ -872,13 +963,16 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
             children: LootBoxCatalog.boxes.skip(row * 2).take(2).map((box) {
               final busy = _busyIds.contains(box.id);
               final canAfford = member.coins >= box.costCoins;
+              final isKidLocked = SubscriptionService.isKidLimited(
+                app.family, member, app.members);
               return Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: _LootBoxCard(
                     box: box,
-                    canAfford: canAfford,
+                    canAfford: canAfford && !isKidLocked,
                     busy: busy,
+                    locked: isKidLocked,
                     onOpen: () => _openLootBox(box),
                   ),
                 ),
@@ -1039,11 +1133,13 @@ class _LootBoxCard extends StatelessWidget {
     required this.canAfford,
     required this.busy,
     required this.onOpen,
+    this.locked = false,
   });
 
   final LootBoxDefinition box;
   final bool canAfford;
   final bool busy;
+  final bool locked;
   final VoidCallback onOpen;
 
   static List<Color> _gradientFor(CosmeticType type) {
@@ -1178,32 +1274,59 @@ class _LootBoxCard extends StatelessWidget {
                   const SizedBox(height: 10),
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: canAfford && !busy ? onOpen : null,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: Colors.white.withValues(alpha: 0.35),
-                        side: BorderSide(
-                          color: Colors.white.withValues(alpha: canAfford ? 0.65 : 0.25),
-                          width: 1.5,
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        textStyle: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      child: busy
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                    child: locked
+                        ? OutlinedButton.icon(
+                            onPressed: null,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              disabledForegroundColor:
+                                  Colors.white.withValues(alpha: 0.5),
+                              side: BorderSide(
+                                color:
+                                    Colors.white.withValues(alpha: 0.25),
+                                width: 1.5,
                               ),
-                            )
-                          : const Text('Open'),
-                    ),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 6),
+                              textStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            icon: const Icon(Icons.lock_rounded,
+                                size: 14),
+                            label: const Text('Locked'),
+                          )
+                        : OutlinedButton(
+                            onPressed:
+                                canAfford && !busy ? onOpen : null,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.white,
+                              disabledForegroundColor:
+                                  Colors.white.withValues(alpha: 0.35),
+                              side: BorderSide(
+                                color: Colors.white.withValues(
+                                    alpha: canAfford ? 0.65 : 0.25),
+                                width: 1.5,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 6),
+                              textStyle: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            child: busy
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text('Open'),
+                          ),
                   ),
                 ],
               ),

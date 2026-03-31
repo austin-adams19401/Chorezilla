@@ -1,5 +1,6 @@
 import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
+import 'package:chorezilla/services/subscription_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -33,6 +34,7 @@ class _EditFamilyPageState extends State<EditFamilyPage> {
   }
 
   Future<void> _saveName() async {
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
     final app = context.read<AppState>();
     final famId = app.familyId;
     if (famId == null) return;

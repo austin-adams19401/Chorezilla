@@ -108,6 +108,7 @@ class Family {
   final SubscriptionTier subscriptionTier;
   final DateTime? subscriptionExpiresAt;
   final DateTime? trialExpiresAt;
+  final DateTime? billingIssueDetectedAt;
 
   const Family({
     required this.id,
@@ -122,11 +123,19 @@ class Family {
     this.subscriptionTier = SubscriptionTier.free,
     this.subscriptionExpiresAt,
     this.trialExpiresAt,
+    this.billingIssueDetectedAt,
   });
+
+  /// Duration of the billing-issue grace period before features degrade.
+  static const gracePeriodDuration = Duration(days: 14);
 
   bool get isPremium {
     if (subscriptionTier == SubscriptionTier.lifetime) return true;
     if (subscriptionTier == SubscriptionTier.premium) {
+      // If there's a billing issue, premium stays active during the grace window.
+      if (billingIssueDetectedAt != null) {
+        return !isGracePeriodExpired;
+      }
       return subscriptionExpiresAt == null ||
           subscriptionExpiresAt!.isAfter(DateTime.now());
     }
@@ -135,6 +144,22 @@ class Family {
     }
     return false;
   }
+
+  /// True when a billing issue exists but the grace period hasn't expired yet.
+  bool get hasBillingIssue =>
+      billingIssueDetectedAt != null && !isGracePeriodExpired;
+
+  /// True when the billing issue grace period (14 days) has elapsed.
+  bool get isGracePeriodExpired {
+    if (billingIssueDetectedAt == null) return false;
+    return DateTime.now().difference(billingIssueDetectedAt!) >=
+        gracePeriodDuration;
+  }
+
+  /// True if this family once had premium but no longer does.
+  bool get wasFormerlyPremium =>
+      subscriptionTier == SubscriptionTier.free &&
+      billingIssueDetectedAt != null;
 
   Map<String, dynamic> toMap() => {
         'name': name,
@@ -151,6 +176,9 @@ class Family {
             : Timestamp.fromDate(subscriptionExpiresAt!),
         'trialExpiresAt':
             trialExpiresAt == null ? null : Timestamp.fromDate(trialExpiresAt!),
+        'billingIssueDetectedAt': billingIssueDetectedAt == null
+            ? null
+            : Timestamp.fromDate(billingIssueDetectedAt!),
       };
 
   factory Family.fromDoc(DocumentSnapshot doc) {
@@ -168,6 +196,7 @@ class Family {
       subscriptionTier: _tierFromString(data['subscriptionTier'] as String?),
       subscriptionExpiresAt: tsAsDate(data['subscriptionExpiresAt']),
       trialExpiresAt: tsAsDate(data['trialExpiresAt']),
+      billingIssueDetectedAt: tsAsDate(data['billingIssueDetectedAt']),
     );
   }
 
@@ -185,6 +214,7 @@ class Family {
     'subscriptionTier': subscriptionTier.name,
     'subscriptionExpiresAt': subscriptionExpiresAt?.toIso8601String(),
     'trialExpiresAt': trialExpiresAt?.toIso8601String(),
+    'billingIssueDetectedAt': billingIssueDetectedAt?.toIso8601String(),
   };
 
   factory Family.fromCacheMap(Map<String, dynamic> data) {
@@ -203,6 +233,7 @@ class Family {
       subscriptionTier: _tierFromString(data['subscriptionTier'] as String?),
       subscriptionExpiresAt: parseIsoDateTimeOrNull(data['subscriptionExpiresAt']),
       trialExpiresAt: parseIsoDateTimeOrNull(data['trialExpiresAt']),
+      billingIssueDetectedAt: parseIsoDateTimeOrNull(data['billingIssueDetectedAt']),
     );
   }
 

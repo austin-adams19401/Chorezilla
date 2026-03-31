@@ -1,3 +1,4 @@
+import 'package:chorezilla/components/billing_issue_banner.dart';
 import 'package:chorezilla/components/chores_nav_icon.dart';
 import 'package:chorezilla/components/parent_menu_drawer.dart';
 import 'package:chorezilla/components/rewards_nav_icon.dart';
@@ -254,6 +255,13 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
       body: Column(
         children: [
           const ParentNotificationRegistrar(),
+          Builder(
+            builder: (context) {
+              final family = context.watch<AppState>().family;
+              if (family == null) return const SizedBox.shrink();
+              return BillingIssueBanner(family: family);
+            },
+          ),
           Expanded(
             child: IndexedStack(index: _index, children: pages),
           ),

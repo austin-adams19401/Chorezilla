@@ -36,6 +36,7 @@ class _AssignTabState extends State<AssignTab> {
   }
 
   Future<void> _confirmDeleteChore(Chore chore) async {
+    if (SubscriptionService.guardCoParentReadOnly(context)) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
