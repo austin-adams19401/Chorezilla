@@ -1,10 +1,40 @@
 rules_version = '2';
 
-// Craft rules based on data in your Firestore database
-// allow write: if firestore.get(
-//    /databases/(default)/documents/users/$(request.auth.uid)).data.isAdmin;
 service firebase.storage {
   match /b/{bucket}/o {
+
+    // ----------------------------------------
+    // PUBLIC SPRITE SHEETS (no auth required)
+    // ----------------------------------------
+    // These are static assets used by the app.
+    // Allow anyone to read so auth timing doesn't break downloads.
+    match /sprite-sheets/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ----------------------------------------
+    // FAMILY PROOF IMAGES (auth required)
+    // ----------------------------------------
+    // Path: families/{familyId}/proofs/{fileName}
+    match /families/{familyId}/proofs/{fileName} {
+
+      allow read: if request.auth != null
+        && familyId in firestore.get(
+          /databases/(default)/documents/users/$(request.auth.uid)
+        ).data.memberships;
+
+      allow write: if request.auth != null
+        && familyId in firestore.get(
+          /databases/(default)/documents/users/$(request.auth.uid)
+        ).data.memberships
+        && request.resource.contentType.matches('image/.*')
+        && request.resource.size <= 5 * 1024 * 1024;
+    }
+
+    // ----------------------------------------
+    // DEFAULT: DENY EVERYTHING ELSE
+    // ----------------------------------------
     match /{allPaths=**} {
       allow read, write: if false;
     }

@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "588085741239-d05r9a6a2tu6n1lct49hud6g17gcqi0u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.chorezilla.chorezilla",
+            "certificate_hash": "f10417d12ab243d55923c6f98a2b98856900c032"
+          }
+        },
+        {
           "client_id": "588085741239-tetqvu3rths6h7s5paoj2qvvham46sfg.apps.googleusercontent.com",
           "client_type": 3
         }

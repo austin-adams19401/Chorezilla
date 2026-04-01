@@ -115,9 +115,11 @@ if (isNewProfile) {
           'displayName': effectiveName,
           if (email != null && email.isNotEmpty) 'email': email,
           'updatedAt': FieldValue.serverTimestamp(),
-          'memberships.$currentFamId': {
-            'memberId': ownerMemberDoc.id,
-            'role': 'parent',
+          'memberships': {
+            currentFamId: {
+              'memberId': ownerMemberDoc.id,
+              'role': 'parent',
+            },
           },
         }, SetOptions(merge: true));
 

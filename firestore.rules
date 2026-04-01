@@ -2,8 +2,217 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if false;
+
+    // ═══════════════════════════════════════════════════════════════
+    // Helper functions
+    // ═══════════════════════════════════════════════════════════════
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userProfileRef() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function userProfile() {
+      return isSignedIn()
+        ? get(userProfileRef()).data
+        : null;
+    }
+
+    function hasMemberships() {
+      return isSignedIn()
+        && userProfile() != null
+        && userProfile().memberships != null;
+    }
+
+    function membership(familyId) {
+      return hasMemberships()
+        && familyId in userProfile().memberships
+        ? userProfile().memberships[familyId]
+        : null;
+    }
+
+    function isMember(familyId) {
+      return membership(familyId) != null;
+    }
+
+    function isParent(familyId) {
+      return isMember(familyId)
+        && membership(familyId).role == 'parent';
+    }
+
+    function isOwner(familyId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/families/$(familyId))
+        && get(/databases/$(database)/documents/families/$(familyId)).data.ownerUid == request.auth.uid;
+    }
+
+    function canReadFamily(familyId) {
+      return isMember(familyId) || isOwner(familyId);
+    }
+
+    function myMemberId(familyId) {
+      return isMember(familyId)
+        && membership(familyId).memberId != null
+        ? membership(familyId).memberId
+        : null;
+    }
+
+    function isOwnMemberDoc(familyId, memberId) {
+      return canReadFamily(familyId)
+        && myMemberId(familyId) != null
+        && myMemberId(familyId) == memberId;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // /users/{uid}
+    // ═══════════════════════════════════════════════════════════════
+    match /users/{uid} {
+      allow read, create, update, delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // /joinCodes/{code}
+    // ═══════════════════════════════════════════════════════════════
+    match /joinCodes/{code} {
+      allow read, create, update: if isSignedIn();
+      allow delete: if false;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // /invites/{code} - managed by Cloud Functions
+    // ═══════════════════════════════════════════════════════════════
+    match /invites/{code} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // /families/{familyId}
+    // ═══════════════════════════════════════════════════════════════
+    match /families/{familyId} {
+      allow read: if canReadFamily(familyId);
+
+      allow create: if isSignedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+
+      allow update: if isParent(familyId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny([
+              'subscriptionTier',
+              'subscriptionExpiresAt',
+              'trialExpiresAt',
+              'billingIssueDetectedAt'
+            ]);
+
+      allow delete: if isOwner(familyId);
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/members/{memberId}
+      // ─────────────────────────────────────────────────────────
+      match /members/{memberId} {
+        // Broad read for kid join / selection flows
+        allow read: if isSignedIn();
+
+        allow create: if isParent(familyId);
+
+        allow update: if isParent(familyId)
+          || isOwnMemberDoc(familyId, memberId);
+
+        allow delete: if isParent(familyId);
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/chores/{choreId}
+      // ─────────────────────────────────────────────────────────
+      match /chores/{choreId} {
+        allow read: if canReadFamily(familyId);
+        allow create, update, delete: if isParent(familyId);
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/assignments/{assignmentId}
+      // ─────────────────────────────────────────────────────────
+      match /assignments/{assignmentId} {
+        allow read: if canReadFamily(familyId);
+
+        // Kids can self-assign bonus chores
+        allow create: if canReadFamily(familyId);
+
+        // Parents can update any assignment.
+        // Kids can update only their own assignment.
+        allow update: if isParent(familyId)
+          || (
+            canReadFamily(familyId)
+            && myMemberId(familyId) != null
+            && resource.data.memberId == myMemberId(familyId)
+          );
+
+        allow delete: if isParent(familyId);
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/rewards/{rewardId}
+      // ─────────────────────────────────────────────────────────
+      match /rewards/{rewardId} {
+        allow read: if canReadFamily(familyId);
+        allow create: if isParent(familyId);
+
+        // Kids can only update memberPurchaseCounts
+        allow update: if isParent(familyId)
+          || (
+            canReadFamily(familyId)
+            && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['memberPurchaseCounts'])
+          );
+
+        allow delete: if isParent(familyId);
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/rewardRedemptions/{redemptionId}
+      // ─────────────────────────────────────────────────────────
+      match /rewardRedemptions/{redemptionId} {
+        allow read: if canReadFamily(familyId);
+        allow create: if canReadFamily(familyId);
+        allow update: if isParent(familyId);
+        allow delete: if false;
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/devices/{deviceId}
+      // ─────────────────────────────────────────────────────────
+      match /devices/{deviceId} {
+        allow read, create, update: if canReadFamily(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/events/{eventId}
+      // ─────────────────────────────────────────────────────────
+      match /events/{eventId} {
+        allow read: if canReadFamily(familyId);
+        allow create: if canReadFamily(familyId);
+        allow update, delete: if false;
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/choreMemberSchedules/{scheduleId}
+      // ─────────────────────────────────────────────────────────
+      match /choreMemberSchedules/{scheduleId} {
+        allow read: if canReadFamily(familyId);
+        allow create, update, delete: if isParent(familyId);
+      }
+
+      // ─────────────────────────────────────────────────────────
+      // /families/{familyId}/dayStatusOverrides/{overrideId}
+      // ─────────────────────────────────────────────────────────
+      match /dayStatusOverrides/{overrideId} {
+        allow read: if canReadFamily(familyId);
+        allow create, update, delete: if isParent(familyId);
+      }
     }
   }
 }

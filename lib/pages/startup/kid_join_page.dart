@@ -103,6 +103,7 @@ class _KidJoinPageState extends State<KidJoinPage> {
       'defaultFamilyId': familyId,
       'role': 'kid',
       'memberId': memberId,
+      'memberships.$familyId': {'memberId': memberId, 'role': 'child'},
     }, SetOptions(merge: true));
 
     if (!mounted) return;
