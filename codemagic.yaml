@@ -11,8 +11,7 @@ workflows:
       xcode: 16.2
 
     scripts:
-
-      - flutter build ios --simulator --flavor staging  # --flavor is optional
+      - flutter build ios --simulator
 
     artifacts:
 
