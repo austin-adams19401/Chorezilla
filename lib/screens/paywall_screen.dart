@@ -74,6 +74,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
         _error = 'No subscription plans available. Please try again later.';
       }
     } catch (e) {
+      debugPrint('PaywallScreen: Failed to load offerings: $e');
       _error = 'Could not load subscription plans. Check your connection and try again.';
     } finally {
       if (mounted) setState(() => _loading = false);

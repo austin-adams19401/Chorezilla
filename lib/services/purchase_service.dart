@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:purchases_ui_flutter/purchases_ui_flutter.dart';
 
@@ -17,10 +18,15 @@ class PurchaseService {
   /// Optionally pass a [userId] (e.g., Firebase UID) to link purchases to the
   /// user's account in RevenueCat.
   static Future<void> init({String? userId}) async {
-    final apiKey = Platform.isIOS ? _kAppleApiKey : _kGoogleApiKey;
-    final config = PurchasesConfiguration(apiKey);
-    if (userId != null) config.appUserID = userId;
-    await Purchases.configure(config);
+    try {
+      final apiKey = Platform.isIOS ? _kAppleApiKey : _kGoogleApiKey;
+      final config = PurchasesConfiguration(apiKey);
+      if (userId != null) config.appUserID = userId;
+      await Purchases.configure(config);
+      debugPrint('PurchaseService: initialized successfully');
+    } catch (e) {
+      debugPrint('PurchaseService: init failed: $e');
+    }
   }
 
   /// Log in to RevenueCat with a Firebase UID so purchases are linked cross-device.
