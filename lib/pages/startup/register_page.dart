@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:chorezilla/components/auth_scaffold.dart';
 import 'package:chorezilla/components/inputs.dart';
 import 'package:chorezilla/pages/startup/kid_join_page.dart';
@@ -52,6 +53,24 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       await userCredentials.user?.updateDisplayName(_name.text.trim());
+
+      // The auth state listener fires as soon as the account is created,
+      // before updateDisplayName finishes. That means the family/member
+      // docs may have been written with the fallback name "Parent".
+      // Patch them with the real name now.
+      final uid = userCredentials.user?.uid;
+      final name = _name.text.trim();
+      if (uid != null && name.isNotEmpty) {
+        final db = FirebaseFirestore.instance;
+        final batch = db.batch();
+        batch.set(db.collection('users').doc(uid),
+            {'displayName': name}, SetOptions(merge: true));
+        batch.set(
+            db.collection('families').doc(uid).collection('members').doc(uid),
+            {'displayName': name}, SetOptions(merge: true));
+        await batch.commit();
+      }
+
       AnalyticsService.logAccountCreated();
       if (!mounted) return;
 
