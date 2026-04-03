@@ -66,6 +66,39 @@ extension AppStateAuth on AppState {
     );
   }
 
+  Future<void> signInWithApple() async {
+    final credential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+    );
+
+    final oauthCredential = OAuthProvider('apple.com').credential(
+      idToken: credential.identityToken,
+      accessToken: credential.authorizationCode,
+    );
+
+    final userCred = await auth.signInWithCredential(oauthCredential);
+
+    // Apple only provides the name on the first sign-in. Capture it immediately.
+    final givenName = credential.givenName;
+    final familyName = credential.familyName;
+    if (givenName != null || familyName != null) {
+      final displayName = [givenName, familyName]
+          .where((s) => s != null && s.isNotEmpty)
+          .join(' ');
+      if (displayName.isNotEmpty) {
+        await userCred.user?.updateDisplayName(displayName);
+      }
+    }
+
+    AnalyticsService.logLogin(method: 'apple');
+    debugPrint(
+      'APPLE SIGN IN: user=${userCred.user?.uid} - ${userCred.user?.displayName}',
+    );
+  }
+
   Future<void> _getDataForUser(User u) async {
     // 1) Ensure profile exists & fetch it
     debugPrint('_getDataForUser: ${u.email} - ${u.displayName}');

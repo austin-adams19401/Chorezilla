@@ -1,3 +1,4 @@
+import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/components/billing_issue_banner.dart';
 import 'package:chorezilla/components/chores_nav_icon.dart';
 import 'package:chorezilla/components/parent_menu_drawer.dart';
@@ -32,8 +33,6 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
   TutorialStep _tutorialStep = TutorialStep.step1Today;
   TutorialStep? _prevTutorialStep;
 
-  static const _tutorialCompleteKey = 'tutorialComplete';
-
   @override
   void initState() {
     super.initState();
@@ -48,9 +47,9 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
     super.dispose();
   }
 
-  Future<void> _checkTutorial() async {
-    final prefs = await SharedPreferences.getInstance();
-    final done = prefs.getBool(_tutorialCompleteKey) ?? false;
+  void _checkTutorial() {
+    final family = context.read<AppState>().family;
+    final done = family?.tutorialComplete ?? false;
     if (!done && mounted) {
       setState(() => _showTutorial = true);
     }
@@ -153,8 +152,12 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
   }
 
   Future<void> _resetTutorial() async {
+    final app = context.read<AppState>();
+    final familyId = app.family?.id;
+    if (familyId != null) {
+      await app.repo.updateFamily(familyId, {'tutorialComplete': false});
+    }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_tutorialCompleteKey, false);
     await prefs.setBool('showKidViewTutorial', false);
     if (!mounted) return;
     setState(() {
@@ -167,18 +170,24 @@ class _ParentDashboardPageState extends State<ParentDashboardPage>
 
   void _completeTutorial() {
     setState(() => _showTutorial = false);
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setBool(_tutorialCompleteKey, true);
-    });
+    final app = context.read<AppState>();
+    final familyId = app.family?.id;
+    if (familyId != null) {
+      app.repo.updateFamily(familyId, {'tutorialComplete': true});
+    }
   }
 
   Future<void> _completeWithKidView() async {
     setState(() => _showTutorial = false);
+    final app = context.read<AppState>();
+    final familyId = app.family?.id;
+    if (familyId != null) {
+      await app.repo.updateFamily(familyId, {'tutorialComplete': true});
+    }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_tutorialCompleteKey, true);
     await prefs.setBool('showKidViewTutorial', true);
     if (!mounted) return;
-    await context.read<AppState>().setViewMode(AppViewMode.kid);
+    await app.setViewMode(AppViewMode.kid);
   }
 
   @override

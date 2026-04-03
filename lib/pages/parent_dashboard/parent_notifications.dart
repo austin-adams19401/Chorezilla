@@ -60,11 +60,12 @@ class _ParentNotificationRegistrarState
       return;
     }
 
+    // Set flag synchronously before any async work to prevent duplicate calls
+    _initialized = true;
     _registering = true;
     _setup(member).then((_) {
       if (!mounted) return;
       _registering = false;
-      _initialized = true;
       debugPrint('ParentNotificationRegistrar: setup complete.');
     });
   }

@@ -33,6 +33,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   _Plan _selected = _Plan.yearly;
   bool _loading = true;
   bool _purchasing = false;
+  bool _offeringsLoaded = false;
   String? _error;
 
   Package? _monthlyPkg;
@@ -46,6 +47,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _loadOfferings() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final offerings = await Purchases.getOfferings();
       final current = offerings.current;
@@ -63,8 +68,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
           }
         }
       }
-    } catch (_) {
-      // If offerings fail to load we fall back to static prices.
+      _offeringsLoaded =
+          _monthlyPkg != null || _yearlyPkg != null || _lifetimePkg != null;
+      if (!_offeringsLoaded) {
+        _error = 'No subscription plans available. Please try again later.';
+      }
+    } catch (e) {
+      _error = 'Could not load subscription plans. Check your connection and try again.';
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -81,14 +91,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
     AnalyticsService.logPremiumPurchaseStarted();
 
     try {
-      late CustomerInfo info;
-      if (pkg != null) {
-        final result = await Purchases.purchasePackage(pkg);
-        info = result;
-      } else {
-        // Fallback: restore in case products aren't loaded.
-        info = await Purchases.restorePurchases();
+      if (pkg == null) {
+        setState(() {
+          _purchasing = false;
+          _error = 'Subscription plans are not available right now. Please try again.';
+        });
+        return;
       }
+      final info = await Purchases.purchasePackage(pkg);
 
       final hasPremium =
           info.entitlements.active.containsKey(kPremiumEntitlement);
@@ -264,6 +274,23 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             ),
                             const SizedBox(height: 28),
 
+                            // ── Error + Retry ─────────────────────────────
+                            if (_error != null && !_offeringsLoaded) ...[
+                              const SizedBox(height: 20),
+                              Text(
+                                _error!,
+                                style: ts.bodyMedium?.copyWith(color: cs.error),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: _loadOfferings,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Retry'),
+                              ),
+                              const SizedBox(height: 20),
+                            ],
+
                             // ── Monthly / Yearly columns ──────────────────
                             IntrinsicHeight(
                               child: Row(
@@ -272,7 +299,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                   Expanded(
                                     child: _PlanCard(
                                       label: 'Monthly',
-                                      price: '\$3.99',
+                                      price: _monthlyPkg?.storeProduct.priceString ?? '\$3.99',
                                       period: '/mo',
                                       badge: 'Flexible',
                                       badgeColor: const Color(0xFF6B7280),
@@ -286,7 +313,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                   Expanded(
                                     child: _PlanCard(
                                       label: 'Yearly',
-                                      price: '\$29.99',
+                                      price: _yearlyPkg?.storeProduct.priceString ?? '\$29.99',
                                       period: '/yr',
                                       subtext: '7-day free trial',
                                       badge: 'Best Value',
@@ -303,6 +330,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
                             // ── Lifetime ──────────────────────────────────
                             _LifetimeCard(
+                              price: _lifetimePkg?.storeProduct.priceString ?? '\$54.99',
                               selected: _selected == _Plan.lifetime,
                               onTap: () =>
                                   setState(() => _selected = _Plan.lifetime),
@@ -313,8 +341,8 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             const _FeatureSummary(),
                             const SizedBox(height: 28),
 
-                            // ── Error ─────────────────────────────────────
-                            if (_error != null) ...[
+                            // ── Inline error (purchase failures) ──────────
+                            if (_error != null && _offeringsLoaded) ...[
                               Text(
                                 _error!,
                                 style: ts.bodySmall
@@ -332,8 +360,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     _BottomCta(
                       selected: _selected,
                       purchasing: _purchasing,
+                      canPurchase: _offeringsLoaded,
                       onPurchase: _purchase,
                       onRestore: _restore,
+                      monthlyPkg: _monthlyPkg,
+                      yearlyPkg: _yearlyPkg,
+                      lifetimePkg: _lifetimePkg,
                     ),
                   ],
                 ),
@@ -518,10 +550,11 @@ class _PlanCard extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _LifetimeCard extends StatelessWidget {
-  const _LifetimeCard({required this.selected, required this.onTap});
+  const _LifetimeCard({required this.selected, required this.onTap, required this.price});
 
   final bool selected;
   final VoidCallback onTap;
+  final String price;
 
   @override
   Widget build(BuildContext context) {
@@ -609,7 +642,7 @@ class _LifetimeCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '\$54.99',
+                  price,
                   style: ts.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: selected ? AppTheme.zillaGreen : cs.onSurface,
@@ -706,20 +739,32 @@ class _BottomCta extends StatelessWidget {
   const _BottomCta({
     required this.selected,
     required this.purchasing,
+    required this.canPurchase,
     required this.onPurchase,
     required this.onRestore,
+    this.monthlyPkg,
+    this.yearlyPkg,
+    this.lifetimePkg,
   });
 
   final _Plan selected;
   final bool purchasing;
+  final bool canPurchase;
   final VoidCallback onPurchase;
   final VoidCallback onRestore;
+  final Package? monthlyPkg;
+  final Package? yearlyPkg;
+  final Package? lifetimePkg;
 
-  String get _ctaLabel => switch (selected) {
-        _Plan.monthly => 'Start Monthly — \$3.99/mo',
-        _Plan.yearly => 'Try Free for 7 Days',
-        _Plan.lifetime => 'Get Lifetime — \$54.99',
-      };
+  String get _ctaLabel {
+    final monthlyPrice = monthlyPkg?.storeProduct.priceString ?? '\$3.99';
+    final lifetimePrice = lifetimePkg?.storeProduct.priceString ?? '\$54.99';
+    return switch (selected) {
+      _Plan.monthly => 'Start Monthly \u2014 $monthlyPrice/mo',
+      _Plan.yearly => 'Try Free for 7 Days',
+      _Plan.lifetime => 'Get Lifetime \u2014 $lifetimePrice',
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -745,7 +790,7 @@ class _BottomCta extends StatelessWidget {
             width: double.infinity,
             height: 54,
             child: FilledButton(
-              onPressed: purchasing ? null : onPurchase,
+              onPressed: purchasing || !canPurchase ? null : onPurchase,
               child: purchasing
                   ? const SizedBox(
                       width: 22,
@@ -782,7 +827,7 @@ class _BottomCta extends StatelessWidget {
                       ts.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
               Text(
                 selected == _Plan.yearly
-                    ? 'Then \$29.99/yr · Cancel anytime'
+                    ? 'Then ${yearlyPkg?.storeProduct.priceString ?? '\$29.99'}/yr \u00b7 Cancel anytime'
                     : 'Cancel anytime',
                 style: ts.labelSmall?.copyWith(color: cs.onSurfaceVariant),
               ),

@@ -104,6 +104,7 @@ class Family {
   final FamilyStats stats;
   final DateTime? createdAt;
   final bool onboardingComplete;
+  final bool tutorialComplete;
   final String? parentPinHash;
   final SubscriptionTier subscriptionTier;
   final DateTime? subscriptionExpiresAt;
@@ -115,6 +116,7 @@ class Family {
     required this.name,
     required this.ownerUid,
     required this.onboardingComplete,
+    this.tutorialComplete = false,
     this.joinCode,
     this.settings = const FamilySettings(),
     this.stats = const FamilyStats(),
@@ -165,6 +167,7 @@ class Family {
         'name': name,
         'ownerUid': ownerUid,
         'onboardingComplete': onboardingComplete,
+        'tutorialComplete': tutorialComplete,
         'joinCode': joinCode,
         'settings': settings.toMap(),
         'stats': stats.toMap(),
@@ -187,7 +190,8 @@ class Family {
       id: doc.id,
       name: data['name'] as String? ?? 'Family',
       ownerUid: data['ownerUid'] as String? ?? '',
-      onboardingComplete: (data['onboardingComplete'] as bool?) ?? false,
+      onboardingComplete: data['onboardingComplete'] == true,
+      tutorialComplete: data['tutorialComplete'] == true,
       joinCode: data['joinCode'] as String?,
       settings: FamilySettings.fromMap(data['settings'] as Map<String, dynamic>?),
       stats: FamilyStats.fromMap(data['stats'] as Map<String, dynamic>?),
@@ -206,6 +210,7 @@ class Family {
     'name': name,
     'ownerUid': ownerUid,
     'onboardingComplete': onboardingComplete,
+    'tutorialComplete': tutorialComplete,
     'joinCode': joinCode,
     'settings': settings.toMap(),
     'stats': stats.toMap(),
@@ -222,7 +227,8 @@ class Family {
       id: data['id'] as String? ?? '',
       name: data['name'] as String? ?? 'Family',
       ownerUid: data['ownerUid'] as String? ?? '',
-      onboardingComplete: (data['onboardingComplete'] as bool?) ?? false,
+      onboardingComplete: data['onboardingComplete'] == true,
+      tutorialComplete: data['tutorialComplete'] == true,
       joinCode: data['joinCode'] as String?,
       settings: FamilySettings.fromMap(
         data['settings'] as Map<String, dynamic>?,

@@ -1,3 +1,4 @@
+import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/services/purchase_flow.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/themes/app_theme.dart';
@@ -96,7 +97,8 @@ Future<void> showPremiumUpgradeSheet(
   );
 
   if (shouldShowPaywall == true && context.mounted) {
-    await showPremiumPaywall(context);
+    final isKidMode = context.read<AppState>().viewMode == AppViewMode.kid;
+    await showPremiumPaywall(context, requiresParentalGate: isKidMode);
   }
 }
 

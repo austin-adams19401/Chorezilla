@@ -1,19 +1,29 @@
+import 'package:chorezilla/screens/privacy_policy_screen.dart';
+import 'package:chorezilla/screens/terms_of_use_screen.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
+/// URLs kept for App Store Connect metadata references.
 const String kSupportUrl =
     'https://austin-adams19401.github.io/chorezilla-support';
 const String kPrivacyPolicyUrl =
     'https://austin-adams19401.github.io/chorezilla-support/privacy.html';
+const String kTermsOfUseUrl =
+    'https://austin-adams19401.github.io/chorezilla-support/terms.html';
 
-Future<void> openPrivacyPolicy() =>
-    launchUrl(Uri.parse(kPrivacyPolicyUrl), mode: LaunchMode.externalApplication);
+void openPrivacyPolicy(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+  );
+}
 
-Future<void> openTermsOfService() =>
-    launchUrl(Uri.parse(kSupportUrl), mode: LaunchMode.externalApplication);
+void openTermsOfUse(BuildContext context) {
+  Navigator.of(context).push(
+    MaterialPageRoute(builder: (_) => const TermsOfUseScreen()),
+  );
+}
 
-/// "By creating an account you agree to our Terms of Service and Privacy Policy"
+/// "By continuing, you agree to our Terms of Use and Privacy Policy"
 /// with tappable links. Used on register/login screens.
 class LegalConsentText extends StatelessWidget {
   const LegalConsentText({super.key});
@@ -36,15 +46,17 @@ class LegalConsentText extends StatelessWidget {
         children: [
           const TextSpan(text: 'By continuing, you agree to our '),
           TextSpan(
-            text: 'Terms of Service',
+            text: 'Terms of Use',
             style: linkStyle,
-            recognizer: TapGestureRecognizer()..onTap = openTermsOfService,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => openTermsOfUse(context),
           ),
           const TextSpan(text: ' and '),
           TextSpan(
             text: 'Privacy Policy',
             style: linkStyle,
-            recognizer: TapGestureRecognizer()..onTap = openPrivacyPolicy,
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => openPrivacyPolicy(context),
           ),
           const TextSpan(text: '.'),
         ],
@@ -69,17 +81,17 @@ class LegalLinksRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         TextButton(
-          onPressed: openTermsOfService,
+          onPressed: () => openTermsOfUse(context),
           style: TextButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             minimumSize: Size.zero,
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          child: Text('Terms of Service', style: style),
+          child: Text('Terms of Use', style: style),
         ),
-        Text(' · ', style: style),
+        Text(' \u00b7 ', style: style),
         TextButton(
-          onPressed: openPrivacyPolicy,
+          onPressed: () => openPrivacyPolicy(context),
           style: TextButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             minimumSize: Size.zero,

@@ -67,6 +67,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
   // NEW: local "today" stream, same as ParentTodayTab → filtered per kid
   StreamSubscription<List<Assignment>>? _todayAssignmentsSub;
   List<Assignment> _todayAssignmentsForKid = [];
+  List<Assignment> _todayAllFamilyAssignments = [];
   bool _todayAssignmentsBootstrapped = false;
 
   // Silent Ninja: track required chores completed in this session.
@@ -158,6 +159,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     _todayAssignmentsSub?.cancel();
     _todayAssignmentsBootstrapped = false;
     _todayAssignmentsForKid = [];
+    _todayAllFamilyAssignments = [];
 
     debugPrint(
       'ChildDashboardPage: binding today stream for kid=${member.displayName} '
@@ -183,6 +185,7 @@ class _KidDashboardPageState extends State<KidDashboardPage>
           _sessionRequiredCompleted = 0;
           _silentNinjaTriggered = false;
         }
+        _todayAllFamilyAssignments = all;
         _todayAssignmentsForKid = filtered;
         _todayAssignmentsBootstrapped = true;
       });
@@ -324,9 +327,20 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     .where((id) => id.isNotEmpty)
     .toSet();
 
+  // Bonus chores completed or pending by ANY family member today
+  final familyClaimedBonusIds = _todayAllFamilyAssignments
+    .where((a) =>
+        a.bonus &&
+        (a.status == AssignmentStatus.completed ||
+         a.status == AssignmentStatus.pending))
+    .map((a) => a.choreId)
+    .toSet();
+
   // If this kid is not allowed, there are *no* available bonus chores to pick.
   final availableBonusChores = allowBonusChores
-      ? (allBonusChores.where((c) => !takenChoreIds.contains(c.id)).toList()
+      ? (allBonusChores.where((c) =>
+            !takenChoreIds.contains(c.id) &&
+            !familyClaimedBonusIds.contains(c.id)).toList()
           ..sort((a, b) => a.title.compareTo(b.title)))
       : <Chore>[];
 
@@ -545,32 +559,15 @@ class _KidDashboardPageState extends State<KidDashboardPage>
                                     child: CircularProgressIndicator(),
                                   )
                                 else
-                                  Column(
-                                    children: [
-                                      if (availableBonusChores.isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                            12,
-                                            12,
-                                            12,
-                                            4,
-                                          ),
-                                          child: _BonusChoresSection(
-                                            kid: member,
-                                            chores: availableBonusChores,
-                                          ),
-                                        ),
-                                      Expanded(
-                                        child: _TodoList(
-                                          memberId: member.id,
-                                          items: requiredTodos,
-                                          bonusItems: bonusTodos,
-                                          busyIds: _busyIds,
-                                          onComplete: _completeAssignment,
-                                          completedToday: completedToday,
-                                        ),
-                                      ),
-                                    ],
+                                  _TodoList(
+                                    memberId: member.id,
+                                    kid: member,
+                                    items: requiredTodos,
+                                    bonusItems: bonusTodos,
+                                    availableBonusChores: availableBonusChores,
+                                    busyIds: _busyIds,
+                                    onComplete: _completeAssignment,
+                                    completedToday: completedToday,
                                   ),
 
                                 // Tab 2: Submitted
@@ -1237,16 +1234,20 @@ class _KidDashboardPageState extends State<KidDashboardPage>
 class _TodoList extends StatelessWidget {
   const _TodoList({
     required this.memberId,
+    required this.kid,
     required this.items,
-    required this.bonusItems, 
+    required this.bonusItems,
+    required this.availableBonusChores,
     required this.completedToday,
     required this.busyIds,
     required this.onComplete,
   });
 
   final String memberId;
+  final Member kid;
   final List<Assignment> items;
   final List<Assignment> bonusItems;
+  final List<Chore> availableBonusChores;
   final Set<String> busyIds;
   final Future<void> Function(Assignment) onComplete;
   final List<Assignment> completedToday;
@@ -1256,8 +1257,9 @@ class _TodoList extends StatelessWidget {
     final hasTodos = items.isNotEmpty;
     final hasCompleted = completedToday.isNotEmpty;
     final hasBonus = bonusItems.isNotEmpty;
+    final hasAvailableBonus = availableBonusChores.isNotEmpty;
 
-    if (!hasTodos && !hasCompleted && !hasBonus) {
+    if (!hasTodos && !hasCompleted && !hasBonus && !hasAvailableBonus) {
       return const _EmptyState(
         emoji: '🎉',
         title: 'All caught up!',
@@ -1287,6 +1289,16 @@ class _TodoList extends StatelessWidget {
 
         return CustomScrollView(
           slivers: [
+            if (hasAvailableBonus)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                  child: _BonusChoresSection(
+                    kid: kid,
+                    chores: availableBonusChores,
+                  ),
+                ),
+              ),
             if (hasTodos) ...[
               SliverToBoxAdapter(
                 child: Padding(

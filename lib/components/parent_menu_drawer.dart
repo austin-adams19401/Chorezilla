@@ -176,15 +176,15 @@ class ParentDrawer extends StatelessWidget {
               title: const Text('Privacy Policy'),
               onTap: () {
                 Navigator.of(context).pop();
-                openPrivacyPolicy();
+                openPrivacyPolicy(context);
               },
             ),
             ListTile(
               leading: Icon(Icons.description_outlined, color: cs.primary),
-              title: const Text('Terms of Service'),
+              title: const Text('Terms of Use'),
               onTap: () {
                 Navigator.of(context).pop();
-                openTermsOfService();
+                openTermsOfUse(context);
               },
             ),
 

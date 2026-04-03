@@ -1,5 +1,6 @@
 import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 import 'package:chorezilla/components/leveling.dart';
+import 'package:chorezilla/components/parental_gate.dart';
 import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/pages/kid_pages/kid_dashboard.dart';
 import 'package:flutter/material.dart';
@@ -285,141 +286,19 @@ Future<void> _showAdultExitDialog(BuildContext context) async {
   // Safety: if for some reason there is no parent PIN yet, just switch back.
   if (!app.hasParentPin) {
     await app.setViewMode(AppViewMode.parent);
-    if(!context.mounted) return;
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('No parent PIN set yet — going back to parent view.'),
+        content: Text('No parent PIN set yet \u2014 going back to parent view.'),
       ),
     );
     return;
   }
 
-  final ok = await showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) => const _ParentPinDialog(),
-  );
+  final ok = await showParentPinGate(context);
 
-  if (ok == true) {
+  if (ok) {
     await app.setViewMode(AppViewMode.parent);
-    // Root routing should notice viewMode == parent and show parent dashboard.
-  }
-}
-
-class _ParentPinDialog extends StatefulWidget {
-  const _ParentPinDialog();
-
-  @override
-  State<_ParentPinDialog> createState() => _ParentPinDialogState();
-}
-
-class _ParentPinDialogState extends State<_ParentPinDialog> {
-  final _controller = TextEditingController();
-  String? _error;
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final app = context.read<AppState>();
-    final pin = _controller.text.trim();
-    if (pin.length != 4) {
-      setState(() => _error = 'Enter your 4-digit parent PIN.');
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-
-    final ok = await app.verifyParentPin(pin);
-
-    if (!mounted) return;
-    setState(() => _busy = false);
-
-    if (!ok) {
-      setState(() => _error = "Hmm, are you SURE you're the parent?");
-      return;
-    }
-
-    Navigator.of(context).pop(true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-
-    return AlertDialog(
-      backgroundColor: cs.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-      contentPadding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-      actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      title: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: cs.primaryContainer,
-            child: Icon(
-              Icons.lock_outline_rounded,
-              color: cs.onPrimaryContainer,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'Parents only',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 8),
-          Text(
-            'Enter your parent PIN to go back to the parent view.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            maxLength: 4,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: 'Parent PIN',
-              border: const OutlineInputBorder(),
-              errorText: _error,
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _busy ? null : _submit,
-          child: const Text('Unlock'),
-        ),
-      ],
-    );
   }
 }
 

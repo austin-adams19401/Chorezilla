@@ -207,7 +207,7 @@ class _ParentSetupPageState extends State<ParentSetupPage> {
                           decoration: TextDecoration.underline,
                         ),
                         recognizer: TapGestureRecognizer()
-                          ..onTap = openPrivacyPolicy,
+                          ..onTap = () => openPrivacyPolicy(context),
                       ),
                       const TextSpan(text: '.'),
                     ],

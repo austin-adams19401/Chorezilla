@@ -1,14 +1,15 @@
+import 'dart:io';
+
+import 'package:chorezilla/components/apple_sign_in.dart';
 import 'package:chorezilla/components/auth_scaffold.dart';
 import 'package:chorezilla/components/inputs.dart';
 import 'package:chorezilla/pages/startup/forgot_pw_page.dart';
-import 'package:chorezilla/pages/startup/kid_join_page.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:chorezilla/components/google_sign_in.dart';
 import 'package:chorezilla/services/analytics_service.dart';
-import 'package:chorezilla/services/legal_links.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -27,6 +28,8 @@ class _LoginPageState extends State<LoginPage> {
   String? _error;
   bool _googleBusy = false;
   String? _googleError;
+  bool _appleBusy = false;
+  String? _appleError;
 
   @override
   void dispose() {
@@ -51,6 +54,24 @@ class _LoginPageState extends State<LoginPage> {
       }
     } finally {
       if (mounted) setState(() { _googleBusy = false; });
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() { _appleBusy = true; _appleError = null; });
+    try {
+      await context.read<AppState>().signInWithApple();
+      if (mounted) Navigator.of(context).pushNamedAndRemoveUntil('/', (_) => false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _appleError = e is Exception
+              ? e.toString().replaceFirst('Exception: ', '')
+              : 'Apple sign-in failed. Please try again.';
+        });
+      }
+    } finally {
+      if (mounted) setState(() { _appleBusy = false; });
     }
   }
 
@@ -183,6 +204,20 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 8),
                 Text(_googleError!, style: TextStyle(color: cs.error)),
               ],
+              if (Platform.isIOS) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: AppleSignInButton(
+                    isLoading: _appleBusy,
+                    onPressed: _appleBusy ? null : _signInWithApple,
+                  ),
+                ),
+                if (_appleError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(_appleError!, style: TextStyle(color: cs.error)),
+                ],
+              ],
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () {
@@ -205,31 +240,6 @@ class _LoginPageState extends State<LoginPage> {
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const KidJoinPage()),
-                  );
-                },
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        'Joining a family? ',
-                        style: TextStyle(color: cs.inverseSurface, fontSize: 16),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      'Enter code',
-                      style: TextStyle(color: cs.primary, fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              const LegalConsentText(),
             ],
           ),
         ),
