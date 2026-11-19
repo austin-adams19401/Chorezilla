@@ -1,7 +1,7 @@
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/services/purchase_service.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/themes/app_theme.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
@@ -108,24 +108,25 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
       final app = context.read<AppState>();
       final familyId = app.familyId;
+      var synced = false;
       if (familyId != null) {
-        final sub = subscriptionFromCustomerInfo(info);
-        await FirebaseFirestore.instance.doc('families/$familyId').set(
-          {
-            'subscriptionTier': sub.tier,
-            'subscriptionExpiresAt': sub.expiresAt == null
-                ? null
-                : Timestamp.fromDate(sub.expiresAt!),
-          },
-          SetOptions(merge: true),
-        );
+        try {
+          await BackendFunctions.refreshSubscription(familyId);
+          synced = true;
+        } catch (e) {
+          debugPrint('refreshSubscription after purchase: $e');
+        }
       }
 
       AnalyticsService.logPremiumPurchaseCompleted();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Welcome to Premium! 🎉'),
+          SnackBar(
+            content: Text(
+              synced
+                  ? 'Welcome to Premium! 🎉'
+                  : 'Purchase received. Premium unlocks when the store confirms it.',
+            ),
             backgroundColor: AppTheme.zillaGreen,
           ),
         );
@@ -157,16 +158,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
         final app = context.read<AppState>();
         final familyId = app.familyId;
         if (familyId != null) {
-          final sub = subscriptionFromCustomerInfo(info);
-          await FirebaseFirestore.instance.doc('families/$familyId').set(
-            {
-              'subscriptionTier': sub.tier,
-              'subscriptionExpiresAt': sub.expiresAt == null
-                  ? null
-                  : Timestamp.fromDate(sub.expiresAt!),
-            },
-            SetOptions(merge: true),
-          );
+          try {
+            await BackendFunctions.refreshSubscription(familyId);
+          } catch (e) {
+            debugPrint('refreshSubscription after restore: $e');
+          }
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

@@ -1,11 +1,11 @@
 import 'dart:math' as math;
 import 'package:chorezilla/components/inputs.dart';
+import 'package:chorezilla/components/pin_pad.dart';
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/services/subscription_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -38,9 +38,6 @@ class _AddKidsPageState extends State<AddKidsPage> {
   String? _error;
   String? _editingMemberId;
 
-  final pinController = TextEditingController();
-  final pinConfirmController = TextEditingController();
-
   final ChorezillaRepo _repo = ChorezillaRepo(
     firebaseDB: FirebaseFirestore.instance,
   );
@@ -49,8 +46,6 @@ class _AddKidsPageState extends State<AddKidsPage> {
   void dispose() {
     _name.dispose();
     _nameNode.dispose();
-    pinController.dispose();
-    pinConfirmController.dispose();
     super.dispose();
   }
 
@@ -207,9 +202,12 @@ class _AddKidsPageState extends State<AddKidsPage> {
 
   Future<void> _showPinDialog(Member m) async {
     final app = context.read<AppState>();
-    final hasExistingPin = (m.pinHash != null && m.pinHash!.trim().isNotEmpty);
+    final hasExistingPin = m.hasPin;
 
     bool pinEnabled = hasExistingPin;
+    String pin = '';
+    String confirm = '';
+    var active = 0;
     String? error;
 
     await showDialog<bool>(
@@ -238,8 +236,8 @@ class _AddKidsPageState extends State<AddKidsPage> {
                         setDialogState(() {
                           pinEnabled = value;
                           if (!value) {
-                            pinController.clear();
-                            pinConfirmController.clear();
+                            pin = '';
+                            confirm = '';
                             error = null;
                           }
                         });
@@ -254,22 +252,31 @@ class _AddKidsPageState extends State<AddKidsPage> {
                     ),
                     if (pinEnabled) ...[
                       const SizedBox(height: 12),
-                      TextField(
-                        controller: pinController,
-                        keyboardType: TextInputType.number,
-                        maxLength: 4,
-                        obscureText: true,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        decoration: themedInput(ctx, '4-digit PIN'),
+                      PinDots(
+                        value: pin,
+                        length: 4,
+                        selected: active == 0,
+                        onTap: () => setDialogState(() => active = 0),
                       ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: pinConfirmController,
-                        keyboardType: TextInputType.number,
-                        maxLength: 4,
-                        obscureText: true,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        decoration: themedInput(ctx, 'Confirm PIN'),
+                      const SizedBox(height: 8),
+                      PinDots(
+                        value: confirm,
+                        length: 4,
+                        selected: active == 1,
+                        onTap: () => setDialogState(() => active = 1),
+                      ),
+                      const SizedBox(height: 8),
+                      PinPad(
+                        value: active == 0 ? pin : confirm,
+                        onChanged: (next) => setDialogState(() {
+                          if (active == 0) {
+                            pin = next;
+                            if (pin.length == 4) active = 1;
+                          } else {
+                            confirm = next;
+                          }
+                          error = null;
+                        }),
                       ),
                       if (hasExistingPin)
                         Padding(
@@ -304,8 +311,8 @@ class _AddKidsPageState extends State<AddKidsPage> {
                       return;
                     }
 
-                    final newPin = pinController.text.trim();
-                    final confirmPin = pinConfirmController.text.trim();
+                    final newPin = pin.trim();
+                    final confirmPin = confirm.trim();
 
                     if (newPin.isEmpty && hasExistingPin) {
                       if (ctx.mounted) Navigator.of(ctx).pop(true);
@@ -337,8 +344,6 @@ class _AddKidsPageState extends State<AddKidsPage> {
         );
       },
     );
-    pinController.clear();
-    pinConfirmController.clear();
   }
 
   @override

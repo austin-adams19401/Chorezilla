@@ -1,3 +1,4 @@
+import 'package:chorezilla/components/pin_pad.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -28,20 +29,13 @@ class _ParentPinGateDialog extends StatefulWidget {
 }
 
 class _ParentPinGateDialogState extends State<_ParentPinGateDialog> {
-  final _controller = TextEditingController();
+  String _pin = '';
   String? _error;
   bool _busy = false;
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
   Future<void> _submit() async {
     final app = context.read<AppState>();
-    final pin = _controller.text.trim();
-    if (pin.length != 4) {
+    if (_pin.length != 4) {
       setState(() => _error = 'Enter your 4-digit parent PIN.');
       return;
     }
@@ -51,7 +45,17 @@ class _ParentPinGateDialogState extends State<_ParentPinGateDialog> {
       _error = null;
     });
 
-    final ok = await app.verifyParentPin(pin);
+    bool ok;
+    try {
+      ok = await app.verifyParentPin(_pin);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e.toString().replaceFirst('Exception: ', '');
+      });
+      return;
+    }
 
     if (!mounted) return;
     setState(() => _busy = false);
@@ -97,7 +101,12 @@ class _ParentPinGateDialogState extends State<_ParentPinGateDialog> {
           ),
         ],
       ),
-      content: Column(
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -109,20 +118,25 @@ class _ParentPinGateDialogState extends State<_ParentPinGateDialog> {
             ),
           ),
           const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            keyboardType: TextInputType.number,
-            maxLength: 4,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: 'Parent PIN',
-              border: const OutlineInputBorder(),
-              errorText: _error,
-              errorMaxLines: 2,
-            ),
+          PinDots(value: _pin, length: 4, selected: true),
+          const SizedBox(height: 12),
+          PinPad(
+            value: _pin,
+            onChanged: (next) => setState(() {
+              _pin = next;
+              _error = null;
+            }),
           ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: theme.textTheme.bodySmall?.copyWith(color: cs.error),
+            ),
+          ],
         ],
+          ),
+        ),
       ),
       actions: [
         TextButton(

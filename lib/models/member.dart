@@ -9,6 +9,8 @@ class Member {
   final String? userUid;
   final String? avatarKey;
   final String? pinHash;
+  /// True once a kid PIN is stored server-side. Legacy docs may only have [pinHash].
+  final bool pinSet;
 
   /// Birth month/year — day is always 1; used to compute age dynamically.
   final DateTime? birthMonth;
@@ -82,6 +84,7 @@ class Member {
     this.userUid,
     this.avatarKey,
     this.pinHash,
+    this.pinSet = false,
     this.birthMonth,
     this.level = 1,
     this.xp = 0,
@@ -133,6 +136,7 @@ class Member {
     String? userUid,
     String? avatarKey,
     String? pinHash,
+    bool? pinSet,
     DateTime? birthMonth,
     int? level,
     int? xp,
@@ -189,6 +193,7 @@ class Member {
     userUid: userUid ?? this.userUid,
     avatarKey: avatarKey ?? this.avatarKey,
     pinHash: pinHash ?? this.pinHash,
+    pinSet: pinSet ?? this.pinSet,
     birthMonth: birthMonth ?? this.birthMonth,
     level: level ?? this.level,
     xp: xp ?? this.xp,
@@ -241,6 +246,7 @@ class Member {
     'userUid': userUid,
     'avatarKey': avatarKey,
     'pinHash': pinHash,
+    'pinSet': pinSet,
     'birthMonth': birthMonth == null ? null : Timestamp.fromDate(birthMonth!),
     'level': level,
     'xp': xp,
@@ -302,6 +308,7 @@ class Member {
       userUid: data['userUid'] as String?,
       avatarKey: data['avatarKey'] as String?,
       pinHash: data['pinHash'] as String?,
+      pinSet: data['pinSet'] == true,
       birthMonth: tsAsDate(data['birthMonth']),
       level: (data['level'] as num?)?.toInt() ?? 1,
       xp: (data['xp'] as num?)?.toInt() ?? 0,
@@ -367,6 +374,7 @@ class Member {
     'userUid': userUid,
     'avatarKey': avatarKey,
     'pinHash': pinHash,
+    'pinSet': pinSet,
     'birthMonth': birthMonth?.toIso8601String(),
     'level': level,
     'xp': xp,
@@ -420,6 +428,7 @@ class Member {
       userUid: data['userUid'] as String?,
       avatarKey: data['avatarKey'] as String?,
       pinHash: data['pinHash'] as String?,
+      pinSet: data['pinSet'] == true,
       birthMonth: parseIsoDateTimeOrNull(data['birthMonth']),
       level: (data['level'] as num?)?.toInt() ?? 1,
       xp: (data['xp'] as num?)?.toInt() ?? 0,
@@ -506,6 +515,10 @@ class Member {
   String get kidName => (nickname != null && nickname!.isNotEmpty) ? nickname! : displayName;
 
   bool ownsCosmetic(String cosmeticId) => ownedCosmetics.contains(cosmeticId);
+
+  /// Legacy clients stored the hash on the member doc. New PINs set [pinSet].
+  bool get hasPin =>
+      pinSet || (pinHash != null && pinHash!.trim().isNotEmpty);
 
   bool hasBadge(String badgeId) => badges.contains(badgeId);
 

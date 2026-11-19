@@ -1,10 +1,9 @@
-import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/state/app_state.dart';
-import 'package:chorezilla/models/family.dart';
 
 class ParentJoinPage extends StatefulWidget {
   const ParentJoinPage({super.key, this.initialCode});
@@ -17,7 +16,7 @@ class ParentJoinPage extends StatefulWidget {
 class _ParentJoinPageState extends State<ParentJoinPage> {
   final _code = TextEditingController();
   String? _familyId;
-  Family? _family;
+  String? _familyName;
   String? _error;
   bool _busy = false;
 
@@ -37,18 +36,17 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
   }
 
   Future<void> _lookup() async {
-    setState(() { _busy = true; _familyId = null; _family = null; _error = null; });
+    setState(() { _busy = true; _familyId = null; _familyName = null; _error = null; });
     try {
-      final repo = context.read<AppState>().repo;
-      final code = _code.text.trim().toUpperCase();
-      final famId = await repo.redeemJoinCode(code);
-      if (famId == null) {
+      final preview = await BackendFunctions.previewJoinCode(_code.text);
+      if (preview.familyId.isEmpty) {
         setState(() { _error = 'Invalid or expired code'; });
         return;
       }
-      // fetch family once to show name
-      final fam = await repo.watchFamily(famId).first;
-      setState(() { _familyId = famId; _family = fam; });
+      setState(() {
+        _familyId = preview.familyId;
+        _familyName = preview.familyName;
+      });
     } catch (e) {
       setState(() { _error = e.toString(); });
     } finally {
@@ -66,10 +64,9 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
       );
 
       final app = context.read<AppState>();
-      final repo = app.repo;
-      await repo.joinFamilyAsParent(
-        familyId: _familyId!,
-        uid: user.uid,
+      await BackendFunctions.joinWithFamilyCode(
+        code: _code.text,
+        kind: 'parent',
         displayName: user.displayName,
       );
       await app.refreshAfterProfileChange();
@@ -114,8 +111,8 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
                       : const Text('Check'),
                 ),
                 const SizedBox(width: 12),
-                if (_family != null)
-                  Text('Found: ${_family!.name}', style: ts.bodyMedium),
+                if (_familyName != null)
+                  Text('Found: $_familyName', style: ts.bodyMedium),
               ],
             ),
             if (_error != null) ...[
@@ -123,7 +120,7 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
               Text(_error!, style: TextStyle(color: cs.error)),
             ],
             const SizedBox(height: 24),
-            if (_family != null)
+            if (_familyName != null)
               FilledButton.tonal(
                 onPressed: _busy ? null : _join,
                 child: const Text('Join as Parent'),

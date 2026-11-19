@@ -5,6 +5,7 @@ import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/coin_economy_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/level_rewards_page.dart';
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/services/purchase_flow.dart';
 import 'package:chorezilla/services/purchase_service.dart';
 import 'package:chorezilla/themes/app_theme.dart';
@@ -535,12 +536,14 @@ class _RedeemCodeDialogState extends State<_RedeemCodeDialog> {
             final code = _controller.text.trim();
             if (code.isEmpty) return;
             try {
-              final famId = await app.redeemJoinCode(code);
+              await BackendFunctions.joinWithFamilyCode(
+                code: code,
+                kind: 'parent',
+                displayName: app.firebaseUser?.displayName,
+              );
+              await app.refreshAfterProfileChange();
               if (!mounted) return;
               Navigator.of(context).pop();
-              if (famId == null && mounted) {
-                ParentDrawer._showErrorSnack(context, 'Code not valid.');
-              }
             } catch (e) {
               if (!mounted) return;
               Navigator.of(context).pop();

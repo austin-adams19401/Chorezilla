@@ -1,9 +1,8 @@
-import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/models/common.dart';
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:provider/provider.dart';
 
@@ -15,10 +14,9 @@ class KidJoinPage extends StatefulWidget {
 
 class _KidJoinPageState extends State<KidJoinPage> {
   final _code = TextEditingController();
-  final _repo = ChorezillaRepo(firebaseDB: FirebaseFirestore.instance);
 
   String? familyId;
-  List<QueryDocumentSnapshot<Map<String, dynamic>>> members = [];
+  List<JoinKidPreview> members = [];
   bool _searching = false;
 
   @override
@@ -47,35 +45,24 @@ class _KidJoinPageState extends State<KidJoinPage> {
     try {
       await _ensureAnon();
 
-      final codeDoc = await FirebaseFirestore.instance
-          .collection('joinCodes')
-          .doc(code)
-          .get();
+      final preview = await BackendFunctions.previewJoinCode(code);
 
       if (!mounted) return;
-
-      if (!codeDoc.exists) {
+      if (preview.familyId.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Code not found. Check with your parent.')),
         );
         return;
       }
-
-      final resolvedFamilyId = codeDoc.data()!['familyId'] as String;
-
-      final memSnap = await FirebaseFirestore.instance
-          .collection('families')
-          .doc(resolvedFamilyId)
-          .collection('members')
-          .where('role', isEqualTo: 'child')
-          .where('active', isEqualTo: true)
-          .get();
-
-      if (!mounted) return;
       setState(() {
-        familyId = resolvedFamilyId;
-        members = memSnap.docs;
+        familyId = preview.familyId;
+        members = preview.kids;
       });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
     } finally {
       if (mounted) setState(() { _searching = false; });
     }
@@ -94,18 +81,22 @@ class _KidJoinPageState extends State<KidJoinPage> {
   }
 
   Future<void> _chooseMember(String memberId) async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    try {
+      await BackendFunctions.joinWithFamilyCode(
+        code: _code.text,
+        kind: 'child',
+        memberId: memberId,
+      );
+      await _finishJoin();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+    }
+  }
 
-    // Write both familyId (legacy) and defaultFamilyId so that
-    // _getDataForUser can find the family and start streams.
-    await FirebaseFirestore.instance.collection('users').doc(uid).set({
-      'familyId': familyId,
-      'defaultFamilyId': familyId,
-      'role': 'kid',
-      'memberId': memberId,
-      'memberships.$familyId': {'memberId': memberId, 'role': 'child'},
-    }, SetOptions(merge: true));
-
+  Future<void> _finishJoin() async {
     if (!mounted) return;
     final app = context.read<AppState>();
 
@@ -146,13 +137,17 @@ class _KidJoinPageState extends State<KidJoinPage> {
 
     setState(() { _searching = true; });
     try {
-      final newId = await _repo.addChild(
-        familyId!,
+      await BackendFunctions.joinWithFamilyCode(
+        code: _code.text,
+        kind: 'child',
         displayName: name,
-        avatarKey: null,
-        pinHash: null,
       );
-      await _chooseMember(newId);
+      await _finishJoin();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
     } finally {
       if (mounted) setState(() { _searching = false; });
     }
@@ -256,9 +251,8 @@ class _KidJoinPageState extends State<KidJoinPage> {
                       );
                     }
 
-                    final data = members[i].data();
-                    final name = (data['displayName'] ?? 'Kid') as String;
-                    final avatarKey = data['avatarKey'] as String?;
+                    final name = members[i].displayName;
+                    final avatarKey = members[i].avatarKey;
 
                     return InkWell(
                       onTap: () => _chooseMember(members[i].id),

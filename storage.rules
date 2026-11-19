@@ -1,8 +1,65 @@
+rules_version = '2';
+
+// Kid photos and chore-proof photos are visible only to that family.
+// Sprite sheets are shared app art and stay world-readable.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /{allPaths=**} {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userPath() {
+      return /databases/(default)/documents/users/$(request.auth.uid);
+    }
+
+    function familyPath(familyId) {
+      return /databases/(default)/documents/families/$(familyId);
+    }
+
+    function isFamilyMember(familyId) {
+      return signedIn()
+        && firestore.exists(familyPath(familyId))
+        && (
+          firestore.get(familyPath(familyId)).data.ownerUid == request.auth.uid
+          || firestore.get(familyPath(familyId)).data.get('parentUids', {}).get(request.auth.uid, false) == true
+          || firestore.get(familyPath(familyId)).data.get('memberUids', {}).get(request.auth.uid, false) == true
+          || (
+            firestore.exists(userPath())
+            && (
+              firestore.get(userPath()).data.defaultFamilyId == familyId
+              || firestore.get(userPath()).data.familyId == familyId
+              || familyId in firestore.get(userPath()).data.get('memberships', {})
+            )
+          )
+        );
+    }
+
+    function isImageUpload() {
+      return request.resource.size < 8 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /sprite-sheets/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /families/{familyId}/proofs/{allPaths=**} {
+      allow read: if isFamilyMember(familyId);
+      allow delete: if isFamilyMember(familyId);
+      allow create, update: if isFamilyMember(familyId) && isImageUpload();
+    }
+
+    match /families/{familyId}/kids/{memberId}/{allPaths=**} {
+      allow read: if isFamilyMember(familyId);
+      allow delete: if isFamilyMember(familyId);
+      allow create, update: if isFamilyMember(familyId) && isImageUpload();
+    }
+
+    match /families/{familyId}/photos/{allPaths=**} {
+      allow read: if isFamilyMember(familyId);
+      allow delete: if isFamilyMember(familyId);
+      allow create, update: if isFamilyMember(familyId) && isImageUpload();
     }
   }
 }

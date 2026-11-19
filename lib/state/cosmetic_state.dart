@@ -15,20 +15,18 @@ extension AppStateCosmetics on AppState {
       throw Exception('Already owned');
     }
 
-    await repo.purchaseCosmetic(
-      famId,
+    await BackendFunctions.purchaseCosmetic(
+      familyId: famId,
       memberId: memberId,
       itemId: item.id,
-      costCoins: item.costCoins,
     );
   }
 
-  /// Opens a loot box for [memberId] using the result from the 3-click dialog.
-  /// Writes the outcome to Firestore.
-  Future<void> openLootBox(
+  /// Opens a loot box server-side. The returned rolls are what the 3-tap
+  /// dialog should reveal; the coin deduction already happened.
+  Future<LootBoxServerResult> openLootBox(
     String memberId,
     LootBoxDefinition box,
-    LootBoxClickState result,
   ) async {
     final famId = _familyId!;
     final member = members.firstWhere((m) => m.id == memberId);
@@ -37,13 +35,20 @@ extension AppStateCosmetics on AppState {
       throw Exception('Not enough coins to open ${box.name}');
     }
 
-    await repo.openLootBox(
-      famId,
+    return BackendFunctions.openLootBox(
+      familyId: famId,
       memberId: memberId,
-      boxCostCoins: box.costCoins,
-      wonItemId: result.wonItem!.id,
-      isDuplicate: result.isDuplicate,
-      coinRefund: result.coinRefund,
+      boxId: box.id,
+    );
+  }
+
+  /// Grants the level-up cosmetic for [level] if XP already qualifies.
+  Future<String?> grantLevelCosmetic(String memberId, int level) {
+    final famId = _familyId!;
+    return BackendFunctions.grantLevelCosmetic(
+      familyId: famId,
+      memberId: memberId,
+      level: level,
     );
   }
 

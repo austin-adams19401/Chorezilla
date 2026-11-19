@@ -2,15 +2,14 @@ library;
 
 // lib/state/app_state.dart
 import 'dart:async';
-import 'dart:convert';
 import 'package:chorezilla/models/award.dart';
 import 'package:chorezilla/models/chore_member_schedule.dart';
 import 'package:chorezilla/models/common.dart';
 import 'package:chorezilla/models/history.dart';
 import 'package:chorezilla/models/recurrance.dart';
 import 'package:chorezilla/models/badge.dart';
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/services/local_cache.dart';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -144,8 +143,9 @@ class AppState extends ChangeNotifier {
   bool _membersLoaded = false;
   bool _subscriptionSynced = false;
 
-  // Parent PIN state: value + "have we loaded it yet?"
-  String? _parentPinHash; // from Family.parentPinHash
+  // Parent PIN state: whether one is set, plus a legacy hash until it is migrated.
+  String? _parentPinHash;
+  bool _parentPinSet = false;
   bool _parentPinKnown = false;
 
   bool get bootLoaded => _familyLoaded && _membersLoaded;
@@ -289,6 +289,7 @@ class AppState extends ChangeNotifier {
     _familyLoaded = false;
     _membersLoaded = false;
     _parentPinHash = null;
+    _parentPinSet = false;
     _parentPinKnown = false;
 
     await _familySub?.cancel();

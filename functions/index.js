@@ -1,9 +1,9 @@
 /* eslint-disable camelcase */
 const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
-admin.initializeApp({
-    projectId: "chorezilla-dev",
-});
+// Use the project this codebase is deployed to. Hardcoding chorezilla-dev
+// made production deploys read and write the dev project.
+admin.initializeApp();
 const db = admin.firestore();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -350,7 +350,7 @@ exports.notifyOnRewardPurchased = functions
 
         if (!memberSnap.exists) return null;
         const member = memberSnap.data();
-        const kidName = member.name || "Your kid";
+        const kidName = member.displayName || member.name || "Your kid";
         const rewardName = data.rewardName || "a reward";
         const coinCost = (data.coinCost || 0);
 
@@ -413,15 +413,15 @@ exports.notifyOnMemberLevelUp = functions
         const familyId = context.params.familyId;
         const memberId = context.params.memberId;
 
-        // Only care about kids
-        if (after.role !== "kid") return null;
+        // The app writes role "child" (roleToString). Older data may say "kid".
+        if (after.role !== "kid" && after.role !== "child") return null;
 
         const beforeLevel = typeof before.level === "number" ? before.level : 1;
         const afterLevel = typeof after.level === "number" ? after.level : 1;
 
         if (afterLevel <= beforeLevel) return null;
 
-        const kidName = after.name || "Your kid";
+        const kidName = after.displayName || after.name || "Your kid";
 
         console.log("notifyOnMemberLevelUp:", { familyId, memberId, beforeLevel, afterLevel });
 
@@ -442,3 +442,5 @@ exports.notifyOnMemberLevelUp = functions
             },
         });
     });
+
+require("./register")(exports, {functions, admin, db});

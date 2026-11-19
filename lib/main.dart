@@ -1,5 +1,5 @@
 //Auth
-import 'package:chorezilla/auth/auth_gate.dart';
+import 'package:chorezilla/Auth/auth_gate.dart';
 import 'package:chorezilla/pages/family_setup/parent_setup_screen.dart';
 //Pages
 import 'package:chorezilla/pages/startup/login_page.dart';

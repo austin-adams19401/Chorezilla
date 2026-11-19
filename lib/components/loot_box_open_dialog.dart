@@ -64,10 +64,21 @@ class LootBoxOpenDialog extends StatefulWidget {
     super.key,
     required this.boxDefinition,
     required this.ownedCosmetics,
+    this.scriptedRolls,
+    this.scriptedItem,
+    this.scriptedDuplicate = false,
+    this.scriptedCoinRefund = 0,
   });
 
   final LootBoxDefinition boxDefinition;
   final List<String> ownedCosmetics;
+
+  /// Server-authored rarity rolls (length 3). When set, the dialog reveals
+  /// these instead of rolling on the device.
+  final List<CosmeticRarity>? scriptedRolls;
+  final CosmeticItem? scriptedItem;
+  final bool scriptedDuplicate;
+  final int scriptedCoinRefund;
 
   @override
   State<LootBoxOpenDialog> createState() => _LootBoxOpenDialogState();
@@ -126,10 +137,37 @@ class _LootBoxOpenDialogState extends State<LootBoxOpenDialog>
     if (_clickState.isFinished) return;
 
     _previousRarity = _clickState.currentRarity;
-    final newState = widget.boxDefinition.rollClick(
-      _clickState,
-      widget.ownedCosmetics,
-    );
+    final scripted = widget.scriptedRolls;
+    final LootBoxClickState newState;
+    if (scripted != null &&
+        scripted.length >= 3 &&
+        widget.scriptedItem != null) {
+      final newCount = _clickState.clickCount + 1;
+      final rolled = newCount - 1 < scripted.length
+          ? scripted[newCount - 1]
+          : scripted.last;
+      final best = _clickState.currentRarity == null ||
+              rolled.index > _clickState.currentRarity!.index
+          ? rolled
+          : _clickState.currentRarity!;
+      if (newCount < 3) {
+        newState = LootBoxClickState(clickCount: newCount, currentRarity: best);
+      } else {
+        newState = LootBoxClickState(
+          clickCount: newCount,
+          currentRarity: best,
+          isFinished: true,
+          wonItem: widget.scriptedItem,
+          isDuplicate: widget.scriptedDuplicate,
+          coinRefund: widget.scriptedCoinRefund,
+        );
+      }
+    } else {
+      newState = widget.boxDefinition.rollClick(
+        _clickState,
+        widget.ownedCosmetics,
+      );
+    }
     setState(() => _clickState = newState);
 
     if (newState.isFinished) {

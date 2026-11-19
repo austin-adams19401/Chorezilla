@@ -12,6 +12,7 @@ extension AppStateFamilyStreams on AppState {
     _familyLoaded = false;
     _membersLoaded = false;
     _parentPinHash = null;
+    _parentPinSet = false;
     _parentPinKnown = false;
     _rewards = const [];
     _rewardsBootstrapped = false;
@@ -27,18 +28,19 @@ extension AppStateFamilyStreams on AppState {
       _family = fam;
       _cache.saveFamily(fam);
 
-      // Keep parent PIN state in sync with the Family doc
+      // Keep parent PIN state in sync with the Family doc.
+      // The hash is legacy; parentPinSet is the server-side flag.
       _parentPinHash = fam.parentPinHash;
+      _parentPinSet = fam.parentPinSet;
       _parentPinKnown = true;
 
       if (!_familyLoaded) {
         _familyLoaded = true;
       }
 
-      // Sync subscription status with RevenueCat once per session
-      // (only for non-free tiers).
-      if (!_subscriptionSynced &&
-          fam.subscriptionTier != SubscriptionTier.free) {
+      // Sync subscription status with RevenueCat once per session,
+      // including free families so a new purchase is picked up.
+      if (!_subscriptionSynced) {
         _subscriptionSynced = true;
         _syncSubscription(familyId, fam);
       }
@@ -207,6 +209,7 @@ extension AppStateFamilyStreams on AppState {
         _familyLoaded = true;
         // Restore PIN state from cache so Gate 3.5 doesn't block on Firestore
         _parentPinHash = cachedFamily.parentPinHash;
+        _parentPinSet = cachedFamily.parentPinSet;
         _parentPinKnown = true;
         changed = true;
       }
@@ -242,32 +245,12 @@ extension AppStateFamilyStreams on AppState {
     }
   }
 
-  /// Syncs subscription status with RevenueCat and updates Firestore if needed.
+  /// Asks Cloud Functions to refresh subscription fields from RevenueCat.
+  /// The client never writes those fields.
   Future<void> _syncSubscription(String familyId, Family fam) async {
     try {
-      final result = await syncSubscriptionWithRevenueCat(
-        currentTier: fam.subscriptionTier.name,
-        currentExpiresAt: fam.subscriptionExpiresAt,
-        currentBillingIssue: fam.billingIssueDetectedAt,
-      );
-
-      if (result.changed) {
-        final updates = <String, dynamic>{
-          'subscriptionTier': result.tier,
-          'subscriptionExpiresAt': result.expiresAt == null
-              ? null
-              : Timestamp.fromDate(result.expiresAt!),
-          'billingIssueDetectedAt': result.billingIssueDetectedAt == null
-              ? null
-              : Timestamp.fromDate(result.billingIssueDetectedAt!),
-        };
-        await FirebaseFirestore.instance
-            .doc('families/$familyId')
-            .update(updates);
-        debugPrint('Subscription synced with RevenueCat: ${result.tier}');
-      } else {
-        debugPrint('Subscription in sync with RevenueCat, no update needed.');
-      }
+      await BackendFunctions.refreshSubscription(familyId);
+      debugPrint('Subscription refresh requested for ${fam.subscriptionTier.name}');
     } catch (e) {
       debugPrint('Failed to sync subscription with RevenueCat: $e');
     }

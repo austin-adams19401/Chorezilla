@@ -1,4 +1,5 @@
 import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
+import 'package:chorezilla/components/pin_pad.dart';
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/components/parental_gate.dart';
 import 'package:chorezilla/models/cosmetics.dart';
@@ -332,7 +333,16 @@ class _KidCard extends StatelessWidget {
     final pin = await _showKidPinDialog(context, member.kidName);
     if (pin == null) return; // cancelled
 
-    final ok = await app.verifyKidPin(memberId: member.id, pin: pin);
+    bool ok;
+    try {
+      ok = await app.verifyKidPin(memberId: member.id, pin: pin);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.toString().replaceFirst('Exception: ', ''))),
+      );
+      return;
+    }
     if (!context.mounted) return;
 
     if (!ok) {
@@ -532,67 +542,79 @@ class _KidCard extends StatelessWidget {
 }
 
 Future<String?> _showKidPinDialog(BuildContext context, String kidName) async {
-  final controller = TextEditingController();
-
   final result = await showDialog<String?>(
     context: context,
     barrierDismissible: false,
-    builder: (ctx) {
-      final theme = Theme.of(ctx);
-      final cs = theme.colorScheme;
-      return AlertDialog(
-        backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Text(
-          'Enter PIN for $kidName',
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+    builder: (ctx) => _KidPinDialog(kidName: kidName),
+  );
+
+  return result;
+}
+
+class _KidPinDialog extends StatefulWidget {
+  const _KidPinDialog({required this.kidName});
+  final String kidName;
+
+  @override
+  State<_KidPinDialog> createState() => _KidPinDialogState();
+}
+
+class _KidPinDialogState extends State<_KidPinDialog> {
+  String _pin = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return AlertDialog(
+      backgroundColor: cs.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: Text(
+        'Enter PIN for ${widget.kidName}',
+        style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w700,
         ),
-        content: SingleChildScrollView(
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.55,
+        ),
+        child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            Text(
-              'Enter this kid’s 4-digit PIN.\nParents can also use the parent PIN.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: cs.onSurfaceVariant,
+              Text(
+                'Enter this kid’s 4-digit PIN.\nParents can also use the parent PIN.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: TextInputType.number,
-              maxLength: 4,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: 'PIN',
-                border: OutlineInputBorder(),
+              const SizedBox(height: 16),
+              PinDots(value: _pin, length: 4, selected: true),
+              const SizedBox(height: 12),
+              PinPad(
+                value: _pin,
+                onChanged: (next) => setState(() => _pin = next),
               ),
-            ),
-          ],
+            ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final pin = controller.text.trim();
-              Navigator.of(ctx).pop(pin.isEmpty ? null : pin);
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      );
-    },
-  );
-
-  return result;
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(null),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.of(context).pop(_pin.isEmpty ? null : _pin);
+          },
+          child: const Text('Continue'),
+        ),
+      ],
+    );
+  }
 }
 
 
