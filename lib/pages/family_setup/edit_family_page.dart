@@ -1,4 +1,5 @@
 import 'package:chorezilla/components/premium_upgrade_sheet.dart';
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/data/chorezilla_repo.dart';
 import 'package:chorezilla/services/subscription_service.dart';
 import 'package:flutter/material.dart';
@@ -55,7 +56,7 @@ class _EditFamilyPageState extends State<EditFamilyPage> {
     final app = context.read<AppState>();
     setState(() { _busy = true; _error = null; });
     try {
-      final code = await app.ensureParentJoinCode();
+      final code = await BackendFunctions.createParentInvite(app.familyId!);
       setState(() { _code = code; });
     } catch (e) {
       setState(() { _error = e.toString(); });

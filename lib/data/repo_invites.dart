@@ -28,19 +28,6 @@ extension InviteRepo on ChorezillaRepo {
     return code;
   }
 
-  /// A separate code that can only join as a parent. The code is written only
-  /// to joinCodes, which clients cannot read, and returned to the parent who
-  /// created it. It is not stored on the family document, which kids can read.
-  Future<String> ensureParentJoinCode(String familyId) async {
-    final code = _randomCode(6);
-    await firebaseDB.collection('joinCodes').doc(code).set({
-      'familyId': familyId,
-      'kind': 'parent',
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    return code;
-  }
-
   // Lookup a familyId for a given code (does NOT link current user)
   Future<String?> redeemJoinCode(String code) async {
     code = code.trim().toUpperCase();

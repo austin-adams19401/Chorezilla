@@ -96,6 +96,11 @@ class BackendFunctions {
     );
   }
 
+  static Future<String> createParentInvite(String familyId) async {
+    final data = await _call('createInvite', {'familyId': familyId});
+    return data['code']?.toString() ?? '';
+  }
+
   static Future<String> redeemParentInvite({
     required String code,
     String? displayName,

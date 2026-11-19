@@ -706,6 +706,39 @@ function register(exportsObj, {functions, admin, db}) {
         return null;
       });
 
+  exportsObj.backfillLegacyPins = functions
+      .region("us-central1")
+      .pubsub.schedule("every 60 minutes")
+      .onRun(async () => {
+        let cursor = null;
+        for (let page = 0; page < 20; page++) {
+          let query = db.collection("families")
+              .orderBy(admin.firestore.FieldPath.documentId())
+              .limit(50);
+          if (cursor) query = query.startAfter(cursor);
+          const snap = await query.get();
+          if (snap.empty) break;
+          for (const fam of snap.docs) {
+            await migrateFamilyPin(fam.id, fam.data() || {});
+            const members = await fam.ref.collection("members").get();
+            for (const mem of members.docs) {
+              const pinHash = (mem.data() || {}).pinHash;
+              if (!pinHash) continue;
+              await securityRef(fam.id).set({
+                [`kidLegacy.${mem.id}`]: pinHash,
+              }, {merge: true});
+              await mem.ref.set({
+                pinSet: true,
+                pinHash: FieldValue.delete(),
+              }, {merge: true});
+            }
+          }
+          cursor = snap.docs[snap.docs.length - 1];
+          if (snap.size < 50) break;
+        }
+        return null;
+      });
+
   exportsObj.migrateMemberPinOnWrite = functions
       .region("us-central1")
       .firestore.document("families/{familyId}/members/{memberId}")

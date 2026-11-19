@@ -291,7 +291,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && isParent(request.resource.data.familyId)
         && request.resource.data.familyId is string
-        && (request.resource.data.kind == 'child' || request.resource.data.kind == 'parent')
+        && request.resource.data.kind == 'child'
         && request.resource.data.keys().hasOnly(['familyId', 'createdAt', 'kind']);
       allow update: if signedIn()
         && isParent(resource.data.familyId)

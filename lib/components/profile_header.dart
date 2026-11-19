@@ -6,6 +6,7 @@ import 'package:chorezilla/components/avatar_cosmetic_widgets.dart';
 import 'package:chorezilla/components/leveling.dart';
 import 'package:chorezilla/models/cosmetics.dart';
 import 'package:chorezilla/pages/kid_pages/kid_edit_profile_page.dart';
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/services/sprite_cache_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -129,7 +130,7 @@ class ProfileHeader extends StatelessWidget {
       return;
     }
     try {
-      final code = await app.ensureParentJoinCode();
+      final code = await BackendFunctions.createParentInvite(app.familyId!);
       if (!context.mounted) return;
       await showDialog(
         context: context,

@@ -536,17 +536,29 @@ class _RedeemCodeDialogState extends State<_RedeemCodeDialog> {
             final code = _controller.text.trim();
             if (code.isEmpty) return;
             try {
-              final preview = await BackendFunctions.previewJoinCode(code);
-              if (preview.kind != 'parent') {
-                throw Exception(
-                  'That code is for a kid device. Use the parent invite code.',
+              try {
+                final preview = await BackendFunctions.previewJoinCode(code);
+                if (preview.kind != 'parent') {
+                  throw Exception(
+                    'That code is for a kid device. Use the parent invite code.',
+                  );
+                }
+                await BackendFunctions.joinWithFamilyCode(
+                  code: code,
+                  kind: 'parent',
+                  displayName: app.firebaseUser?.displayName,
+                );
+              } catch (e) {
+                final message = e.toString();
+                if (!message.contains('not-found') &&
+                    !message.contains('Code not found')) {
+                  rethrow;
+                }
+                await BackendFunctions.redeemParentInvite(
+                  code: code,
+                  displayName: app.firebaseUser?.displayName,
                 );
               }
-              await BackendFunctions.joinWithFamilyCode(
-                code: code,
-                kind: 'parent',
-                displayName: app.firebaseUser?.displayName,
-              );
               await app.refreshAfterProfileChange();
               if (!mounted) return;
               Navigator.of(context).pop();

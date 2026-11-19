@@ -1,6 +1,8 @@
 /* eslint-disable camelcase */
 const functions = require("firebase-functions/v1");
 const admin = require("firebase-admin");
+const sub = require("./logic/subscription");
+const limits = require("./logic/limits");
 // Use the project this codebase is deployed to. Hardcoding chorezilla-dev
 // made production deploys read and write the dev project.
 admin.initializeApp();
@@ -110,10 +112,16 @@ exports.createInvite = functions
 
         const famData = famSnap.data() || {};
         const parents = famData.parentUids || {};
-        if (parents[uid] !== true) {
+        if (famData.ownerUid !== uid && parents[uid] !== true) {
             throw new functions.https.HttpsError(
                 "permission-denied",
                 "Only parents can create invites."
+            );
+        }
+        if (!sub.isPremiumFamily(famData, Date.now())) {
+            throw new functions.https.HttpsError(
+                "failed-precondition",
+                "Inviting another parent requires Chorezilla Unlimited."
             );
         }
 
@@ -202,9 +210,30 @@ exports.redeemInvite = functions
             if (!famSnap.exists) {
                 throw new functions.https.HttpsError("not-found", "Family missing.");
             }
+            const fam = famSnap.data() || {};
+            if (!sub.isPremiumFamily(fam, Date.now())) {
+                throw new functions.https.HttpsError(
+                    "failed-precondition",
+                    "Inviting another parent requires Chorezilla Unlimited."
+                );
+            }
+            const existingMembers = await tx.get(
+                famRef.collection("members").where("userUid", "==", uid).limit(1)
+            );
+            const existingRole = existingMembers.empty ?
+                "" : (existingMembers.docs[0].data().role || "");
+            const decision = limits.parentJoinDecision(existingRole);
+            if (decision === "blocked") {
+                throw new functions.https.HttpsError(
+                    "permission-denied",
+                    "A kid login cannot join this family as a parent."
+                );
+            }
 
             // Link user → family, add to parentUids, and add a member row
-            const memRef = famRef.collection("members").doc();
+            const memRef = decision === "already-parent" ?
+                existingMembers.docs[0].ref :
+                famRef.collection("members").doc();
             tx.set(
                 userRef,
                 {
@@ -227,17 +256,19 @@ exports.redeemInvite = functions
                 ["memberUids." + uid]: true,
             }, { merge: true });
 
-            tx.set(memRef, {
-                name: displayName,
-                displayName: displayName,
-                role: "parent",
-                userUid: uid,
-                avatar: "🦄",
-                usesThisDevice: true,
-                requiresPin: false,
-                active: true,
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+            if (decision !== "already-parent") {
+                tx.set(memRef, {
+                    name: displayName,
+                    displayName: displayName,
+                    role: "parent",
+                    userUid: uid,
+                    avatar: "🦄",
+                    usesThisDevice: true,
+                    requiresPin: false,
+                    active: true,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+            }
 
             // Delete both invite docs (single-use)
             const famInviteRef = famRef.collection("invites").doc(code);
