@@ -28,22 +28,16 @@ extension InviteRepo on ChorezillaRepo {
     return code;
   }
 
-  /// A separate code that can only join as a parent. The kid/QR code stays
-  /// kind "child" and cannot be upgraded by the client.
+  /// A separate code that can only join as a parent. The code is written only
+  /// to joinCodes, which clients cannot read, and returned to the parent who
+  /// created it. It is not stored on the family document, which kids can read.
   Future<String> ensureParentJoinCode(String familyId) async {
-    final famRef = familyDoc(firebaseDB, familyId);
-    final snap = await famRef.get();
-    final data = snap.data() as Map<String, dynamic>? ?? {};
-    var code = (data['parentJoinCode'] as String?)?.trim();
-    if (code == null || code.isEmpty) {
-      code = _randomCode(6);
-      await famRef.set({'parentJoinCode': code}, SetOptions(merge: true));
-    }
+    final code = _randomCode(6);
     await firebaseDB.collection('joinCodes').doc(code).set({
       'familyId': familyId,
       'kind': 'parent',
       'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    });
     return code;
   }
 

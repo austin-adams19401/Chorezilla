@@ -173,7 +173,7 @@ test("owner can publish a join code and other users cannot read the code doc", a
     kind: "parent",
     createdAt: serverTimestamp(),
   }));
-  await assertSucceeds(updateDoc(doc(owner, "families/fam1"), {parentJoinCode: "PARENT1"}));
+  await assertFails(updateDoc(doc(owner, "families/fam1"), {parentJoinCode: "PARENT1"}));
   await assertFails(setDoc(doc(dbFor("kid"), "joinCodes/PARENT2"), {
     familyId: "fam1",
     kind: "parent",

@@ -107,7 +107,8 @@ service cloud.firestore {
         && same('ownerUid')
         && same('parentUids')
         && same('memberUids')
-        && same('subscriptionAppUserId');
+        && same('subscriptionAppUserId')
+        && same('parentJoinCode');
     }
 
     function linksUnchanged() {

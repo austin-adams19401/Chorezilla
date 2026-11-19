@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import 'package:chorezilla/components/premium_upgrade_sheet.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/models/member.dart';
 import 'package:chorezilla/models/common.dart';
@@ -123,6 +124,10 @@ class ProfileHeader extends StatelessWidget {
 
   Future<void> _handleInvite(BuildContext context) async {
     final app = context.read<AppState>();
+    if (!(app.family?.isPremium ?? false)) {
+      await showPremiumUpgradeSheet(context, reason: UpgradeReason.parentAccount);
+      return;
+    }
     try {
       final code = await app.ensureParentJoinCode();
       if (!context.mounted) return;

@@ -258,6 +258,14 @@ test("join codes keep their kind and previews include legacy kids", () => {
   assert.equal(kids[1].displayName, "Legacy");
 });
 
+test("a kid login cannot be promoted by a parent invite", () => {
+  assert.equal(limits.parentJoinDecision(null), "create");
+  assert.equal(limits.parentJoinDecision(""), "create");
+  assert.equal(limits.parentJoinDecision("parent"), "already-parent");
+  assert.equal(limits.parentJoinDecision("child"), "blocked");
+  assert.equal(limits.parentJoinDecision("kid"), "blocked");
+});
+
 test("a claimed kid profile cannot be attached by another login", () => {
   assert.equal(limits.kidProfileClaim(null, "kid-login"), "claim");
   assert.equal(limits.kidProfileClaim("", "kid-login"), "claim");

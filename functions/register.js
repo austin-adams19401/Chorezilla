@@ -505,9 +505,19 @@ function register(exportsObj, {functions, admin, db}) {
             await memSnap.ref.set({userUid: uid}, {merge: true});
           }
         } else {
+          if (!sub.isPremiumFamily(fam, Date.now())) {
+            fail("failed-precondition",
+                "Inviting another parent requires Chorezilla Unlimited.");
+          }
           const existing = await famRef.collection("members")
               .where("userUid", "==", uid).limit(1).get();
-          if (!existing.empty) {
+          const existingRole = existing.empty ? "" : existing.docs[0].data().role;
+          const decision = limits.parentJoinDecision(existingRole);
+          if (decision === "blocked") {
+            fail("permission-denied",
+                "A kid login cannot join this family as a parent.");
+          }
+          if (decision === "already-parent") {
             memberId = existing.docs[0].id;
           } else {
             const memRef = famRef.collection("members").doc();

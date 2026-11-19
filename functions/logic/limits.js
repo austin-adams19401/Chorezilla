@@ -123,6 +123,17 @@ function kidProfileClaim(existingUid, callerUid) {
   return "same";
 }
 
+/**
+ * A parent invite must not promote a login that already has a kid profile.
+ * @param {string|null|undefined} existingRole
+ * @return {"create"|"already-parent"|"blocked"}
+ */
+function parentJoinDecision(existingRole) {
+  if (!existingRole) return "create";
+  if (isKidRole(existingRole)) return "blocked";
+  return "already-parent";
+}
+
 module.exports = {
   FREE_KIDS,
   FREE_CUSTOM_CHORES,
@@ -134,4 +145,5 @@ module.exports = {
   joinCodeKind,
   previewKids,
   kidProfileClaim,
+  parentJoinDecision,
 };
