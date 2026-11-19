@@ -3,6 +3,7 @@ import 'package:chorezilla/services/purchase_service.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/themes/app_theme.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:chorezilla/services/analytics_service.dart';
@@ -99,7 +100,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
         });
         return;
       }
-      final info = await Purchases.purchasePackage(pkg);
+      // purchases_flutter 9+ returns PurchaseResult instead of CustomerInfo.
+      // The entitlement id is unchanged: "Chorezilla Unlimited".
+      final info = (await Purchases.purchase(PurchaseParams.package(pkg))).customerInfo;
 
       final hasPremium =
           info.entitlements.active.containsKey(kPremiumEntitlement);
@@ -132,11 +135,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
         );
         Navigator.of(context).pop(true);
       }
-    } on PurchasesErrorCode catch (e) {
-      if (e == PurchasesErrorCode.purchaseCancelledError) {
-        // User cancelled — do nothing.
-      } else {
-        setState(() => _error = e.toString());
+    } on PlatformException catch (e) {
+      final code = PurchasesErrorHelper.getErrorCode(e);
+      if (code != PurchasesErrorCode.purchaseCancelledError) {
+        setState(() => _error = e.message ?? 'Purchase could not be completed.');
       }
     } catch (e) {
       setState(() => _error = e.toString());
