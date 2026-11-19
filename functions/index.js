@@ -174,7 +174,7 @@ exports.redeemInvite = functions
         }
 
         const codeRaw = data && data.code ? data.code : "";
-        const code = codeRaw.toString().trim();
+        const code = codeRaw.toString().trim().toUpperCase();
 
         const displayNameRaw =
             data && data.displayName ? data.displayName : "Parent";

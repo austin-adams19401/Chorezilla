@@ -420,12 +420,28 @@ function register(exportsObj, {functions, admin, db}) {
         const code = data && data.code ? String(data.code).trim().toUpperCase() : "";
         if (!code) fail("invalid-argument", "Missing code.");
         const codeSnap = await db.collection("joinCodes").doc(code).get();
-        if (!codeSnap.exists) fail("not-found", "Code not found.");
-        const familyId = (codeSnap.data() || {}).familyId;
+        let familyId = "";
+        let codeKind = "child";
+        if (codeSnap.exists) {
+          familyId = (codeSnap.data() || {}).familyId;
+          codeKind = limits.joinCodeKind(codeSnap.data() || {});
+        } else {
+          const inviteSnap = await db.collection("invites").doc(code).get();
+          if (!inviteSnap.exists) fail("not-found", "Code not found.");
+          const invite = inviteSnap.data() || {};
+          let expiresAt = new Date(0);
+          if (invite.expiresAt && typeof invite.expiresAt.toDate === "function") {
+            expiresAt = invite.expiresAt.toDate();
+          }
+          if (expiresAt < new Date()) {
+            fail("failed-precondition", "Invite expired.");
+          }
+          familyId = invite.familyId;
+          codeKind = "invite";
+        }
         const famSnap = await db.collection("families").doc(familyId).get();
         if (!famSnap.exists) fail("not-found", "Family not found.");
         const fam = famSnap.data() || {};
-        const codeKind = limits.joinCodeKind(codeSnap.data() || {});
         const membersSnap = await db.collection("families").doc(familyId)
             .collection("members")
             .get();
@@ -736,6 +752,38 @@ function register(exportsObj, {functions, admin, db}) {
           cursor = snap.docs[snap.docs.length - 1];
           if (snap.size < 50) break;
         }
+        return null;
+      });
+
+  exportsObj.clearMemberLinkOnDelete = functions
+      .region("us-central1")
+      .firestore.document("families/{familyId}/members/{memberId}")
+      .onDelete(async (snap, context) => {
+        const uid = (snap.data() || {}).userUid;
+        if (!uid) return null;
+        const familyId = context.params.familyId;
+        const famRef = db.collection("families").doc(familyId);
+        const stillThere = await famRef.collection("members")
+            .where("userUid", "==", uid).limit(1).get();
+        if (!stillThere.empty) return null;
+        await famRef.set({
+          [`memberUids.${uid}`]: FieldValue.delete(),
+          [`parentUids.${uid}`]: FieldValue.delete(),
+        }, {merge: true});
+        const userRef = db.collection("users").doc(uid);
+        const userSnap = await userRef.get();
+        const user = userSnap.exists ? (userSnap.data() || {}) : {};
+        const patch = {
+          [`memberships.${familyId}`]: FieldValue.delete(),
+        };
+        if (user.defaultFamilyId === familyId) {
+          patch.defaultFamilyId = FieldValue.delete();
+        }
+        if (user.familyId === familyId) patch.familyId = FieldValue.delete();
+        if (user.memberId === context.params.memberId) {
+          patch.memberId = FieldValue.delete();
+        }
+        await userRef.set(patch, {merge: true});
         return null;
       });
 

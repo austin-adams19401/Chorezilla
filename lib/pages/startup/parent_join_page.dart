@@ -50,7 +50,7 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
         setState(() { _error = 'Invalid or expired code'; });
         return;
       }
-      if (preview.kind != 'parent') {
+      if (preview.kind == 'child') {
         setState(() {
           _error = 'That code is for a kid. Ask a parent for a parent invite.';
         });
@@ -82,6 +82,11 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
         await BackendFunctions.joinWithFamilyCode(
           code: _code.text,
           kind: 'parent',
+          displayName: user.displayName,
+        );
+      } else if (_codeKind == 'invite') {
+        await BackendFunctions.redeemParentInvite(
+          code: _code.text,
           displayName: user.displayName,
         );
       } else if (_codeKind == 'child') {
