@@ -183,6 +183,81 @@ test("loot pick prefers an unowned item of the rolled rarity", () => {
   assert.equal(dup.isDuplicate, true);
 });
 
+test("subscription refresh stays on the tied parent account", () => {
+  const owner = {ownerUid: "owner"};
+  assert.equal(sub.billingAppUserId(owner), "owner");
+  assert.equal(sub.refreshCallerAllowed("owner", owner), true);
+  assert.equal(sub.refreshCallerAllowed("kid", owner), false);
+  assert.equal(sub.mayApplySubscription(owner, "owner"), true);
+  assert.equal(sub.mayApplySubscription(owner, "kid"), false);
+
+  const tied = {ownerUid: "owner", subscriptionAppUserId: "owner"};
+  assert.equal(sub.refreshCallerAllowed("owner", tied), true);
+  assert.equal(sub.refreshCallerAllowed("coparent", tied), false);
+  assert.equal(sub.mayApplySubscription(tied, "coparent"), false);
+  assert.equal(sub.mayApplySubscription(tied, "owner"), true);
+});
+
+test("level grants are the free reward once per level", () => {
+  const first = sub.planLevelGrant({
+    xp: sub.xpForLevel(3),
+    requestedLevel: 3,
+    owned: ["title_level_1"],
+    grants: {},
+  });
+  assert.equal(first.itemId, "zilla_sky_blue");
+  assert.equal(first.grant, true);
+
+  const again = sub.planLevelGrant({
+    xp: sub.xpForLevel(6),
+    requestedLevel: 3,
+    owned: ["zilla_sky_blue"],
+    grants: {"3": "zilla_sky_blue"},
+  });
+  assert.equal(again.itemId, "zilla_sky_blue");
+  assert.equal(again.grant, undefined);
+
+  const locked = sub.planLevelGrant({
+    xp: sub.xpForLevel(2),
+    requestedLevel: 3,
+    owned: [],
+    grants: {},
+  });
+  assert.equal(locked.error, "locked");
+
+  const noReward = sub.planLevelGrant({
+    xp: sub.xpForLevel(4),
+    requestedLevel: 4,
+    owned: [],
+    grants: {},
+  });
+  assert.equal(noReward.itemId, null);
+
+  const customIgnored = sub.planLevelGrant({
+    xp: sub.xpForLevel(3),
+    requestedLevel: 3,
+    owned: [],
+    grants: {},
+    family: {settings: {customLevelRewards: {"3": [{cosmeticId: "bg_ocean"}]}}},
+    premium: true,
+  });
+  assert.equal(customIgnored.itemId, "zilla_sky_blue");
+});
+
+test("join codes keep their kind and previews include legacy kids", () => {
+  assert.equal(limits.joinCodeKind({kind: "parent"}), "parent");
+  assert.equal(limits.joinCodeKind({}), "child");
+  assert.equal(limits.joinCodeKind({kind: "child"}), "child");
+  const kids = limits.previewKids([
+    {id: "a", role: "child", active: true, displayName: "Sam"},
+    {id: "b", role: "kid", active: true, name: "Legacy"},
+    {id: "c", role: "kid", active: false, displayName: "Gone"},
+    {id: "d", role: "parent", active: true, displayName: "Pat"},
+  ]);
+  assert.deepEqual(kids.map((kid) => kid.id), ["a", "b"]);
+  assert.equal(kids[1].displayName, "Legacy");
+});
+
 test("kid role accepts child and kid; custom flag cannot hide a made-up title", () => {
   assert.equal(limits.isKidRole("child"), true);
   assert.equal(limits.isKidRole("kid"), true);

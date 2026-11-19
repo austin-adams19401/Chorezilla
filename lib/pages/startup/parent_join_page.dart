@@ -17,6 +17,7 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
   final _code = TextEditingController();
   String? _familyId;
   String? _familyName;
+  String? _codeKind;
   String? _error;
   bool _busy = false;
 
@@ -36,16 +37,29 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
   }
 
   Future<void> _lookup() async {
-    setState(() { _busy = true; _familyId = null; _familyName = null; _error = null; });
+    setState(() {
+      _busy = true;
+      _familyId = null;
+      _familyName = null;
+      _codeKind = null;
+      _error = null;
+    });
     try {
       final preview = await BackendFunctions.previewJoinCode(_code.text);
       if (preview.familyId.isEmpty) {
         setState(() { _error = 'Invalid or expired code'; });
         return;
       }
+      if (preview.kind != 'parent') {
+        setState(() {
+          _error = 'That code is for a kid. Ask a parent for a parent invite.';
+        });
+        return;
+      }
       setState(() {
         _familyId = preview.familyId;
         _familyName = preview.familyName;
+        _codeKind = preview.kind;
       });
     } catch (e) {
       setState(() { _error = e.toString(); });
@@ -56,7 +70,7 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
 
   Future<void> _join() async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _familyId == null) return;
+    if (user == null) return;
     setState(() { _busy = true; _error = null; });
     try {
       debugPrint(
@@ -64,11 +78,18 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
       );
 
       final app = context.read<AppState>();
-      await BackendFunctions.joinWithFamilyCode(
-        code: _code.text,
-        kind: 'parent',
-        displayName: user.displayName,
-      );
+      if (_codeKind == 'parent') {
+        await BackendFunctions.joinWithFamilyCode(
+          code: _code.text,
+          kind: 'parent',
+          displayName: user.displayName,
+        );
+      } else {
+        await BackendFunctions.redeemParentInvite(
+          code: _code.text,
+          displayName: user.displayName,
+        );
+      }
       await app.refreshAfterProfileChange();
       if (!mounted) return;
       // Go back to the root; AuthGate will now show the new family's dashboard
@@ -120,11 +141,10 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
               Text(_error!, style: TextStyle(color: cs.error)),
             ],
             const SizedBox(height: 24),
-            if (_familyName != null)
-              FilledButton.tonal(
-                onPressed: _busy ? null : _join,
-                child: const Text('Join as Parent'),
-              ),
+            FilledButton.tonal(
+              onPressed: _busy ? null : _join,
+              child: const Text('Join as Parent'),
+            ),
           ],
         ),
       ),

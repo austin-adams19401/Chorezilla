@@ -91,8 +91,20 @@ class BackendFunctions {
     return JoinCodePreview(
       familyId: data['familyId']?.toString() ?? '',
       familyName: data['familyName']?.toString() ?? 'Family',
+      kind: data['kind']?.toString() ?? 'child',
       kids: kids,
     );
+  }
+
+  static Future<String> redeemParentInvite({
+    required String code,
+    String? displayName,
+  }) async {
+    final data = await _call('redeemInvite', {
+      'code': code,
+      if (displayName != null) 'displayName': displayName,
+    });
+    return data['familyId']?.toString() ?? '';
   }
 
   static Future<({String familyId, String memberId})> joinWithFamilyCode({
@@ -169,10 +181,12 @@ class BackendFunctions {
 class JoinCodePreview {
   final String familyId;
   final String familyName;
+  final String kind;
   final List<JoinKidPreview> kids;
   const JoinCodePreview({
     required this.familyId,
     required this.familyName,
+    required this.kind,
     required this.kids,
   });
 }

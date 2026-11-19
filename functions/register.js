@@ -54,13 +54,9 @@ function register(exportsObj, {functions, admin, db}) {
    * @param {string} uid
    * @return {boolean}
    */
-  function isParentUser(fam, user, uid) {
+  function isParentUser(fam, uid) {
     if (fam.ownerUid === uid) return true;
     if (fam.parentUids && fam.parentUids[uid] === true) return true;
-    if (user.role === "parent") return true;
-    const memberships = user.memberships || {};
-    const entry = memberships[fam.id] || null;
-    if (entry && entry.role === "parent") return true;
     return false;
   }
 
@@ -156,8 +152,17 @@ function register(exportsObj, {functions, admin, db}) {
       fail("internal", "Could not verify the subscription with RevenueCat.");
     }
     const payload = await response.json();
+    const famSnap = await db.collection("families").doc(familyId).get();
+    const fam = famSnap.exists ? (famSnap.data() || {}) : {};
+    if (!sub.mayApplySubscription(fam, uid)) {
+      fail("permission-denied",
+          "This subscription belongs to a different account than the one tied to the family.");
+    }
     const fields = sub.fieldsFromSubscriber(payload.subscriber || {}, Date.now());
-    await db.collection("families").doc(familyId).set(subscriptionWrite(fields), {merge: true});
+    await db.collection("families").doc(familyId).set({
+      ...subscriptionWrite(fields),
+      subscriptionAppUserId: uid,
+    }, {merge: true});
     return {
       tier: fields.tier,
       expiresAt: fields.expiresAt ? fields.expiresAt.toISOString() : null,
@@ -175,8 +180,13 @@ function register(exportsObj, {functions, admin, db}) {
         const user = userSnap.exists ? (userSnap.data() || {}) : {};
         const familyId = requested || user.defaultFamilyId || user.familyId || "";
         if (!familyId) fail("failed-precondition", "No family to update.");
-        await assertMember(uid, familyId);
-        return refreshFamilySubscription(uid, familyId);
+        const {fam} = await assertMember(uid, familyId);
+        if (!sub.refreshCallerAllowed(uid, fam)) {
+          fail("permission-denied",
+              "Only the parent account tied to this family's subscription can refresh it.");
+        }
+        const billingUid = sub.billingAppUserId(fam);
+        return refreshFamilySubscription(billingUid, familyId);
       });
 
   exportsObj.revenueCatWebhook = functions
@@ -222,6 +232,13 @@ function register(exportsObj, {functions, admin, db}) {
             res.status(200).json({ok: true, skipped: true});
             return;
           }
+          const famSnap = await db.collection("families").doc(familyId).get();
+          const fam = famSnap.exists ? (famSnap.data() || {}) : {};
+          if (!sub.mayApplySubscription(fam, appUserId)) {
+            console.log("Webhook: ignoring subscriber that is not tied to the family", appUserId);
+            res.status(200).json({ok: true, skipped: true});
+            return;
+          }
           if (process.env.REVENUECAT_SECRET_API_KEY) {
             await refreshFamilySubscription(appUserId, familyId);
           } else {
@@ -244,9 +261,9 @@ function register(exportsObj, {functions, admin, db}) {
         const uid = context.auth && context.auth.uid;
         if (!uid) fail("unauthenticated", "Sign in required.");
         const familyId = data && data.familyId ? String(data.familyId) : "";
-        const {fam, user} = await assertMember(uid, familyId);
+        const {fam} = await assertMember(uid, familyId);
         fam.id = familyId;
-        if (!isParentUser(fam, user, uid)) {
+        if (!isParentUser(fam, uid)) {
           fail("permission-denied", "Only a parent can set the parent PIN.");
         }
         const raw = data ? data.pin : null;
@@ -311,9 +328,9 @@ function register(exportsObj, {functions, admin, db}) {
         const familyId = data && data.familyId ? String(data.familyId) : "";
         const memberId = data && data.memberId ? String(data.memberId) : "";
         if (!memberId) fail("invalid-argument", "Missing memberId.");
-        const {fam, user} = await assertMember(uid, familyId);
+        const {fam} = await assertMember(uid, familyId);
         fam.id = familyId;
-        if (!isParentUser(fam, user, uid)) {
+        if (!isParentUser(fam, uid)) {
           fail("permission-denied", "Only a parent can set a kid PIN.");
         }
         const memRef = db.collection("families").doc(familyId)
@@ -408,20 +425,14 @@ function register(exportsObj, {functions, admin, db}) {
         const famSnap = await db.collection("families").doc(familyId).get();
         if (!famSnap.exists) fail("not-found", "Family not found.");
         const fam = famSnap.data() || {};
-        const kidsSnap = await db.collection("families").doc(familyId)
+        const codeKind = limits.joinCodeKind(codeSnap.data() || {});
+        const membersSnap = await db.collection("families").doc(familyId)
             .collection("members")
-            .where("role", "==", "child")
-            .where("active", "==", true)
             .get();
-        const kids = kidsSnap.docs.map((doc) => {
-          const d = doc.data() || {};
-          return {
-            id: doc.id,
-            displayName: d.displayName || d.name || "Kid",
-            avatarKey: d.avatarKey || null,
-          };
-        });
-        return {familyId, familyName: fam.name || "Family", kids};
+        const kids = limits.previewKids(membersSnap.docs.map((doc) => {
+          return Object.assign({id: doc.id}, doc.data() || {});
+        }));
+        return {familyId, familyName: fam.name || "Family", kind: codeKind, kids};
       });
 
   exportsObj.joinWithFamilyCode = functions
@@ -430,14 +441,16 @@ function register(exportsObj, {functions, admin, db}) {
         const uid = context.auth && context.auth.uid;
         if (!uid) fail("unauthenticated", "Sign in required.");
         const code = data && data.code ? String(data.code).trim().toUpperCase() : "";
-        const kind = data && data.kind ? String(data.kind) : "";
         if (!code) fail("invalid-argument", "Missing code.");
-        if (kind !== "parent" && kind !== "child") {
-          fail("invalid-argument", "kind must be parent or child.");
-        }
         const codeSnap = await db.collection("joinCodes").doc(code).get();
         if (!codeSnap.exists) fail("not-found", "Code not found.");
-        const familyId = (codeSnap.data() || {}).familyId;
+        const codeData = codeSnap.data() || {};
+        const kind = limits.joinCodeKind(codeData);
+        const requestedKind = data && data.kind ? String(data.kind) : "";
+        if (requestedKind && requestedKind !== kind) {
+          fail("permission-denied", "This code cannot be used that way.");
+        }
+        const familyId = codeData.familyId;
         const famRef = db.collection("families").doc(familyId);
         const famSnap = await famRef.get();
         if (!famSnap.exists) fail("not-found", "Family not found.");
@@ -621,30 +634,31 @@ function register(exportsObj, {functions, admin, db}) {
         const famRef = db.collection("families").doc(familyId);
         const memRef = famRef.collection("members").doc(memberId);
         return db.runTransaction(async (tx) => {
-          const famSnap = await tx.get(famRef);
           const memSnap = await tx.get(memRef);
           if (!memSnap.exists) fail("not-found", "Kid not found.");
-          const fam = famSnap.data() || {};
           const mem = memSnap.data() || {};
-          const reached = sub.levelForXp(Number(mem.xp) || 0);
-          if (requested > reached) {
+          const plan = sub.planLevelGrant({
+            xp: mem.xp,
+            requestedLevel: requested,
+            owned: mem.ownedCosmetics,
+            grants: mem.levelCosmeticGrants,
+          });
+          if (plan.error === "invalid") fail("invalid-argument", "Missing level.");
+          if (plan.error === "locked") {
             fail("failed-precondition", "That level is not unlocked yet.");
           }
-          const premium = sub.isPremiumFamily(fam, Date.now());
-          const cosmeticId = sub.levelCosmeticId(fam, requested, premium);
-          if (!cosmeticId) return {itemId: null};
+          if (!plan.itemId) return {itemId: null};
+          if (!plan.grant && !plan.record) return {itemId: plan.itemId};
           const owned = Array.isArray(mem.ownedCosmetics) ?
             mem.ownedCosmetics.map(String) : [];
-          let grantId = cosmeticId;
-          if (owned.includes(cosmeticId)) {
-            const original = loot.itemById(cosmeticId);
-            const alt = original ? loot.pickUnownedOfType(original.type, owned) : null;
-            if (!alt) return {itemId: null};
-            grantId = alt.id;
+          const update = {
+            [`levelCosmeticGrants.${requested}`]: plan.itemId,
+          };
+          if (plan.grant && !owned.includes(plan.itemId)) {
+            update.ownedCosmetics = owned.concat([plan.itemId]);
           }
-          if (!loot.itemById(grantId)) fail("invalid-argument", "Unknown cosmetic.");
-          tx.update(memRef, {ownedCosmetics: owned.concat([grantId])});
-          return {itemId: grantId};
+          tx.update(memRef, update);
+          return {itemId: plan.itemId};
         });
       });
 

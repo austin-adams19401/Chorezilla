@@ -536,9 +536,8 @@ class _RedeemCodeDialogState extends State<_RedeemCodeDialog> {
             final code = _controller.text.trim();
             if (code.isEmpty) return;
             try {
-              await BackendFunctions.joinWithFamilyCode(
+              await BackendFunctions.redeemParentInvite(
                 code: code,
-                kind: 'parent',
                 displayName: app.firebaseUser?.displayName,
               );
               await app.refreshAfterProfileChange();

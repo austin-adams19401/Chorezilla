@@ -234,6 +234,70 @@ function levelCosmeticId(family, level, premium) {
   return DEFAULT_LEVEL_COSMETICS[level] || null;
 }
 
+/**
+ * RevenueCat app user already tied to this family, otherwise the owner.
+ * @param {object} fam
+ * @return {string}
+ */
+function billingAppUserId(fam) {
+  const recorded = fam && fam.subscriptionAppUserId;
+  if (typeof recorded === "string" && recorded.length > 0) return recorded;
+  const owner = fam && fam.ownerUid;
+  return typeof owner === "string" ? owner : "";
+}
+
+/**
+ * Only the account whose RevenueCat identity is tied to the family may refresh it.
+ * @param {string} callerUid
+ * @param {object} fam
+ * @return {boolean}
+ */
+function refreshCallerAllowed(callerUid, fam) {
+  const billing = billingAppUserId(fam);
+  return !!callerUid && !!billing && callerUid === billing;
+}
+
+/**
+ * A subscriber payload may be written only for the identity already tied to
+ * the family, or for the owner when nothing is tied yet.
+ * @param {object} fam
+ * @param {string} appUserId
+ * @return {boolean}
+ */
+function mayApplySubscription(fam, appUserId) {
+  if (!appUserId) return false;
+  const recorded = fam && fam.subscriptionAppUserId;
+  if (typeof recorded === "string" && recorded.length > 0) {
+    return recorded === appUserId;
+  }
+  return !!(fam && fam.ownerUid === appUserId);
+}
+
+/**
+ * One designated free level reward per level. Repeats return the same id
+ * and never substitute a different shop or loot item.
+ * @param {object} input
+ * @return {{error?: string, itemId: string|null, grant?: boolean, record?: boolean}}
+ */
+function planLevelGrant(input) {
+  const requested = Number(input && input.requestedLevel);
+  if (!requested || requested < 1) return {error: "invalid", itemId: null};
+  const reached = levelForXp(Number(input && input.xp) || 0);
+  if (requested > reached) return {error: "locked", itemId: null};
+  const designated = DEFAULT_LEVEL_COSMETICS[requested] || null;
+  if (!designated) return {itemId: null};
+  const grants = (input && input.grants) || {};
+  const prior = grants[String(requested)];
+  if (typeof prior === "string" && prior.length > 0) {
+    return {itemId: prior};
+  }
+  const owned = Array.isArray(input && input.owned) ? input.owned.map(String) : [];
+  if (owned.includes(designated)) {
+    return {itemId: designated, record: true};
+  }
+  return {itemId: designated, grant: true};
+}
+
 module.exports = {
   ENTITLEMENT,
   GRACE_MS,
@@ -244,4 +308,8 @@ module.exports = {
   fieldsFromWebhookEvent,
   levelCosmeticId,
   DEFAULT_LEVEL_COSMETICS,
+  billingAppUserId,
+  refreshCallerAllowed,
+  mayApplySubscription,
+  planLevelGrant,
 };

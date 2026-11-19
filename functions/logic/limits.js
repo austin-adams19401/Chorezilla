@@ -86,9 +86,28 @@ function countsAsCustom(data, defaults) {
 }
 
 /**
- * @param {string|null|undefined} role
- * @return {boolean}
+ * Kind stored on a join-code document. Missing kind is the legacy kid/QR code.
+ * @param {object} data
+ * @return {"parent"|"child"}
  */
+function joinCodeKind(data) {
+  return data && data.kind === "parent" ? "parent" : "child";
+}
+
+/**
+ * @param {Array<{id: string, role?: string, active?: boolean, displayName?: string, name?: string, avatarKey?: string}>} members
+ * @return {Array<{id: string, displayName: string, avatarKey: string|null}>}
+ */
+function previewKids(members) {
+  return (members || [])
+      .filter((member) => isKidRole(member.role) && member.active !== false)
+      .map((member) => ({
+        id: member.id,
+        displayName: member.displayName || member.name || "Kid",
+        avatarKey: member.avatarKey || null,
+      }));
+}
+
 function isKidRole(role) {
   return role === "kid" || role === "child";
 }
@@ -101,4 +120,6 @@ module.exports = {
   DEFAULT_REWARD_TITLES,
   countsAsCustom,
   isKidRole,
+  joinCodeKind,
+  previewKids,
 };

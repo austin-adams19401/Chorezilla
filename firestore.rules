@@ -79,15 +79,7 @@ service cloud.firestore {
     }
 
     function isParent(familyId) {
-      return isOwner(familyId)
-        || isParentUid(familyId)
-        || (
-          isLinked(familyId)
-          && (
-            userData().get('role', '') == 'parent'
-            || userData().get('memberships', {}).get(familyId, {}).get('role', '') == 'parent'
-          )
-        );
+      return isOwner(familyId) || isParentUid(familyId);
     }
 
     function same(field) {
@@ -114,7 +106,8 @@ service cloud.firestore {
         && same('parentPinSet')
         && same('ownerUid')
         && same('parentUids')
-        && same('memberUids');
+        && same('memberUids')
+        && same('subscriptionAppUserId');
     }
 
     function linksUnchanged() {
@@ -137,8 +130,11 @@ service cloud.firestore {
       let keys = request.resource.data.get('memberships', {}).keys();
       return (fid == null || ownsFamily(fid))
         && (legacy == null || legacy == fid)
-        && request.resource.data.get('role', 'parent') == 'parent'
         && (keys.size() == 0 || (fid is string && keys.hasOnly([fid]) && ownsFamily(fid)));
+    }
+
+    function roleUnchanged() {
+      return request.resource.data.get('role', null) == resource.data.get('role', null);
     }
 
     function noFamilyLinkOnCreate() {
@@ -185,14 +181,18 @@ service cloud.firestore {
         && same('pinSet')
         && same('role')
         && same('userUid')
+        && same('levelCosmeticGrants')
         && cosmeticsOk();
     }
 
     match /users/{userId} {
       allow read: if signedIn() && uid() == userId;
       allow create: if signedIn() && uid() == userId
-        && (noFamilyLinkOnCreate() || linkingOnlyToOwnedFamily());
+        && (noFamilyLinkOnCreate()
+          || (linkingOnlyToOwnedFamily()
+            && request.resource.data.get('role', 'parent') == 'parent'));
       allow update: if signedIn() && uid() == userId
+        && roleUnchanged()
         && (linksUnchanged() || linkingOnlyToOwnedFamily());
       allow delete: if signedIn() && uid() == userId;
     }
@@ -290,10 +290,13 @@ service cloud.firestore {
       allow create: if signedIn()
         && isParent(request.resource.data.familyId)
         && request.resource.data.familyId is string
-        && request.resource.data.keys().hasOnly(['familyId', 'createdAt']);
+        && (request.resource.data.kind == 'child' || request.resource.data.kind == 'parent')
+        && request.resource.data.keys().hasOnly(['familyId', 'createdAt', 'kind']);
       allow update: if signedIn()
         && isParent(resource.data.familyId)
-        && request.resource.data.familyId == resource.data.familyId;
+        && request.resource.data.familyId == resource.data.familyId
+        && request.resource.data.kind == resource.data.get('kind', 'child')
+        && (request.resource.data.kind == 'child' || request.resource.data.kind == 'parent');
       allow delete: if signedIn() && isParent(resource.data.familyId);
     }
 

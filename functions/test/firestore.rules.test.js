@@ -154,13 +154,52 @@ test("owner can publish a join code and other users cannot read the code doc", a
   const owner = dbFor("owner");
   await assertSucceeds(setDoc(doc(owner, "joinCodes/ABC123"), {
     familyId: "fam1",
+    kind: "child",
     createdAt: serverTimestamp(),
   }));
   await assertFails(getDoc(doc(dbFor("stranger"), "joinCodes/ABC123")));
   await assertFails(setDoc(doc(dbFor("stranger"), "joinCodes/ZZZZZZ"), {
     familyId: "fam1",
+    kind: "child",
     createdAt: serverTimestamp(),
   }));
+  await assertFails(setDoc(doc(owner, "joinCodes/NOPARENT"), {
+    familyId: "fam1",
+    createdAt: serverTimestamp(),
+  }));
+  await assertFails(updateDoc(doc(owner, "joinCodes/ABC123"), {kind: "parent"}));
+});
+
+test("a member cannot promote their own role to parent", async () => {
+  await seed();
+  const kid = dbFor("kid");
+  await assertFails(updateDoc(doc(kid, "users/kid"), {role: "parent"}));
+  await assertSucceeds(setDoc(doc(kid, "families/kid"), {
+    name: "Kid family",
+    ownerUid: "kid",
+  }));
+  await assertFails(updateDoc(doc(kid, "users/kid"), {
+    role: "parent",
+    defaultFamilyId: "kid",
+    familyId: "kid",
+    memberships: {kid: {memberId: "kid", role: "parent"}},
+  }));
+});
+
+test("a profile marked parent is not a parent without parentUids", async () => {
+  await seed();
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "users/pretend"), {
+      displayName: "Pretend",
+      role: "parent",
+      defaultFamilyId: "fam1",
+      memberships: {fam1: {memberId: "pretend", role: "parent"}},
+    });
+  });
+  const db = dbFor("pretend");
+  await assertFails(updateDoc(doc(db, "families/fam1"), {name: "Taken over"}));
+  await assertFails(deleteDoc(doc(db, "families/fam1/members/kid1")));
 });
 
 test("creating a family as premium from the client is rejected", async () => {

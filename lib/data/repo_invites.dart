@@ -21,6 +21,7 @@ extension InviteRepo on ChorezillaRepo {
     // mirror in /joinCodes/{code} for lookup
     await firebaseDB.collection('joinCodes').doc(code).set({
       'familyId': familyId,
+      'kind': 'child',
       'createdAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
