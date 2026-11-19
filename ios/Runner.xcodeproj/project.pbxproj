@@ -275,7 +275,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/FirebaseCrashlytics/upload-symbols\" --build-phase --validate -gsp \"${PROJECT_DIR}/Runner/GoogleService-Info.plist\" -p ios";
+			shellScript = "/bin/sh \"${SRCROOT}/scripts/upload_crashlytics_dsyms.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
