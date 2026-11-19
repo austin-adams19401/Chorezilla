@@ -112,6 +112,17 @@ function isKidRole(role) {
   return role === "kid" || role === "child";
 }
 
+/**
+ * @param {string|null|undefined} existingUid
+ * @param {string} callerUid
+ * @return {"taken"|"claim"|"same"}
+ */
+function kidProfileClaim(existingUid, callerUid) {
+  if (existingUid && existingUid !== callerUid) return "taken";
+  if (!existingUid) return "claim";
+  return "same";
+}
+
 module.exports = {
   FREE_KIDS,
   FREE_CUSTOM_CHORES,
@@ -122,4 +133,5 @@ module.exports = {
   isKidRole,
   joinCodeKind,
   previewKids,
+  kidProfileClaim,
 };

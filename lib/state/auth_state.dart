@@ -153,6 +153,11 @@ extension AppStateAuth on AppState {
     return repo.ensureJoinCode(famId);
   }
 
+  Future<String> ensureParentJoinCode() async {
+    final famId = _familyId!;
+    return repo.ensureParentJoinCode(famId);
+  }
+
   Future<String?> redeemJoinCode(String code) {
     return repo.redeemJoinCode(code);
   }

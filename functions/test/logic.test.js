@@ -258,6 +258,13 @@ test("join codes keep their kind and previews include legacy kids", () => {
   assert.equal(kids[1].displayName, "Legacy");
 });
 
+test("a claimed kid profile cannot be attached by another login", () => {
+  assert.equal(limits.kidProfileClaim(null, "kid-login"), "claim");
+  assert.equal(limits.kidProfileClaim("", "kid-login"), "claim");
+  assert.equal(limits.kidProfileClaim("kid-login", "kid-login"), "same");
+  assert.equal(limits.kidProfileClaim("other-login", "kid-login"), "taken");
+});
+
 test("kid role accepts child and kid; custom flag cannot hide a made-up title", () => {
   assert.equal(limits.isKidRole("child"), true);
   assert.equal(limits.isKidRole("kid"), true);

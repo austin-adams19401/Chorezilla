@@ -204,26 +204,38 @@ exports.redeemInvite = functions
             }
 
             // Link user → family, add to parentUids, and add a member row
+            const memRef = famRef.collection("members").doc();
             tx.set(
                 userRef,
                 {
                     displayName: displayName,
                     role: "parent",
                     familyId: familyId,
+                    defaultFamilyId: familyId,
+                    memberId: memRef.id,
+                    ["memberships." + familyId]: {
+                        memberId: memRef.id,
+                        role: "parent",
+                    },
                     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
                 },
                 { merge: true }
             );
 
-            tx.set(famRef, { ["parentUids." + uid]: true }, { merge: true });
+            tx.set(famRef, {
+                ["parentUids." + uid]: true,
+                ["memberUids." + uid]: true,
+            }, { merge: true });
 
-            const memRef = famRef.collection("members").doc();
             tx.set(memRef, {
                 name: displayName,
+                displayName: displayName,
                 role: "parent",
+                userUid: uid,
                 avatar: "🦄",
                 usesThisDevice: true,
                 requiresPin: false,
+                active: true,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             });
 

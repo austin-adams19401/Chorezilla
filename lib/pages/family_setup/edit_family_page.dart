@@ -55,7 +55,7 @@ class _EditFamilyPageState extends State<EditFamilyPage> {
     final app = context.read<AppState>();
     setState(() { _busy = true; _error = null; });
     try {
-      final code = await app.ensureJoinCode();
+      final code = await app.ensureParentJoinCode();
       setState(() { _code = code; });
     } catch (e) {
       setState(() { _error = e.toString(); });

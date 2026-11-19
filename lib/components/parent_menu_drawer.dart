@@ -132,7 +132,7 @@ class ParentDrawer extends StatelessWidget {
             ListTile(
               leading: Icon(Icons.qr_code_rounded, color: cs.primary),
               title: const Text('Share family code'),
-              subtitle: const Text('Invite another parent or device'),
+              subtitle: const Text('For a kid device to join'),
               onTap: () async {
                 final famId = app.familyId;
                 if (famId == null) {
@@ -536,8 +536,15 @@ class _RedeemCodeDialogState extends State<_RedeemCodeDialog> {
             final code = _controller.text.trim();
             if (code.isEmpty) return;
             try {
-              await BackendFunctions.redeemParentInvite(
+              final preview = await BackendFunctions.previewJoinCode(code);
+              if (preview.kind != 'parent') {
+                throw Exception(
+                  'That code is for a kid device. Use the parent invite code.',
+                );
+              }
+              await BackendFunctions.joinWithFamilyCode(
                 code: code,
+                kind: 'parent',
                 displayName: app.firebaseUser?.displayName,
               );
               await app.refreshAfterProfileChange();

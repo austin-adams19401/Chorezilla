@@ -84,6 +84,10 @@ class _ParentJoinPageState extends State<ParentJoinPage> {
           kind: 'parent',
           displayName: user.displayName,
         );
+      } else if (_codeKind == 'child') {
+        throw Exception(
+          'That code is for a kid device. Use the parent invite code.',
+        );
       } else {
         await BackendFunctions.redeemParentInvite(
           code: _code.text,

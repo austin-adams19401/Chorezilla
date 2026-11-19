@@ -496,7 +496,12 @@ function register(exportsObj, {functions, admin, db}) {
           if (!limits.isKidRole(mem.role) || mem.active === false) {
             fail("failed-precondition", "Pick an active kid profile.");
           }
-          if (!mem.userUid) {
+          const claim = limits.kidProfileClaim(mem.userUid, uid);
+          if (claim === "taken") {
+            fail("failed-precondition",
+                "That profile is already linked to another login.");
+          }
+          if (claim === "claim") {
             await memSnap.ref.set({userUid: uid}, {merge: true});
           }
         } else {

@@ -168,6 +168,17 @@ test("owner can publish a join code and other users cannot read the code doc", a
     createdAt: serverTimestamp(),
   }));
   await assertFails(updateDoc(doc(owner, "joinCodes/ABC123"), {kind: "parent"}));
+  await assertSucceeds(setDoc(doc(owner, "joinCodes/PARENT1"), {
+    familyId: "fam1",
+    kind: "parent",
+    createdAt: serverTimestamp(),
+  }));
+  await assertSucceeds(updateDoc(doc(owner, "families/fam1"), {parentJoinCode: "PARENT1"}));
+  await assertFails(setDoc(doc(dbFor("kid"), "joinCodes/PARENT2"), {
+    familyId: "fam1",
+    kind: "parent",
+    createdAt: serverTimestamp(),
+  }));
 });
 
 test("a member cannot promote their own role to parent", async () => {

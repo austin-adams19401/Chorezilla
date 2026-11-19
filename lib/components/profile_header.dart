@@ -124,7 +124,7 @@ class ProfileHeader extends StatelessWidget {
   Future<void> _handleInvite(BuildContext context) async {
     final app = context.read<AppState>();
     try {
-      final code = await app.ensureJoinCode();
+      final code = await app.ensureParentJoinCode();
       if (!context.mounted) return;
       await showDialog(
         context: context,
