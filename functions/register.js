@@ -445,9 +445,9 @@ function register(exportsObj, {functions, admin, db}) {
         const membersSnap = await db.collection("families").doc(familyId)
             .collection("members")
             .get();
-        const kids = limits.previewKids(membersSnap.docs.map((doc) => {
+        const kids = codeKind === "child" ? limits.previewKids(membersSnap.docs.map((doc) => {
           return Object.assign({id: doc.id}, doc.data() || {});
-        }));
+        })) : [];
         return {familyId, familyName: fam.name || "Family", kind: codeKind, kids};
       });
 
@@ -766,13 +766,17 @@ function register(exportsObj, {functions, admin, db}) {
         const stillThere = await famRef.collection("members")
             .where("userUid", "==", uid).limit(1).get();
         if (!stillThere.empty) return null;
-        await famRef.set({
-          [`memberUids.${uid}`]: FieldValue.delete(),
-          [`parentUids.${uid}`]: FieldValue.delete(),
-        }, {merge: true});
+        const famSnap = await famRef.get();
+        if (famSnap.exists) {
+          await famRef.update({
+            [`memberUids.${uid}`]: FieldValue.delete(),
+            [`parentUids.${uid}`]: FieldValue.delete(),
+          });
+        }
         const userRef = db.collection("users").doc(uid);
         const userSnap = await userRef.get();
-        const user = userSnap.exists ? (userSnap.data() || {}) : {};
+        if (!userSnap.exists) return null;
+        const user = userSnap.data() || {};
         const patch = {
           [`memberships.${familyId}`]: FieldValue.delete(),
         };
@@ -783,7 +787,7 @@ function register(exportsObj, {functions, admin, db}) {
         if (user.memberId === context.params.memberId) {
           patch.memberId = FieldValue.delete();
         }
-        await userRef.set(patch, {merge: true});
+        await userRef.update(patch);
         return null;
       });
 

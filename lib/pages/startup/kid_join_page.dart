@@ -54,6 +54,12 @@ class _KidJoinPageState extends State<KidJoinPage> {
         );
         return;
       }
+      if (preview.kind != 'child') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('That code is for a parent. Use Join as Parent.')),
+        );
+        return;
+      }
       setState(() {
         familyId = preview.familyId;
         members = preview.kids;
