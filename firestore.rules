@@ -1,10 +1,323 @@
 rules_version = '2';
 
-// TODO: TESTING ONLY - restore proper security rules before production release
+// Family data is readable and writable only by that family's members.
+// Membership is the owner uid, parentUids/memberUids (Cloud Functions), or
+// the signed-in user's own profile link. Profile links can only be pointed
+// at a family the user owns; joining someone else's family goes through
+// joinWithFamilyCode (Admin SDK), which bypasses these rules.
+//
+// Clients cannot write subscription fields, PIN hashes, or paid cosmetics.
+// Coin changes from chores, rewards, and badges stay on the client because
+// those flows are transactions the app already runs; loot boxes and the
+// cosmetic shop are Cloud Functions.
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function userPath() {
+      return /databases/$(database)/documents/users/$(uid());
+    }
+
+    function familyPath(familyId) {
+      return /databases/$(database)/documents/families/$(familyId);
+    }
+
+    function userData() {
+      return get(userPath()).data;
+    }
+
+    function familyData(familyId) {
+      return get(familyPath(familyId)).data;
+    }
+
+    function familyAfter(familyId) {
+      return getAfter(familyPath(familyId)).data;
+    }
+
+    function isOwner(familyId) {
+      return signedIn()
+        && exists(familyPath(familyId))
+        && familyData(familyId).get('ownerUid', '') == uid();
+    }
+
+    function isOwnerAfter(familyId) {
+      return signedIn()
+        && familyAfter(familyId).get('ownerUid', '') == uid();
+    }
+
+    function isParentUid(familyId) {
+      return signedIn()
+        && exists(familyPath(familyId))
+        && familyData(familyId).get('parentUids', {}).get(uid(), false) == true;
+    }
+
+    function isMemberUid(familyId) {
+      return signedIn()
+        && exists(familyPath(familyId))
+        && familyData(familyId).get('memberUids', {}).get(uid(), false) == true;
+    }
+
+    function isLinked(familyId) {
+      return signedIn()
+        && exists(userPath())
+        && (
+          userData().get('defaultFamilyId', '') == familyId
+          || userData().get('familyId', '') == familyId
+          || familyId in userData().get('memberships', {})
+        );
+    }
+
+    function isFamilyMember(familyId) {
+      return isOwner(familyId) || isParentUid(familyId) || isMemberUid(familyId) || isLinked(familyId);
+    }
+
+    function isParent(familyId) {
+      return isOwner(familyId) || isParentUid(familyId);
+    }
+
+    function same(field) {
+      return request.resource.data.get(field, null) == resource.data.get(field, null);
+    }
+
+    function subscriptionUntouched() {
+      return same('subscriptionTier')
+        && same('subscriptionExpiresAt')
+        && same('trialExpiresAt')
+        && same('billingIssueDetectedAt');
+    }
+
+    function subscriptionSafeOnCreate() {
+      return request.resource.data.get('subscriptionTier', 'free') == 'free'
+        && request.resource.data.get('subscriptionExpiresAt', null) == null
+        && request.resource.data.get('trialExpiresAt', null) == null
+        && request.resource.data.get('billingIssueDetectedAt', null) == null;
+    }
+
+    function protectedFamilyUntouched() {
+      return subscriptionUntouched()
+        && same('parentPinHash')
+        && same('parentPinSet')
+        && same('ownerUid')
+        && same('parentUids')
+        && same('memberUids')
+        && same('subscriptionAppUserId')
+        && same('parentJoinCode');
+    }
+
+    function linksUnchanged() {
+      return request.resource.data.get('defaultFamilyId', null) == resource.data.get('defaultFamilyId', null)
+        && request.resource.data.get('familyId', null) == resource.data.get('familyId', null)
+        && request.resource.data.get('memberId', null) == resource.data.get('memberId', null)
+        && request.resource.data.get('role', null) == resource.data.get('role', null)
+        && request.resource.data.get('memberships', {}) == resource.data.get('memberships', {});
+    }
+
+    function ownsFamily(familyId) {
+      return familyId is string
+        && familyId.size() > 0
+        && familyAfter(familyId).get('ownerUid', '') == uid();
+    }
+
+    function linkingOnlyToOwnedFamily() {
+      let fid = request.resource.data.get('defaultFamilyId', null);
+      let legacy = request.resource.data.get('familyId', null);
+      let keys = request.resource.data.get('memberships', {}).keys();
+      return (fid == null || ownsFamily(fid))
+        && (legacy == null || legacy == fid)
+        && (keys.size() == 0 || (fid is string && keys.hasOnly([fid]) && ownsFamily(fid)));
+    }
+
+    function roleUnchanged() {
+      return request.resource.data.get('role', null) == resource.data.get('role', null);
+    }
+
+    function noFamilyLinkOnCreate() {
+      return request.resource.data.get('defaultFamilyId', null) == null
+        && request.resource.data.get('familyId', null) == null
+        && request.resource.data.get('memberId', null) == null
+        && request.resource.data.get('role', null) == null
+        && request.resource.data.get('memberships', {}).size() == 0;
+    }
+
+    function titleIds() {
+      return [
+        'title_none',
+        'title_level_1', 'title_level_2', 'title_level_3', 'title_level_4',
+        'title_level_5', 'title_level_6', 'title_level_7', 'title_level_8',
+        'title_level_9', 'title_level_10', 'title_level_11', 'title_level_12',
+        'title_level_13', 'title_level_14', 'title_level_15', 'title_level_16',
+        'title_level_17', 'title_level_18', 'title_level_19', 'title_level_20',
+        'title_treasure_hoarder', 'title_big_spender', 'title_silent_ninja'
+      ];
+    }
+
+    function cosmeticsOk() {
+      let before = resource.data.get('ownedCosmetics', []);
+      let after = request.resource.data.get('ownedCosmetics', []);
+      return (before.hasAll(after) && after.hasAll(before))
+        || (after.hasAll(before) && after.removeAll(before).hasOnly(titleIds()));
+    }
+
+    function starterCosmetics() {
+      let list = request.resource.data.get('ownedCosmetics', []);
+      return list.size() == 0 || list.hasOnly(['title_level_1']);
+    }
+
+    function memberSecretsOkOnCreate() {
+      return request.resource.data.get('coins', 0) == 0
+        && request.resource.data.get('pinHash', null) == null
+        && request.resource.data.get('pinSet', false) == false
+        && starterCosmetics();
+    }
+
+    function memberSecretsOkOnUpdate() {
+      return same('pinHash')
+        && same('pinSet')
+        && same('role')
+        && same('userUid')
+        && same('levelCosmeticGrants')
+        && cosmeticsOk();
+    }
+
+    function memberProfileFieldsOk(familyId) {
+      return isParent(familyId)
+        || resource.data.get('userUid', '') == uid()
+        || (
+          same('active')
+          && same('fcmTokens')
+          && same('notificationsEnabled')
+          &&           same('displayName')
+          && same('name')
+          && same('nickname')
+        );
+    }
+
+    match /users/{userId} {
+      allow read: if signedIn() && uid() == userId;
+      allow create: if signedIn() && uid() == userId
+        && (noFamilyLinkOnCreate()
+          || (linkingOnlyToOwnedFamily()
+            && request.resource.data.get('role', 'parent') == 'parent'));
+      allow update: if signedIn() && uid() == userId
+        && roleUnchanged()
+        && (linksUnchanged() || linkingOnlyToOwnedFamily());
+      allow delete: if signedIn() && uid() == userId;
+    }
+
+    match /families/{familyId} {
+      allow read: if isFamilyMember(familyId);
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == uid()
+        && subscriptionSafeOnCreate()
+        && request.resource.data.get('parentPinHash', null) == null
+        && request.resource.data.get('parentPinSet', false) == false
+        && request.resource.data.get('parentUids', {}).size() == 0
+        && request.resource.data.get('memberUids', {}).size() == 0;
+
+      allow update: if isParent(familyId) && protectedFamilyUntouched();
+
+      allow delete: if isOwner(familyId);
+
+      match /members/{memberId} {
+        allow read: if isFamilyMember(familyId);
+        allow create: if memberSecretsOkOnCreate() && (
+          (
+            (isOwner(familyId) || isOwnerAfter(familyId))
+            && request.resource.data.role == 'parent'
+            && request.resource.data.userUid == uid()
+          )
+          // Registration patches families/{uid}/members/{uid} with just a
+          // display name, sometimes before the family document exists.
+          || (memberId == uid() && familyId == uid())
+          || (
+            isParent(familyId)
+            && request.resource.data.role == 'child'
+          )
+        );
+        allow update: if isFamilyMember(familyId)
+          && memberSecretsOkOnUpdate()
+          && memberProfileFieldsOk(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      match /chores/{docId} {
+        allow read, create, update: if isFamilyMember(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      match /assignments/{docId} {
+        allow read, create, update: if isFamilyMember(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      match /rewards/{docId} {
+        allow read, create, update: if isFamilyMember(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      match /rewardRedemptions/{docId} {
+        allow read, create, update: if isFamilyMember(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      match /choreMemberSchedules/{docId} {
+        allow read, create, update: if isFamilyMember(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      match /devices/{docId} {
+        allow read, create, update: if isFamilyMember(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      match /events/{docId} {
+        allow read, create, update: if isFamilyMember(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      match /dayStatusOverrides/{docId} {
+        allow read, create, update: if isFamilyMember(familyId);
+        allow delete: if isParent(familyId);
+      }
+
+      // PIN material and loot sessions. Cloud Functions use the Admin SDK.
+      match /private/{docId} {
+        allow read, write: if false;
+      }
+
+      // Legacy invite docs are written only by Cloud Functions.
+      match /invites/{code} {
+        allow read, write: if false;
+      }
+    }
+
+    // Knowing a code is enough to call previewJoinCode. The documents
+    // themselves are not readable by clients (they contain family ids).
+    match /joinCodes/{code} {
+      allow get, list: if false;
+      allow create: if signedIn()
+        && isParent(request.resource.data.familyId)
+        && request.resource.data.familyId is string
+        && request.resource.data.kind == 'child'
+        && request.resource.data.keys().hasOnly(['familyId', 'createdAt', 'kind']);
+      allow update: if signedIn()
+        && isParent(resource.data.familyId)
+        && request.resource.data.familyId == resource.data.familyId
+        && request.resource.data.kind == resource.data.get('kind', 'child')
+        && (request.resource.data.kind == 'child' || request.resource.data.kind == 'parent');
+      allow delete: if signedIn() && isParent(resource.data.familyId);
+    }
+
+    match /invites/{code} {
+      allow read, write: if false;
     }
   }
 }

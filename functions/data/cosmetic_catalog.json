@@ -1,0 +1,884 @@
+[
+  {
+    "id": "bg_default",
+    "type": "background",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "bg_kitchen",
+    "type": "background",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "bg_backyard",
+    "type": "background",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "bg_laundry",
+    "type": "background",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "bg_dino",
+    "type": "background",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "bg_jungle",
+    "type": "background",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "bg_candyland",
+    "type": "background",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "bg_ocean",
+    "type": "background",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "bg_space",
+    "type": "background",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "bg_minecraft",
+    "type": "background",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "bg_space2",
+    "type": "background",
+    "costCoins": 30,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "bg_pirate",
+    "type": "background",
+    "costCoins": 30,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "bg_dragon",
+    "type": "background",
+    "costCoins": 30,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "bg_arena",
+    "type": "background",
+    "costCoins": 50,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "bg_volcano",
+    "type": "background",
+    "costCoins": 50,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "bg_treasure",
+    "type": "background",
+    "costCoins": 50,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "bg_unicorn",
+    "type": "background",
+    "costCoins": 50,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "bg_levelup",
+    "type": "background",
+    "costCoins": 50,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_green_basic",
+    "type": "zillaSkin",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "zilla_grass_green",
+    "type": "zillaSkin",
+    "costCoins": 10,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_sky_blue",
+    "type": "zillaSkin",
+    "costCoins": 10,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_sunny_yellow",
+    "type": "zillaSkin",
+    "costCoins": 10,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_coral",
+    "type": "zillaSkin",
+    "costCoins": 12,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_purple",
+    "type": "zillaSkin",
+    "costCoins": 20,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_teal",
+    "type": "zillaSkin",
+    "costCoins": 20,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_hot_pink",
+    "type": "zillaSkin",
+    "costCoins": 22,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_midnight_blue",
+    "type": "zillaSkin",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_gold",
+    "type": "zillaSkin",
+    "costCoins": 35,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_crimson",
+    "type": "zillaSkin",
+    "costCoins": 35,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_emerald",
+    "type": "zillaSkin",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "zilla_galaxy",
+    "type": "zillaSkin",
+    "costCoins": 45,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "frame_default",
+    "type": "avatarFrame",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "frame_green_basic",
+    "type": "avatarFrame",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "frame_stars",
+    "type": "avatarFrame",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "frame_rainbow",
+    "type": "avatarFrame",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "frame_gold",
+    "type": "avatarFrame",
+    "costCoins": 30,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "frame_fire",
+    "type": "avatarFrame",
+    "costCoins": 50,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "title_none",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "title_level_1",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_2",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_3",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_4",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_5",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_6",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_7",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_8",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_9",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_10",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_11",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_12",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_13",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_14",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_15",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_16",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_17",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_18",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_19",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_level_20",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_treasure_hoarder",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_big_spender",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "title_silent_ninja",
+    "type": "title",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": false
+  },
+  {
+    "id": "avatar_default_1",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_2",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_3",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_4",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_banana",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_baseball",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_bolt",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_cookie",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_cute_dragon",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_cute_fox",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_cute_unicorn",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_explorer",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_default_googly_eyes",
+    "type": "avatar",
+    "costCoins": 0,
+    "rarity": null,
+    "isDefault": true
+  },
+  {
+    "id": "avatar_common_coins",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_crayons",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_cupcake",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_fire",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_flowers",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_frog_hat",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_green_alien",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_hamburger",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_hero_mask",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_knight_helmet",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_moon",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_mustache",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_mystery",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_ninja",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_owl",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_panda",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_pirate",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_red_shades",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_robot_head",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_rubber_duck",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_shield",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_shoe",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_space_helmet",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_taco",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_trucker_cap",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_common_watermelon",
+    "type": "avatar",
+    "costCoins": 15,
+    "rarity": "common",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_avatar_3",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_zilla",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_crown",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_crystal",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_diamond",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_discoball",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_galaxy",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_magic_cat",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_ninja_cat",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_phoenix",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_green_dragon",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_skull",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_sword",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_viking_helm",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_volcano",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_wand",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_rare_wings",
+    "type": "avatar",
+    "costCoins": 25,
+    "rarity": "rare",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_cosmic_crown",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_crystal_dragon",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_crystal_skull",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_green_dragon",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_fire_skull",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_gold_dragon",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_green_monster",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_ice_dragon",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  },
+  {
+    "id": "avatar_epic_zombie",
+    "type": "avatar",
+    "costCoins": 40,
+    "rarity": "epic",
+    "isDefault": false
+  }
+]

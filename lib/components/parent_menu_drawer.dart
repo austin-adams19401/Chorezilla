@@ -5,6 +5,7 @@ import 'package:chorezilla/pages/family_setup/edit_family_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/coin_economy_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/devices_profiles_page.dart';
 import 'package:chorezilla/pages/parent_dashboard/settings/level_rewards_page.dart';
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/services/purchase_flow.dart';
 import 'package:chorezilla/services/purchase_service.dart';
 import 'package:chorezilla/themes/app_theme.dart';
@@ -131,7 +132,7 @@ class ParentDrawer extends StatelessWidget {
             ListTile(
               leading: Icon(Icons.qr_code_rounded, color: cs.primary),
               title: const Text('Share family code'),
-              subtitle: const Text('Invite another parent or device'),
+              subtitle: const Text('For a kid device to join'),
               onTap: () async {
                 final famId = app.familyId;
                 if (famId == null) {
@@ -535,12 +536,26 @@ class _RedeemCodeDialogState extends State<_RedeemCodeDialog> {
             final code = _controller.text.trim();
             if (code.isEmpty) return;
             try {
-              final famId = await app.redeemJoinCode(code);
+              final preview = await BackendFunctions.previewJoinCode(code);
+              if (preview.kind == 'invite') {
+                await BackendFunctions.redeemParentInvite(
+                  code: code,
+                  displayName: app.firebaseUser?.displayName,
+                );
+              } else if (preview.kind == 'parent') {
+                await BackendFunctions.joinWithFamilyCode(
+                  code: code,
+                  kind: 'parent',
+                  displayName: app.firebaseUser?.displayName,
+                );
+              } else {
+                throw Exception(
+                  'That code is for a kid device. Use the parent invite code.',
+                );
+              }
+              await app.refreshAfterProfileChange();
               if (!mounted) return;
               Navigator.of(context).pop();
-              if (famId == null && mounted) {
-                ParentDrawer._showErrorSnack(context, 'Code not valid.');
-              }
             } catch (e) {
               if (!mounted) return;
               Navigator.of(context).pop();

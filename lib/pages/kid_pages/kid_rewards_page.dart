@@ -875,19 +875,26 @@ class _CosmeticsTabState extends State<_CosmeticsTab> {
 
     setState(() => _busyIds.add(box.id));
     try {
-      // The dialog handles the 3-click mechanic and returns the final result
-      final clickState = await showDialog<LootBoxClickState>(
+      // The server rolls and deducts coins. The dialog only reveals that result.
+      final result = await app.openLootBox(widget.member.id, box);
+      if (!mounted) return;
+      final rolls = <CosmeticRarity>[
+        for (final name in result.rolls)
+          for (final rarity in CosmeticRarity.values)
+            if (rarity.name == name) rarity,
+      ];
+      await showDialog<void>(
         context: context,
         barrierDismissible: false,
         builder: (_) => LootBoxOpenDialog(
           boxDefinition: box,
           ownedCosmetics: member.ownedCosmetics,
+          scriptedRolls: rolls.length == 3 ? rolls : null,
+          scriptedItem: CosmeticCatalog.byId(result.wonItemId),
+          scriptedDuplicate: result.isDuplicate,
+          scriptedCoinRefund: result.coinRefund,
         ),
       );
-
-      if (clickState == null || !mounted) return;
-
-      await app.openLootBox(widget.member.id, box, clickState);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

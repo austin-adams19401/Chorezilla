@@ -18,22 +18,20 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "com.chorezilla.chorezilla"
-    compileSdk = flutter.compileSdkVersion
+    // Play rejects updates that target below Android 16 (API 36) as of Aug 31, 2026.
+    compileSdk = maxOf(flutter.compileSdkVersion, 36)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
         applicationId = "com.chorezilla.chorezilla"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // purchases_ui_flutter 11 requires Android 7.0 (API 24).
+        minSdk = maxOf(flutter.minSdkVersion, 24)
+        targetSdk = maxOf(flutter.targetSdkVersion, 36)
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -66,6 +64,12 @@ android {
 }
 
 
+
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
 
 flutter {
     source = "../.."

@@ -16,20 +16,23 @@ extension AppStateWrites on AppState {
     final famId = _familyId!;
     debugPrint('ADDING CHILD');
 
-    String? pinHash;
-    if (pin != null && pin.isNotEmpty) {
-      if (!_isValidPin(pin)) {
-        throw ArgumentError('PIN must be exactly 4 digits (0–9).');
-      }
-      pinHash = _hashPin(pin);
+    if (pin != null && pin.isNotEmpty && !_isValidPin(pin)) {
+      throw ArgumentError('PIN must be exactly 4 digits (0–9).');
     }
 
-    await repo.addChild(
+    final memberId = await repo.addChild(
       famId,
       displayName: name,
       avatarKey: avatarKey,
-      pinHash: pinHash,
+      pinHash: null,
     );
+    if (pin != null && pin.isNotEmpty) {
+      await BackendFunctions.setKidPin(
+        familyId: famId,
+        memberId: memberId,
+        pin: pin.trim(),
+      );
+    }
   }
 
   Future<void> updateMember(String memberId, Map<String, dynamic> patch) async {

@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.5+21
+version: 1.0.6+30
 
 environment:
   sdk: ^3.9.0
@@ -36,7 +36,6 @@ dependencies:
   confetti: ^0.8.0
   cupertino_icons: ^1.0.8
   provider: ^6.1.5+1
-  crypto: ^3.0.6
   firebase_core: ^4.1.1
   cloud_firestore: ^6.0.2
   firebase_auth: ^6.1.0
@@ -47,13 +46,15 @@ dependencies:
   qr_flutter: ^4.1.0
   device_info_plus: ^12.1.0
   google_sign_in: ^7.2.0
-  sign_in_with_apple: ^6.1.4
+  sign_in_with_apple: ^8.2.0
   package_info_plus: ^9.0.0
   intl: ^0.20.2
   image_picker: ^1.2.1
   firebase_messaging: ^16.0.4
-  purchases_flutter: ^8.7.1
-  purchases_ui_flutter: ^8.7.1
+  # 11.x pulls purchases-android 11, which depends on Play Billing Library 9.1.0.
+  purchases_flutter: ^11.0.4
+  cloud_functions: ^6.0.2
+  purchases_ui_flutter: ^11.0.4
   mobile_scanner: ^7.0.0
   in_app_review: ^2.0.9
   firebase_crashlytics: any
@@ -92,6 +93,8 @@ flutter_launcher_icons:
 
 # The following section is specific to Flutter packages.
 flutter:
+  config:
+    enable-swift-package-manager: true
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

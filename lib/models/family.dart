@@ -106,6 +106,8 @@ class Family {
   final bool onboardingComplete;
   final bool tutorialComplete;
   final String? parentPinHash;
+  /// True when a parent PIN exists. The hash itself lives in a private doc.
+  final bool parentPinSet;
   final SubscriptionTier subscriptionTier;
   final DateTime? subscriptionExpiresAt;
   final DateTime? trialExpiresAt;
@@ -122,6 +124,7 @@ class Family {
     this.stats = const FamilyStats(),
     this.createdAt,
     this.parentPinHash,
+    this.parentPinSet = false,
     this.subscriptionTier = SubscriptionTier.free,
     this.subscriptionExpiresAt,
     this.trialExpiresAt,
@@ -133,18 +136,15 @@ class Family {
 
   bool get isPremium {
     if (subscriptionTier == SubscriptionTier.lifetime) return true;
-    if (subscriptionTier == SubscriptionTier.premium) {
-      // If there's a billing issue, premium stays active during the grace window.
-      if (billingIssueDetectedAt != null) {
-        return !isGracePeriodExpired;
-      }
-      return subscriptionExpiresAt == null ||
-          subscriptionExpiresAt!.isAfter(DateTime.now());
+    // A future trialExpiresAt on a free family is not premium. Trials are
+    // stored as tier "premium" by the subscription function.
+    if (subscriptionTier != SubscriptionTier.premium) return false;
+    // If there's a billing issue, premium stays active during the grace window.
+    if (billingIssueDetectedAt != null) {
+      return !isGracePeriodExpired;
     }
-    if (trialExpiresAt != null && trialExpiresAt!.isAfter(DateTime.now())) {
-      return true;
-    }
-    return false;
+    final expiry = subscriptionExpiresAt ?? trialExpiresAt;
+    return expiry == null || expiry.isAfter(DateTime.now());
   }
 
   /// True when a billing issue exists but the grace period hasn't expired yet.
@@ -173,6 +173,7 @@ class Family {
         'stats': stats.toMap(),
         'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
         'parentPinHash': parentPinHash,
+        'parentPinSet': parentPinSet,
         'subscriptionTier': subscriptionTier.name,
         'subscriptionExpiresAt': subscriptionExpiresAt == null
             ? null
@@ -197,6 +198,7 @@ class Family {
       stats: FamilyStats.fromMap(data['stats'] as Map<String, dynamic>?),
       createdAt: tsAsDate(data['createdAt']),
       parentPinHash: data['parentPinHash'] as String?,
+      parentPinSet: data['parentPinSet'] == true,
       subscriptionTier: _tierFromString(data['subscriptionTier'] as String?),
       subscriptionExpiresAt: tsAsDate(data['subscriptionExpiresAt']),
       trialExpiresAt: tsAsDate(data['trialExpiresAt']),
@@ -216,6 +218,7 @@ class Family {
     'stats': stats.toMap(),
     'createdAt': createdAt?.toIso8601String(),
     'parentPinHash': parentPinHash,
+    'parentPinSet': parentPinSet,
     'subscriptionTier': subscriptionTier.name,
     'subscriptionExpiresAt': subscriptionExpiresAt?.toIso8601String(),
     'trialExpiresAt': trialExpiresAt?.toIso8601String(),
@@ -236,6 +239,7 @@ class Family {
       stats: FamilyStats.fromMap(data['stats'] as Map<String, dynamic>?),
       createdAt: parseIsoDateTimeOrNull(data['createdAt']),
       parentPinHash: data['parentPinHash'] as String?,
+      parentPinSet: data['parentPinSet'] == true,
       subscriptionTier: _tierFromString(data['subscriptionTier'] as String?),
       subscriptionExpiresAt: parseIsoDateTimeOrNull(data['subscriptionExpiresAt']),
       trialExpiresAt: parseIsoDateTimeOrNull(data['trialExpiresAt']),

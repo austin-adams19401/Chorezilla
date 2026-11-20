@@ -1,8 +1,9 @@
+import 'package:chorezilla/services/backend_functions.dart';
 import 'package:chorezilla/services/purchase_service.dart';
 import 'package:chorezilla/state/app_state.dart';
 import 'package:chorezilla/themes/app_theme.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import 'package:chorezilla/services/analytics_service.dart';
@@ -99,7 +100,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
         });
         return;
       }
-      final info = await Purchases.purchasePackage(pkg);
+      // purchases_flutter 9+ returns PurchaseResult instead of CustomerInfo.
+      // The entitlement id is unchanged: "Chorezilla Unlimited".
+      final info = (await Purchases.purchase(PurchaseParams.package(pkg))).customerInfo;
 
       final hasPremium =
           info.entitlements.active.containsKey(kPremiumEntitlement);
@@ -108,34 +111,34 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
       final app = context.read<AppState>();
       final familyId = app.familyId;
+      var synced = false;
       if (familyId != null) {
-        final sub = subscriptionFromCustomerInfo(info);
-        await FirebaseFirestore.instance.doc('families/$familyId').set(
-          {
-            'subscriptionTier': sub.tier,
-            'subscriptionExpiresAt': sub.expiresAt == null
-                ? null
-                : Timestamp.fromDate(sub.expiresAt!),
-          },
-          SetOptions(merge: true),
-        );
+        try {
+          await BackendFunctions.refreshSubscription(familyId);
+          synced = true;
+        } catch (e) {
+          debugPrint('refreshSubscription after purchase: $e');
+        }
       }
 
       AnalyticsService.logPremiumPurchaseCompleted();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Welcome to Premium! 🎉'),
+          SnackBar(
+            content: Text(
+              synced
+                  ? 'Welcome to Premium! 🎉'
+                  : 'Purchase received. Premium unlocks when the store confirms it.',
+            ),
             backgroundColor: AppTheme.zillaGreen,
           ),
         );
         Navigator.of(context).pop(true);
       }
-    } on PurchasesErrorCode catch (e) {
-      if (e == PurchasesErrorCode.purchaseCancelledError) {
-        // User cancelled — do nothing.
-      } else {
-        setState(() => _error = e.toString());
+    } on PlatformException catch (e) {
+      final code = PurchasesErrorHelper.getErrorCode(e);
+      if (code != PurchasesErrorCode.purchaseCancelledError) {
+        setState(() => _error = e.message ?? 'Purchase could not be completed.');
       }
     } catch (e) {
       setState(() => _error = e.toString());
@@ -157,16 +160,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
         final app = context.read<AppState>();
         final familyId = app.familyId;
         if (familyId != null) {
-          final sub = subscriptionFromCustomerInfo(info);
-          await FirebaseFirestore.instance.doc('families/$familyId').set(
-            {
-              'subscriptionTier': sub.tier,
-              'subscriptionExpiresAt': sub.expiresAt == null
-                  ? null
-                  : Timestamp.fromDate(sub.expiresAt!),
-            },
-            SetOptions(merge: true),
-          );
+          try {
+            await BackendFunctions.refreshSubscription(familyId);
+          } catch (e) {
+            debugPrint('refreshSubscription after restore: $e');
+          }
         }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

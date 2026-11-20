@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:chorezilla/components/badge_unlock_dialog.dart';
 import 'package:chorezilla/components/leveling.dart';
@@ -912,44 +911,26 @@ class _KidDashboardPageState extends State<KidDashboardPage>
     CosmeticItem? grantedCosmetic;
 
     if (!simulate) {
-      app.updateMember(member.id, {'level': info.level});
+      await app.updateMember(member.id, {'level': info.level});
 
-      // Award the level title (add to owned cosmetics if not already there).
+      // Award the level title (titles are the only cosmetics clients may add).
       if (lvlTitle != null &&
           !member.ownedCosmetics.contains(lvlTitle.id)) {
         final updatedOwned = [...member.ownedCosmetics, lvlTitle.id];
-        app.updateMember(member.id, {'ownedCosmetics': updatedOwned});
+        await app.updateMember(member.id, {'ownedCosmetics': updatedOwned});
       }
 
-      // Auto-grant in-game cosmetic if the level reward has one.
-      // If the kid already owns it, fall back to a random unowned cosmetic
-      // of the same type.
-      final cosId = lvlReward?.cosmeticId;
-      if (cosId != null) {
-        String grantId = cosId;
-        if (member.ownedCosmetics.contains(cosId)) {
-          final original = CosmeticCatalog.items
-              .where((c) => c.id == cosId)
-              .firstOrNull;
-          if (original != null) {
-            final pool = CosmeticCatalog.items
-                .where((c) =>
-                    c.type == original.type &&
-                    !member.ownedCosmetics.contains(c.id))
-                .toList();
-            grantId = pool.isNotEmpty
-                ? pool[Random().nextInt(pool.length)].id
-                : '';
-          } else {
-            grantId = '';
+      // Paid cosmetics are granted by the server so the client cannot pick them.
+      if (lvlReward?.cosmeticId != null) {
+        try {
+          final grantId = await app.grantLevelCosmetic(member.id, info.level);
+          if (grantId != null) {
+            grantedCosmetic = CosmeticCatalog.items
+                .where((c) => c.id == grantId)
+                .firstOrNull;
           }
-        }
-        if (grantId.isNotEmpty) {
-          grantedCosmetic = CosmeticCatalog.items
-              .where((c) => c.id == grantId)
-              .firstOrNull;
-          final updatedOwned = [...member.ownedCosmetics, grantId];
-          app.updateMember(member.id, {'ownedCosmetics': updatedOwned});
+        } catch (e) {
+          debugPrint('grantLevelCosmetic failed: $e');
         }
       }
 
