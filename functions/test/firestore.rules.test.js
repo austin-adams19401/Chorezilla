@@ -108,6 +108,7 @@ test("a kid cannot rename or deactivate another profile", async () => {
   const kid = dbFor("kid");
   await assertFails(updateDoc(doc(kid, "families/fam1/members/kid2"), {active: false}));
   await assertFails(updateDoc(doc(kid, "families/fam1/members/kid2"), {displayName: "Hacked"}));
+  await assertFails(updateDoc(doc(kid, "families/fam1/members/kid2"), {nickname: "Hacked"}));
   await assertSucceeds(updateDoc(doc(dbFor("owner"), "families/fam1/members/kid2"), {
     displayName: "Renamed",
   }));

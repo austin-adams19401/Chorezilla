@@ -104,13 +104,29 @@ function register(exportsObj, {functions, admin, db}) {
    * @param {string} familyId
    * @param {string} key
    */
-  async function assertNotLocked(familyId, key) {
-    const snap = await securityRef(familyId).get();
-    const attempts = (snap.exists && snap.data().attempts) || {};
-    const state = pins.attemptState(attempts[key], Date.now());
-    if (state.locked) {
-      fail("resource-exhausted", "Too many PIN attempts. Try again in 15 minutes.");
-    }
+  /**
+   * Count one guess before the slow PIN check so parallel calls cannot all
+   * pass the lockout read.
+   * @param {string} familyId
+   * @param {string} key
+   */
+  async function reserveAttempt(familyId, key) {
+    const ref = securityRef(familyId);
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const data = snap.exists ? (snap.data() || {}) : {};
+      const attempts = Object.assign({}, data.attempts || {});
+      const now = Date.now();
+      const state = pins.attemptState(attempts[key], now);
+      if (state.locked) {
+        fail("resource-exhausted", "Too many PIN attempts. Try again in 15 minutes.");
+      }
+      attempts[key] = {
+        count: state.count + 1,
+        windowStartMs: state.windowStartMs,
+      };
+      tx.set(ref, {attempts}, {merge: true});
+    });
   }
 
   /**
@@ -297,7 +313,7 @@ function register(exportsObj, {functions, admin, db}) {
         await assertMember(uid, familyId);
         if (!pins.isValidPin(pin)) return {ok: false};
         const key = `${familyId}:parent`;
-        await assertNotLocked(familyId, key);
+        await reserveAttempt(familyId, key);
         const secSnap = await securityRef(familyId).get();
         const sec = secSnap.exists ? (secSnap.data() || {}) : {};
         const famSnap = await db.collection("families").doc(familyId).get();
@@ -306,7 +322,7 @@ function register(exportsObj, {functions, admin, db}) {
         if (sec.parentPin) ok = pins.verifyPinRecord(pin, sec.parentPin);
         else if (sec.parentLegacy) ok = pins.verifyLegacy(familyId, pin, sec.parentLegacy);
         else ok = pins.verifyLegacy(familyId, pin, fam.parentPinHash);
-        await recordAttempt(familyId, key, ok);
+        if (ok) await recordAttempt(familyId, key, true);
         if (ok && !sec.parentPin) {
           await securityRef(familyId).set({
             parentPin: pins.createPinRecord(pin),
@@ -372,8 +388,10 @@ function register(exportsObj, {functions, admin, db}) {
         const pin = data && data.pin ? String(data.pin).trim() : "";
         await assertMember(uid, familyId);
         if (!memberId || !pins.isValidPin(pin)) return {ok: false};
+        const parentKey = `${familyId}:parent`;
         const key = `${familyId}:${memberId}:pin`;
-        await assertNotLocked(familyId, key);
+        await reserveAttempt(familyId, parentKey);
+        await reserveAttempt(familyId, key);
         const secSnap = await securityRef(familyId).get();
         const sec = secSnap.exists ? (secSnap.data() || {}) : {};
         let parentOk = false;
@@ -384,6 +402,7 @@ function register(exportsObj, {functions, admin, db}) {
           parentOk = pins.verifyLegacy(familyId, pin, (famSnap.data() || {}).parentPinHash);
         }
         if (parentOk) {
+          await recordAttempt(familyId, parentKey, true);
           await recordAttempt(familyId, key, true);
           return {ok: true, via: "parent"};
         }
@@ -397,7 +416,10 @@ function register(exportsObj, {functions, admin, db}) {
               .collection("members").doc(memberId).get();
           kidOk = pins.verifyLegacy(familyId, pin, (memSnap.data() || {}).pinHash);
         }
-        await recordAttempt(familyId, key, kidOk);
+        if (kidOk) {
+          await recordAttempt(familyId, parentKey, true);
+          await recordAttempt(familyId, key, true);
+        }
         if (kidOk && !kidPins[memberId]) {
           await securityRef(familyId).set({
             [`kidPins.${memberId}`]: pins.createPinRecord(pin),
@@ -723,6 +745,7 @@ function register(exportsObj, {functions, admin, db}) {
       });
 
   exportsObj.backfillLegacyPins = functions
+      .runWith({timeoutSeconds: 540})
       .region("us-central1")
       .pubsub.schedule("every 60 minutes")
       .onRun(async () => {
@@ -761,15 +784,22 @@ function register(exportsObj, {functions, admin, db}) {
             }
           }
           cursor = snap.docs[snap.docs.length - 1];
-          if (snap.size < 50) {
+          const pageDone = snap.size < 50;
+          await stateRef.set({
+            cursor: pageDone ? null : cursor.id,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+          if (pageDone) {
             finished = true;
             break;
           }
         }
-        await stateRef.set({
-          cursor: finished || !cursor ? null : cursor.id,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
+        if (!finished && cursor) {
+          await stateRef.set({
+            cursor: cursor.id,
+            updatedAt: FieldValue.serverTimestamp(),
+          });
+        }
         return null;
       });
 

@@ -193,8 +193,9 @@ service cloud.firestore {
           same('active')
           && same('fcmTokens')
           && same('notificationsEnabled')
-          && same('displayName')
+          &&           same('displayName')
           && same('name')
+          && same('nickname')
         );
     }
 
