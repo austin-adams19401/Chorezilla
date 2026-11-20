@@ -94,6 +94,25 @@ test("the owner can read the family and cannot write subscription fields", async
   await assertFails(updateDoc(doc(db, "families/fam1"), {parentPinHash: "abc"}));
 });
 
+test("a kid cannot rename or deactivate another profile", async () => {
+  await seed();
+  await testEnv.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore();
+    await setDoc(doc(db, "families/fam1/members/kid2"), {
+      displayName: "Other",
+      role: "child",
+      active: true,
+      coins: 0,
+    });
+  });
+  const kid = dbFor("kid");
+  await assertFails(updateDoc(doc(kid, "families/fam1/members/kid2"), {active: false}));
+  await assertFails(updateDoc(doc(kid, "families/fam1/members/kid2"), {displayName: "Hacked"}));
+  await assertSucceeds(updateDoc(doc(dbFor("owner"), "families/fam1/members/kid2"), {
+    displayName: "Renamed",
+  }));
+});
+
 test("a linked kid can update coins but not cosmetics or the pin hash", async () => {
   await seed();
   const db = dbFor("kid");

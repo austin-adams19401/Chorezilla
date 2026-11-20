@@ -186,6 +186,18 @@ service cloud.firestore {
         && cosmeticsOk();
     }
 
+    function memberProfileFieldsOk(familyId) {
+      return isParent(familyId)
+        || resource.data.get('userUid', '') == uid()
+        || (
+          same('active')
+          && same('fcmTokens')
+          && same('notificationsEnabled')
+          && same('displayName')
+          && same('name')
+        );
+    }
+
     match /users/{userId} {
       allow read: if signedIn() && uid() == userId;
       allow create: if signedIn() && uid() == userId
@@ -229,7 +241,9 @@ service cloud.firestore {
             && request.resource.data.role == 'child'
           )
         );
-        allow update: if isFamilyMember(familyId) && memberSecretsOkOnUpdate();
+        allow update: if isFamilyMember(familyId)
+          && memberSecretsOkOnUpdate()
+          && memberProfileFieldsOk(familyId);
         allow delete: if isParent(familyId);
       }
 

@@ -296,7 +296,7 @@ function register(exportsObj, {functions, admin, db}) {
         const pin = data && data.pin ? String(data.pin).trim() : "";
         await assertMember(uid, familyId);
         if (!pins.isValidPin(pin)) return {ok: false};
-        const key = `${uid}:pin`;
+        const key = `${familyId}:parent`;
         await assertNotLocked(familyId, key);
         const secSnap = await securityRef(familyId).get();
         const sec = secSnap.exists ? (secSnap.data() || {}) : {};
@@ -372,7 +372,7 @@ function register(exportsObj, {functions, admin, db}) {
         const pin = data && data.pin ? String(data.pin).trim() : "";
         await assertMember(uid, familyId);
         if (!memberId || !pins.isValidPin(pin)) return {ok: false};
-        const key = `${uid}:pin`;
+        const key = `${familyId}:${memberId}:pin`;
         await assertNotLocked(familyId, key);
         const secSnap = await securityRef(familyId).get();
         const sec = secSnap.exists ? (secSnap.data() || {}) : {};
@@ -726,14 +726,25 @@ function register(exportsObj, {functions, admin, db}) {
       .region("us-central1")
       .pubsub.schedule("every 60 minutes")
       .onRun(async () => {
+        const stateRef = db.collection("_ops").doc("pinBackfill");
+        const stateSnap = await stateRef.get();
+        const savedId = stateSnap.exists ? stateSnap.data().cursor : null;
         let cursor = null;
-        for (let page = 0; page < 20; page++) {
+        if (savedId) {
+          const saved = await db.collection("families").doc(savedId).get();
+          if (saved.exists) cursor = saved;
+        }
+        let finished = false;
+        for (let page = 0; page < 200; page++) {
           let query = db.collection("families")
               .orderBy(admin.firestore.FieldPath.documentId())
               .limit(50);
           if (cursor) query = query.startAfter(cursor);
           const snap = await query.get();
-          if (snap.empty) break;
+          if (snap.empty) {
+            finished = true;
+            break;
+          }
           for (const fam of snap.docs) {
             await migrateFamilyPin(fam.id, fam.data() || {});
             const members = await fam.ref.collection("members").get();
@@ -750,8 +761,15 @@ function register(exportsObj, {functions, admin, db}) {
             }
           }
           cursor = snap.docs[snap.docs.length - 1];
-          if (snap.size < 50) break;
+          if (snap.size < 50) {
+            finished = true;
+            break;
+          }
         }
+        await stateRef.set({
+          cursor: finished || !cursor ? null : cursor.id,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
         return null;
       });
 
