@@ -416,10 +416,7 @@ function register(exportsObj, {functions, admin, db}) {
               .collection("members").doc(memberId).get();
           kidOk = pins.verifyLegacy(familyId, pin, (memSnap.data() || {}).pinHash);
         }
-        if (kidOk) {
-          await recordAttempt(familyId, parentKey, true);
-          await recordAttempt(familyId, key, true);
-        }
+        if (kidOk) await recordAttempt(familyId, key, true);
         if (kidOk && !kidPins[memberId]) {
           await securityRef(familyId).set({
             [`kidPins.${memberId}`]: pins.createPinRecord(pin),
@@ -765,6 +762,10 @@ function register(exportsObj, {functions, admin, db}) {
           if (cursor) query = query.startAfter(cursor);
           const snap = await query.get();
           if (snap.empty) {
+            await stateRef.set({
+              cursor: null,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
             finished = true;
             break;
           }
